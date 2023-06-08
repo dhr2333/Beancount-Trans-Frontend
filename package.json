@@ -10,8 +10,9 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "element-plus": "^2.3.5",
-    "vue": "^3.3.4",
+    "axios": "^1.4.0",
+    "element-plus": "^2.3.6",
+    "vue": "^3.2.36",
     "vue-router": "^4.0.13"
   },
   "devDependencies": {

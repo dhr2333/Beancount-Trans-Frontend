@@ -40,4 +40,3 @@ npm run dev
 ### Custom theme
 
 See `src/styles/element/index.scss`.
-# Beancount-Trans-Frontend
