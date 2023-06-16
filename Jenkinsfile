@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    tools {
+        nodejs "NodeJs 20.3.0"
+    }
+
     stages {
         stage('Clone') {
             steps {
@@ -9,9 +13,6 @@ pipeline {
         }
         stage('Src Build'){
             steps {
-                nodejs('NodeJs 20.3.0') {
-                    // some block
-                }
                 sh '''PACKAGE=\'beancount-trans-vue.tar.gz\'
 node -v
 npm -v
