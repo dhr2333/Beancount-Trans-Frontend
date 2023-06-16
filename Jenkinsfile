@@ -14,35 +14,30 @@ pipeline {
         stage('Src Build'){
             steps {
                 sh '''PACKAGE=\'beancount-trans-vue.tar.gz\'
-node -v
-npm -v
 npm install
 npm run build
-cd dist
-rm -rf $PACKAGE
-tar zcvf $PACKAGE	*
-cd ..'''
+'''
             }
         }
         stage('Build Image and Push') {
             steps {
-                sshPublisher(publishers: [sshPublisherDesc(configName: 'dhr2333', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: '''PACKAGE=\'beancount-trans-vue.tar.gz\'
-IMAGE_NAME=\'harbor.dhr2333.cn:8080/library/beancount-trans:20230614\'
+//                 sshPublisher(publishers: [sshPublisherDesc(configName: 'dhr2333', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: '''PACKAGE=\'beancount-trans-vue.tar.gz\'
+// IMAGE_NAME=\'harbor.dhr2333.cn:8080/library/beancount-trans-frontend:latest\'
 
-rm /usr/local/daihaorui/jenkins/Beancount-Trans-Frontend/dist/*
-mv /usr/local/daihaorui/jenkins/Beancount-Trans-Fronten/beancount-trans-vue.tar.gz /usr/local/daihaorui/jenkins/Beancount-Trans-Frontend/dist/
-cd /usr/local/daihaorui/jenkins/Beancount-Trans-Frontend/dist/
-tar zxvf $PACKAGE
-rm -rf $PACKAGE
-cd ..
-docker build -t $IMAGE_NAME .
-# docker push $IMAGE_NAME''', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '/Beancount-Trans-Fronten', remoteDirectorySDF: false, removePrefix: 'dist/', sourceFiles: 'dist/beancount-trans-vue.tar.gz')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: true)])
-                // script {
-                //     docker.withRegistry('http://127.0.0.1:8080', 'a4a1bb2f-ee2a-4476-bc0f-f0b8df584cd1') {
-                //         def customImage = docker.build("127.0.0.1:8080/library/beancount-trans-frontend:latest")
-                //         customImage.push()
-                //     }
-                // }
+// rm /usr/local/daihaorui/jenkins/Beancount-Trans-Frontend/dist/*
+// mv /usr/local/daihaorui/jenkins/Beancount-Trans-Fronten/beancount-trans-vue.tar.gz /usr/local/daihaorui/jenkins/Beancount-Trans-Frontend/dist/
+// cd /usr/local/daihaorui/jenkins/Beancount-Trans-Frontend/dist/
+// tar zxvf $PACKAGE
+// rm -rf $PACKAGE
+// cd ..
+// docker build -t $IMAGE_NAME .
+// # docker push $IMAGE_NAME''', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '/Beancount-Trans-Fronten', remoteDirectorySDF: false, removePrefix: 'dist/', sourceFiles: 'dist/beancount-trans-vue.tar.gz')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: true)])
+                script {
+                    docker.withRegistry('http://127.0.0.1:8080', 'a4a1bb2f-ee2a-4476-bc0f-f0b8df584cd1') {
+                        def customImage = docker.build("127.0.0.1:8080/library/beancount-trans-frontend:latest")
+                        customImage.push()
+                    }
+                }
             }
         }
         stage('Pull Image') {
