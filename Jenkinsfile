@@ -33,7 +33,7 @@ npm run build
 // docker build -t $IMAGE_NAME .
 // # docker push $IMAGE_NAME''', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '/Beancount-Trans-Fronten', remoteDirectorySDF: false, removePrefix: 'dist/', sourceFiles: 'dist/beancount-trans-vue.tar.gz')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: true)])
                 script {
-                    docker.withRegistry('http://127.0.0.1:8080', 'a4a1bb2f-ee2a-4476-bc0f-f0b8df584cd1') {
+                    docker.withRegistry('http://harbor.dhr2333.cn:8080', 'a4a1bb2f-ee2a-4476-bc0f-f0b8df584cd1') {
                         def customImage = docker.build("127.0.0.1:8080/library/beancount-trans-frontend:latest")
                         customImage.push()
                     }
