@@ -18,6 +18,7 @@ import "uno.css";
 import "element-plus/theme-chalk/src/message.scss";
 
 const app = createApp(App);
+// app.config.globalProperties.$baseUrl = 'http://127.0.0.1:38001'
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
