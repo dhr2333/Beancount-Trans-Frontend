@@ -1,7 +1,8 @@
 <template>
   <el-table :data="filterExpenseData" style="width: 98%">
-    <el-table-column label="编号" prop="id" />
+    <!-- <el-table-column label="编号" prop="id" /> -->
     <el-table-column label="关键字" prop="key" />
+    <el-table-column label="优先级" prop="payee_order" />
     <el-table-column label="商家" prop="payee" />
     <el-table-column label="映射账户" prop="expend" />
     <el-table-column label="标签" prop="tag" />
@@ -21,25 +22,27 @@
     </el-table-column>
   </el-table>
   <el-dialog v-model="dialogAdd" title="新增映射" width="30%">
-    <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="120px" class="demo-ruleForm" :size="formSize"
-      status-icon>
+    <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="120px" class="demo-ruleForm" status-icon>
       <el-form-item label="关键字" prop="key">
-        <el-input v-model="ruleForm.key" placeholder="古茗" />
+        <el-input v-model="ruleForm.key" placeholder="王者荣耀" />
+      </el-form-item>
+      <el-form-item label="优先级" prop="payee_order">
+        <el-input v-model="ruleForm.payee_order" placeholder="100" />
       </el-form-item>
       <el-form-item label="商家" prop="payee">
-        <el-input v-model="ruleForm.payee" placeholder="古茗" />
+        <el-input v-model="ruleForm.payee" placeholder="腾讯" />
       </el-form-item>
       <el-form-item label="映射账户" prop="expend">
-        <el-input v-model="ruleForm.expend" placeholder="Expenses:Food:DrinkFruit" />
+        <el-input v-model="ruleForm.expend" placeholder="Expenses:Culture:Entertainment" />
       </el-form-item>
       <el-form-item label="标签" prop="tag">
-        <el-input v-model="ruleForm.tag" placeholder="饮料水果" />
+        <el-input v-model="ruleForm.tag" placeholder="影音娱乐" />
       </el-form-item>
       <!-- <el-form-item label="类型" prop="classification">
         <el-select-v2 v-model="ruleForm.classification" placeholder="餐饮美食/饮料水果" :options="options" />
       </el-form-item> -->
       <el-form-item label="类型" prop="classification">
-        <el-input v-model="ruleForm.classification" placeholder="餐饮美食/饮料水果" />
+        <el-input v-model="ruleForm.classification" placeholder="文化休闲/影音娱乐" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
@@ -48,26 +51,28 @@
     </el-form>
   </el-dialog>
   <el-dialog v-model="dialogEdit" title="修改映射" width="30%">
-    <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="120px" class="demo-ruleForm" :size="formSize"
-      status-icon>
+    <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="120px" class="demo-ruleForm" status-icon>
       <el-form-item label="关键字" prop="key">
-        <el-input v-model="ruleForm.key" placeholder="古茗" />
+        <el-input v-model="ruleForm.key" />
+      </el-form-item>
+      <el-form-item label="优先级" prop="payee_order">
+        <el-input v-model="ruleForm.payee_order" />
       </el-form-item>
       <el-form-item label="商家" prop="payee">
-        <el-input v-model="ruleForm.payee" placeholder="古茗" />
+        <el-input v-model="ruleForm.payee" />
       </el-form-item>
       <el-form-item label="映射账户" prop="expend">
-        <el-input v-model="ruleForm.expend" placeholder="Expenses:Food:DrinkFruit" />
+        <el-input v-model="ruleForm.expend" />
       </el-form-item>
       <el-form-item label="标签" prop="tag">
-        <el-input v-model="ruleForm.tag" placeholder="饮料水果" />
+        <el-input v-model="ruleForm.tag" />
       </el-form-item>
       <el-form-item label="类型" prop="classification">
-        <el-input v-model="ruleForm.classification" placeholder="餐饮美食/饮料水果" />
+        <el-input v-model="ruleForm.classification" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="editForm(ruleFormRef)">保存</el-button>
-        <el-button @click="resetForm(ruleFormRef)">重置</el-button>
+        <el-button @click="dialogEdit = false">取消</el-button>
       </el-form-item>
     </el-form>
   </el-dialog>
@@ -82,17 +87,24 @@
       </span>
     </template>
   </el-dialog>
+  <el-dialog v-model="dialogError" title="操作失败" width="30%">
+    <el-icon>
+      <WarningFilled />
+    </el-icon><span>该关键字已存在</span>
+  </el-dialog>
 </template>
 
 <script lang="ts" setup>
 import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import axios from 'axios'
+const dialogError = ref(false)
 
 interface Expense {
   id: number
   key: string
   payee: string
+  payee_order: number
   expend: string
   tag: string
   classification: string
@@ -128,7 +140,6 @@ const filterExpenseData = computed(() =>
 
 // 新增
 const dialogAdd = ref(false)
-const formSize = ref('default')
 
 const handleAdd = () => {
   dialogAdd.value = true
@@ -138,6 +149,7 @@ const ruleFormRef = ref<FormInstance>()
 const ruleForm = ref({
   key: '',
   payee: '' || null,
+  payee_order: '',
   expend: '',
   tag: '',
   classification: '',
@@ -149,6 +161,9 @@ const rules = ref<FormRules>({
     { max: 16, message: '长度应控制在16个字符以内', trigger: 'blur' },
   ],
   payee: [
+    { required: false, message: '', trigger: 'change', },
+  ],
+  payee_order: [
     { required: false, message: '', trigger: 'change', },
   ],
   expend: [
@@ -171,14 +186,22 @@ const resetForm = (formEl: FormInstance | undefined) => {
   formEl.resetFields()
 }
 
+
 // 新增确认
 const submitForm = async (formEl: FormInstance | undefined) => {
   if (!formEl) return
   await formEl.validate((valid, fields) => {
     if (valid) {
       try {
-        const response = axios.post('http://127.0.0.1:8002/translate/map/expense', ruleForm.value);
-        console.log(response);
+        axios.post('http://127.0.0.1:8002/translate/map/expense', ruleForm.value)
+          .then(response => {
+            console.log(response.data);
+          })
+          .catch(error => {
+            dialogError.value = true
+            console.log('该关键字已存在')
+            console.error(error)
+          })
         dialogAdd.value = false
       } catch (error) {
         console.log(error);
@@ -193,6 +216,12 @@ const submitForm = async (formEl: FormInstance | undefined) => {
 const dialogEdit = ref(false)
 
 const handleEdit = (index: number, row: Expense) => {
+  ruleForm.value.key = row.key
+  ruleForm.value.payee_order = row.payee_order
+  ruleForm.value.payee = row.payee
+  ruleForm.value.expend = row.expend
+  ruleForm.value.tag = row.tag
+  ruleForm.value.classification = row.classification
   dialogEdit.value = true
   selectedId.value = row.id
   console.log(index, row)
@@ -203,8 +232,15 @@ const editForm = async (formEl: FormInstance | undefined) => {
   await formEl.validate((valid, fields) => {
     if (valid) {
       try {
-        const response = axios.put(`http://127.0.0.1:8002/translate/map/expense/${selectedId.value}`, ruleForm.value);
-        console.log(response);
+        axios.put(`http://127.0.0.1:8002/translate/map/expense/${selectedId.value}`, ruleForm.value)
+          .then(response => {
+            console.log(response.data);
+          })
+          .catch(error => {
+            dialogError.value = true
+            console.log('该关键字已存在')
+            console.error(error)
+          })
         dialogEdit.value = false
       } catch (error) {
         console.log(error);
