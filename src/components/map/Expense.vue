@@ -110,18 +110,21 @@ interface Expense {
   classification: string
 }
 
+const base_url = "http://127.0.0.1:8002/"
 // 页面获取数据
 const expenseData = ref<Expense[]>([])
 const fetchData = async () => {
   try {
-    // const response = await axios.get('http://127.0.0.1:38001/api/translate/map/expense')
-    const response = await axios.get('http://127.0.0.1:38001/api/translate/map/expense')
+    // const response = await axios.get('http://127.0.0.1:8002/translate/map/expense')
+    const response = await axios.get(base_url + 'translate/map/expense')
+    // const responseData = response.data
     expenseData.value = response.data
     console.log(expenseData.value);
   } catch (error) {
     console.error(error)
   }
 }
+
 
 // 页面数据获取(组件挂载)
 onMounted(() => {
@@ -194,7 +197,8 @@ const submitForm = async (formEl: FormInstance | undefined) => {
   await formEl.validate((valid, fields) => {
     if (valid) {
       try {
-        axios.post('http://127.0.0.1:38001/api/translate/map/expense', ruleForm.value)
+        // axios.post('http://127.0.0.1:38001/api/translate/map/expense', ruleForm.value)
+        axios.post(base_url + 'translate/map/expense', ruleForm.value)
           .then(response => {
             console.log(response.data);
           })
@@ -233,7 +237,8 @@ const editForm = async (formEl: FormInstance | undefined) => {
   await formEl.validate((valid, fields) => {
     if (valid) {
       try {
-        axios.put(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`, ruleForm.value)
+        // axios.put(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`, ruleForm.value)
+        axios.put(base_url + `translate/map/expense/${selectedId.value}`, ruleForm.value)
           .then(response => {
             console.log(response.data);
           })
@@ -265,10 +270,12 @@ const handleDelete = (index: number, row: Expense) => {
 // 删除确认
 const confirmDelete = async () => {
   try {
-    const response = await axios.delete(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`);
+    // const response = await axios.delete(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`);
+    const response = await axios.delete(base_url + `translate/map/expense/${selectedId.value}`);
     console.log(response.data);
     dialogDel.value = false
-    const get = await axios.get('http://127.0.0.1:38001/api/translate/map/expense')
+    // const get = await axios.get('http://127.0.0.1:38001/api/translate/map/expense')
+    const get = await axios.get(base_url + 'translate/map/expense')
     expenseData.value = get.data
   } catch (error) {
     console.error(error);
