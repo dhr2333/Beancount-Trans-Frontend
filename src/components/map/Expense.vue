@@ -198,7 +198,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
     if (valid) {
       try {
         // axios.post('http://127.0.0.1:38001/api/translate/map/expense', ruleForm.value)
-        axios.post(base_url + 'translate/map/expense', ruleForm.value)
+        axios.post(base_url + 'translate/map/expense', ruleForm.value + '/')
           .then(response => {
             console.log(response.data);
           })
@@ -238,7 +238,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
     if (valid) {
       try {
         // axios.put(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`, ruleForm.value)
-        axios.put(base_url + `translate/map/expense/${selectedId.value}`, ruleForm.value)
+        axios.put(base_url + `translate/map/expense/${selectedId.value}/`, ruleForm.value)
           .then(response => {
             console.log(response.data);
           })
@@ -271,7 +271,7 @@ const handleDelete = (index: number, row: Expense) => {
 const confirmDelete = async () => {
   try {
     // const response = await axios.delete(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`);
-    const response = await axios.delete(base_url + `translate/map/expense/${selectedId.value}`);
+    const response = await axios.delete(base_url + `translate/map/expense/${selectedId.value}/`);
     console.log(response.data);
     dialogDel.value = false
     // const get = await axios.get('http://127.0.0.1:38001/api/translate/map/expense')

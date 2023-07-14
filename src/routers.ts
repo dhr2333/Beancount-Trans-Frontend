@@ -10,6 +10,7 @@ import Event from "./components/bill/Event.vue"
 import Commodity from "./components/bill/Commodity.vue"
 import Account from "./components/assets/Account.vue"
 import Home from "./components/HelloWorld.vue"
+import Login from "./views/login/index.vue"
 // import News from "./components/Test_News.vue"
 // import User from "./components/Test_User.vue"
 // import NewsContent from "./components/Test_NewsContent.vue"
@@ -28,7 +29,8 @@ const router = createRouter({
     { path: '/map/test',name:"test", component: Test },
     { path: '/bill/event',name:"event", component: Event },
     { path: '/bill/commodity',name:"commodity", component: Commodity },
-    { path: '/assets/account',name:"account", component: Account },
+    { path: '/assets/account', name: "account", component: Account },
+    { path: '/login', name: "login", component: Login },
     // { path: '/user', component: User },
     // { path: '/newscontent/:aid', component: NewsContent },
   ]
