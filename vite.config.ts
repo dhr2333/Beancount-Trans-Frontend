@@ -14,6 +14,10 @@ import {
   transformerVariantGroup,
 } from 'unocss'
 
+function resolve(dir) {
+  return path.join(__dirname, dir)
+}
+
 const pathSrc = path.resolve(__dirname, 'src')
 
 // https://vitejs.dev/config/
@@ -21,6 +25,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '~/': `${pathSrc}/`,
+      '@': resolve('src')
     },
   },
   css: {

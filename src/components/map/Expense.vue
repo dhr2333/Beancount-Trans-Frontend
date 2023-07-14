@@ -97,7 +97,8 @@
 <script lang="ts" setup>
 import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import axios from 'axios'
+// import axios from 'axios'
+import axios from '../../utils/request'
 const dialogError = ref(false)
 
 interface Expense {
@@ -110,14 +111,16 @@ interface Expense {
   classification: string
 }
 
-const base_url = "http://127.0.0.1:8002/"
+// const base_url = "http://127.0.0.1:38000/api/"
+const base_url = "http://localhost:8002/"
 // 页面获取数据
 const expenseData = ref<Expense[]>([])
 const fetchData = async () => {
   try {
     // const response = await axios.get('http://127.0.0.1:8002/translate/map/expense')
-    const response = await axios.get(base_url + 'translate/map/expense')
-    // const responseData = response.data
+    // const response = await axios.get(base_url + 'translate/map/expense/')
+    const response = await axios.get('translate/map/expense/')
+    // const response = await $http.get()
     expenseData.value = response.data
     console.log(expenseData.value);
   } catch (error) {
@@ -197,14 +200,18 @@ const submitForm = async (formEl: FormInstance | undefined) => {
   await formEl.validate((valid, fields) => {
     if (valid) {
       try {
-        // axios.post('http://127.0.0.1:38001/api/translate/map/expense', ruleForm.value)
-        axios.post(base_url + 'translate/map/expense', ruleForm.value)
+        axios({
+          url: 'translate/map/expense/',
+          data: JSON.parse(JSON.stringify(ruleForm.value)),
+          method: "POST",
+          header: { 'Content-Type': 'application/json' }
+        })
+          // axios.post('http://127.0.0.1:8002/translate/map/expense/', ruleForm.value + '/')
           .then(response => {
             console.log(response.data);
           })
           .catch(error => {
             dialogError.value = true
-            console.log('该关键字已存在')
             console.error(error)
           })
         dialogAdd.value = false
@@ -238,13 +245,18 @@ const editForm = async (formEl: FormInstance | undefined) => {
     if (valid) {
       try {
         // axios.put(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`, ruleForm.value)
-        axios.put(base_url + `translate/map/expense/${selectedId.value}`, ruleForm.value)
+        // axios.put(base_url + `translate/map/expense/${selectedId.value}/`, ruleForm.value + '/')
+        axios({
+          url: `translate/map/expense/${selectedId.value}/`,
+          data: JSON.parse(JSON.stringify(ruleForm.value)),
+          method: "PUT",
+          header: { 'Content-Type': 'application/json' }
+        })
           .then(response => {
             console.log(response.data);
           })
           .catch(error => {
             dialogError.value = true
-            console.log('该关键字已存在')
             console.error(error)
           })
         dialogEdit.value = false
@@ -271,11 +283,11 @@ const handleDelete = (index: number, row: Expense) => {
 const confirmDelete = async () => {
   try {
     // const response = await axios.delete(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`);
-    const response = await axios.delete(base_url + `translate/map/expense/${selectedId.value}`);
+    const response = await axios.delete(`translate/map/expense/${selectedId.value}/`);
     console.log(response.data);
     dialogDel.value = false
     // const get = await axios.get('http://127.0.0.1:38001/api/translate/map/expense')
-    const get = await axios.get(base_url + 'translate/map/expense')
+    const get = await axios.get('translate/map/expense')
     expenseData.value = get.data
   } catch (error) {
     console.error(error);
