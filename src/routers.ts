@@ -1,15 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 // 引入组件
+// import Test from "./components/layouts/Test.vue"
 import Trans from "./components/trans/Trans.vue"
 import Income from "./components/map/Income.vue"
 import Expense from "./components/map/Expense.vue"
 import Payee from "./components/map/Payee.vue"
-import Test from "./components/map/Test.vue"
 import Event from "./components/bill/Event.vue"
 import Commodity from "./components/bill/Commodity.vue"
 import Account from "./components/assets/Account.vue"
-import Home from "./components/HelloWorld.vue"
+// import Home from "./components/HelloWorld.vue"
 import Login from "./views/login/index.vue"
 // import News from "./components/Test_News.vue"
 // import User from "./components/Test_User.vue"
@@ -22,11 +22,11 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     // { path: '/', name:"home",component: Home },
+    // { path: '/test',name:"test", component: Test },
     { path: '/trans',name:"trans", component: Trans },
     { path: '/map/income',name:"income", component: Income },
     { path: '/map/expense',name:"expense", component: Expense },
     { path: '/map/payee',name:"payee", component: Payee },
-    { path: '/map/test',name:"test", component: Test },
     { path: '/bill/event',name:"event", component: Event },
     { path: '/bill/commodity',name:"commodity", component: Commodity },
     { path: '/assets/account', name: "account", component: Account },

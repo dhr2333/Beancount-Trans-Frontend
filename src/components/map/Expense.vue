@@ -104,7 +104,7 @@ const dialogError = ref(false)
 interface Expense {
   id: number
   key: string
-  payee: string
+  payee?: string | null | undefined
   payee_order: number
   expend: string
   tag: string
@@ -112,17 +112,16 @@ interface Expense {
 }
 
 // const base_url = "http://127.0.0.1:38000/api/"
-const base_url = "http://localhost:8002/"
 // 页面获取数据
 const expenseData = ref<Expense[]>([])
+console.log(expenseData.value);
+
 const fetchData = async () => {
   try {
-    // const response = await axios.get('http://127.0.0.1:8002/translate/map/expense')
-    // const response = await axios.get(base_url + 'translate/map/expense/')
-    const response = await axios.get('translate/map/expense/')
-    // const response = await $http.get()
+    const response = await axios.get('expense/')
     expenseData.value = response.data
     console.log(expenseData.value);
+
   } catch (error) {
     console.error(error)
   }
@@ -155,8 +154,8 @@ const handleAdd = () => {
 const ruleFormRef = ref<FormInstance>()
 const ruleForm = ref({
   key: '',
-  payee: '' || null,
-  payee_order: '',
+  payee: null,
+  payee_order: 0,
   expend: '',
   tag: '',
   classification: '',
@@ -201,10 +200,10 @@ const submitForm = async (formEl: FormInstance | undefined) => {
     if (valid) {
       try {
         axios({
-          url: 'translate/map/expense/',
+          url: 'expense/',
           data: JSON.parse(JSON.stringify(ruleForm.value)),
           method: "POST",
-          header: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' }
         })
           // axios.post('http://127.0.0.1:8002/translate/map/expense/', ruleForm.value + '/')
           .then(response => {
@@ -229,14 +228,15 @@ const dialogEdit = ref(false)
 
 const handleEdit = (index: number, row: Expense) => {
   ruleForm.value.key = row.key
+  ruleForm.value.payee = row.payee as null
   ruleForm.value.payee_order = row.payee_order
-  ruleForm.value.payee = row.payee
   ruleForm.value.expend = row.expend
   ruleForm.value.tag = row.tag
   ruleForm.value.classification = row.classification
   dialogEdit.value = true
   selectedId.value = row.id
-  console.log(index, row)
+  console.log(index)
+  console.log(row);
 }
 
 const editForm = async (formEl: FormInstance | undefined) => {
@@ -247,10 +247,12 @@ const editForm = async (formEl: FormInstance | undefined) => {
         // axios.put(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`, ruleForm.value)
         // axios.put(base_url + `translate/map/expense/${selectedId.value}/`, ruleForm.value + '/')
         axios({
-          url: `translate/map/expense/${selectedId.value}/`,
+          url: `expense/${selectedId.value}/`,
           data: JSON.parse(JSON.stringify(ruleForm.value)),
           method: "PUT",
-          header: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json'
+          }
         })
           .then(response => {
             console.log(response.data);
@@ -283,11 +285,11 @@ const handleDelete = (index: number, row: Expense) => {
 const confirmDelete = async () => {
   try {
     // const response = await axios.delete(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`);
-    const response = await axios.delete(`translate/map/expense/${selectedId.value}/`);
+    const response = await axios.delete(`expense/${selectedId.value}/`);
     console.log(response.data);
     dialogDel.value = false
     // const get = await axios.get('http://127.0.0.1:38001/api/translate/map/expense')
-    const get = await axios.get('translate/map/expense')
+    const get = await axios.get('expense')
     expenseData.value = get.data
   } catch (error) {
     console.error(error);

@@ -87,7 +87,7 @@ interface Assets {
 const AssetsData = ref<Assets[]>([])
 const fetchData = async () => {
     try {
-        const response = await axios.get('translate/map/assets/')
+        const response = await axios.get('assets/')
         AssetsData.value = response.data
         console.log(AssetsData.value);
     } catch (error) {
@@ -155,7 +155,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
         if (valid) {
             try {
                 axios({
-                    url: 'translate/map/assets/',
+                    url: 'assets/',
                     data: JSON.parse(JSON.stringify(ruleForm.value)),
                     method: "POST",
                     header: { 'Content-Type': 'application/json' }
@@ -195,7 +195,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
         if (valid) {
             try {
                 axios({
-                    url: `translate/map/assets/${selectedId.value}/`,
+                    url: `assets/${selectedId.value}/`,
                     data: JSON.parse(JSON.stringify(ruleForm.value)),
                     method: "PUT",
                     header: { 'Content-Type': 'application/json' }
@@ -230,10 +230,10 @@ const handleDelete = (index: number, row: Assets) => {
 // 删除确认
 const confirmDelete = async () => {
     try {
-        const response = await axios.delete(`translate/map/assets/${selectedId.value}/`);
+        const response = await axios.delete(`assets/${selectedId.value}/`);
         console.log(response.data);
         dialogDel.value = false
-        const get = await axios.get('translate/map/assets')
+        const get = await axios.get('assets')
         expenseData.value = get.data
     } catch (error) {
         console.error(error);

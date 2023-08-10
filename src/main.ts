@@ -25,6 +25,6 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 }
 app.use(route)
 // axios.defaults.baseURL = "http://localhost:8002/api"
-// app.config.globalProperties.$ = axios
+app.config.globalProperties.$axios = axios  // 全局注册 $axios
 // app.use(ElementPlus);
 app.mount("#app");

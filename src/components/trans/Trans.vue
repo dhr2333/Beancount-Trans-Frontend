@@ -1,6 +1,6 @@
 <template>
-  <el-upload class="upload-demo" drag="true" :action=action method="POST" multiple="false" :headers=headers accept=".csv"
-    show-file-list name="trans">
+  <el-upload class="upload-demo" :drag="true" :action=action method="POST" :multiple="false" :headers=headers
+    accept=".csv" show-file-list name="trans" @success="handleUploadSuccess">
     <el-icon class="el-icon--upload"><upload-filled /></el-icon>
     <div class="el-upload__text">
       拖拽文件至此处 或 <em>单击上传</em>
@@ -11,34 +11,24 @@
       </div>
     </template>
   </el-upload>
+  <el-input class="result-textarea" type="textarea" :rows="30" readonly :value="responseData"
+    placeholder="文件上传并解析成功后可复制"></el-input>
 </template>
 
 <script setup lang="ts">
 import { UploadFilled } from '@element-plus/icons-vue'
 import { ref, computed } from 'vue';
 import axios from '../../utils/request';
+// import { responseData } from '../../utils/request';
 
 const csrfToken = ref('');
 const action = axios.defaults.baseURL + '/translate/trans'
-console.log(action);
-
 
 axios.defaults.withCredentials = true
-// axios.get('http://localhost:8002/api/get_csrf_token/').then(res => {
 axios.get('translate/trans').then(res => {
-  // csrfToken.value = res.data.token
-  // console.log(res);
-  // console.log(res.config);
-  // console.log(res.data);
-  // console.log(res.headers);
-  // console.log(res.status);
-  // console.log(res.headers['set-cookie']);
-  // console.log(document)
-  // console.log(document.cookie)
   csrfToken.value = document.cookie.split('=')[1]
 })
-  .catch(error => {
-    // 处理请求错误
+  .catch(error => {  // 处理请求错误
     console.error(error);
   });
 sessionStorage.setItem("csrf_token", csrfToken.value)
@@ -49,4 +39,9 @@ const headers = computed(() => ({
   'X-CSRFToken': csrfToken.value
 }))
 
+const responseData = ref('')
+const handleUploadSuccess = (response: any) => {
+  responseData.value = response.join('');
+  console.log(responseData.value);
+}
 </script>

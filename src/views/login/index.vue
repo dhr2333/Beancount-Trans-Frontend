@@ -1,3 +1,4 @@
+
 <template>
   <div class="login-register">
     <div class="contain">
@@ -5,9 +6,9 @@
         <div class="big-contain" key="bigContainLogin" v-if="isLogin">
           <div class="btitle">账户登录</div>
           <div class="bform">
-            <input type="username" placeholder="用户名" v-model="form.username" />
+            <input type="username" placeholder="用户名" v-model="username" />
             <span class="errTips" v-if="emailError">* 用户名无效 *</span>
-            <input type="password" placeholder="密码" v-model="form.password" />
+            <input type="password" placeholder="密码" v-model="password" />
             <span class="errTips" v-if="emailError">* 密码填写错误 *</span>
           </div>
           <button class="bbutton" @click="login">登录</button>
@@ -15,10 +16,10 @@
         <div class="big-contain" key="bigContainRegister" v-else>
           <div class="btitle">创建账户</div>
           <div class="bform">
-            <input type="text" placeholder="用户名" v-model="form.username" />
+            <input type="text" placeholder="用户名" v-model="username" />
             <span class="errTips" v-if="existed">* 用户名已经存在！ *</span>
-            <input type="email" placeholder="邮箱" v-model="form.useremail" />
-            <input type="password" placeholder="密码" v-model="form.password" />
+            <input type="email" placeholder="邮箱" v-model="useremail" />
+            <input type="password" placeholder="密码" v-model="password" />
           </div>
           <button class="bbutton" @click="register">注册</button>
         </div>
@@ -39,113 +40,75 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: "login-register",
-  data() {
-    return {
-      isLogin: true,
-      emailError: false,
-      passwordError: false,
-      existed: false,
-      form: {
-        username: "",
-        useremail: "",
-        password: "",
-      },
-    };
-  },
-  methods: {
-    changeType() {
-      this.isLogin = !this.isLogin;
-      this.form.username = "";
-      this.form.useremail = "";
-      this.form.password = "";
-    },
-    login() {
-      const self = this;
-      // console.log(self.$axios.dispatch('login'));
-      if (self.form.username != "" && self.form.password != "") {
-        self
-          .$axios({
-            method: "post",
-            url: "/api/token/",
-            data: {
-              username: self.form.username,
-              password: self.form.password,
-            },
-          })
-          .then((res) => {
-            const storage = localStorage;
-            const expiredTime = Date.parse(res.headers.date) + 60000;
-            console.log(res.data);
-            storage.setItem("token", res.data.access);
-            storage.setItem("refresh", res.data.refresh);
-            storage.setItem("expiredTime", expiredTime);
-            storage.setItem("username", this.signinName);
-            // _this.userToken = 'Bearer ' + res.data.data.body.token;
-            // _this.changeLogin({ Authorization: _this.userToken });
-            this.$router.push("/map/expense/");
-          });
-      }
-    },
+<script lang="ts" setup>
+import { ref } from 'vue';
+import axios from '../../utils/request';
+import router from '~/routers';
 
-    // switch (res.data) {
-    //   case 0:
-    //     alert("登陆成功！");
-    //     break;
-    //   case -1:
-    //     this.emailError = true;
-    //     break;
-    //   case 1:
-    //     this.passwordError = true;
-    //     break;
-    // }
-    // })
-    //     .catch(err => {
-    //   console.log(err);
-    // })
-    //   } else {
-    //     alert("填写不能为空！");
-    //   }
-    // },
-    register() {
-      const self = this;
-      if (
-        self.form.username != "" &&
-        self.form.useremail != "" &&
-        self.form.password != ""
-      ) {
-        self
-          .$axios({
-            method: "post",
-            url: "http://127.0.0.1:8002/api/user/add",
-            data: {
-              username: self.form.username,
-              email: self.form.useremail,
-              password: self.form.password,
-            },
-          })
-          .then((res) => {
-            switch (res.data) {
-              case 0:
-                alert("注册成功！");
-                this.login();
-                break;
-              case -1:
-                this.existed = true;
-                break;
-            }
-          })
-          .catch((err) => {
-            console.log(err);
-          });
-      } else {
-        alert("填写不能为空！");
-      }
-    },
-  },
-};
+const isLogin = ref(true);
+const emailError = ref(false);
+const passwordError = ref(false);
+const existed = ref(false);
+const username = ref("daihaorui");
+const useremail = ref("");
+const password = ref("a13738756428");
+
+function changeType() {
+  isLogin.value = !isLogin.value;
+  username.value = "";
+  useremail.value = "";
+  password.value = "";
+}
+const login = async () => {
+  if (username.value != "" && password.value != "") {
+    try {
+      const res = await axios.post('http://localhost:8002/api/token/', {
+        username: username.value,
+        password: password.value
+      });
+
+      const storage = localStorage;
+      const expiredTime = Date.parse(res.headers.date) + 60000;
+      console.log(res.data);
+      storage.setItem('token', res.data.access);
+      storage.setItem('refresh', res.data.refresh);
+      storage.setItem('expiredTime', expiredTime.toString());
+      storage.setItem('username', username.value);
+      router.push('/map/expense/');
+    } catch (error) {
+      console.log(error);
+    }
+  }
+}
+const register = () => {
+
+}
+
+// function login() {
+//   console.log(self);
+//   // const self = this;
+//   // console.log(self.$axios.dispatch('login'));
+//   if (username.value != "" && password.value != "") {
+//     self.$axios({
+//       method: "post",
+//       url: "http://localhost:8002/api/token/",
+//       data: {
+//         username: username.value,
+//         password: password.value,
+//       },
+//     })
+//       .then((res) => {
+//         const storage = localStorage;
+//         const expiredTime = Date.parse(res.headers.date) + 60000;
+//         console.log(res.data);
+//         storage.setItem("token", res.data.access);
+//         storage.setItem("refresh", res.data.refresh);
+//         storage.setItem("expiredTime", expiredTime);
+//         storage.setItem("username", this.signinName);
+//         this.$router.push("/expense/");
+//       });
+//   }
+// }
 </script>
 
 <style scoped="scoped">
