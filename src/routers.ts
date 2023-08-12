@@ -21,6 +21,7 @@ const router = createRouter({
   // history: createWebHashHistory(),
   history: createWebHistory(),
   routes: [
+    { path: '/',name:"home", component: Trans },
     // { path: '/', name:"home",component: Home },
     // { path: '/test',name:"test", component: Test },
     { path: '/trans',name:"trans", component: Trans },

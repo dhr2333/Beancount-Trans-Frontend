@@ -158,7 +158,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                     url: 'assets/',
                     data: JSON.parse(JSON.stringify(ruleForm.value)),
                     method: "POST",
-                    header: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' }
                 })
                     .then(response => {
                         console.log(response.data);
@@ -198,7 +198,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
                     url: `assets/${selectedId.value}/`,
                     data: JSON.parse(JSON.stringify(ruleForm.value)),
                     method: "PUT",
-                    header: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' }
                 })
                     .then(response => {
                         console.log(response.data);
@@ -233,8 +233,8 @@ const confirmDelete = async () => {
         const response = await axios.delete(`assets/${selectedId.value}/`);
         console.log(response.data);
         dialogDel.value = false
-        const get = await axios.get('assets')
-        expenseData.value = get.data
+        // const get = await axios.get('assets')
+        // expenseData.value = get.data
     } catch (error) {
         console.error(error);
     }

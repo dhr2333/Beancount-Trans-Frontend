@@ -41,7 +41,6 @@ instance.interceptors.request.use(
 instance.interceptors.response.use(
     (response) => {
         responseData.value = response.data;
-        console.log(responseData.value)
         return response;
     },
     (error) => {

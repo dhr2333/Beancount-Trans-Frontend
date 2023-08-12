@@ -34,9 +34,12 @@ axios.get('translate/trans').then(res => {
 sessionStorage.setItem("csrf_token", csrfToken.value)
 
 
+const token = localStorage.getItem("token");
+
 const headers = computed(() => ({
   //   'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-  'X-CSRFToken': csrfToken.value
+  'X-CSRFToken': csrfToken.value,
+  "Authorization": `Bearer ${token}`
 }))
 
 const responseData = ref('')
