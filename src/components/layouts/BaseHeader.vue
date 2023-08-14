@@ -23,17 +23,54 @@
 
     <div class="flex-grow" />
     <el-sub-menu index="manager">
-      <template #title>设置</template>
-      <router-link to="" class="no-underline"><el-menu-item index="">个人中心</el-menu-item></router-link>
-      <router-link to="http://127.0.0.1:8002/api-auth/logout/" class="no-underline"><el-menu-item
-          index="http://127.0.0.1:8002/api-auth/logout/">退出登录</el-menu-item></router-link>
+      <template #title>{{ getUser() }}</template>
+      <router-link to="" class="no-underline"><el-menu-item index="" @click="user()">个人中心</el-menu-item></router-link>
+      <el-menu-item index="logout" @click="cleanToken">退出登录</el-menu-item>
     </el-sub-menu>
   </el-menu>
 </template>
 
 <script lang="ts" setup>
+import { computed } from 'vue'
+import router from '~/routers'
+
 const handleSelect = (key: string, keyPath: string[]) => {
   console.log(key, keyPath)
+}
+const decodeJWT = (token: string) => {
+  const base64Url = token.split('.')[1]
+  const base64 = base64Url.replace('-', '+').replace('_', '/')
+  return JSON.parse(window.atob(base64))
+}
+const getUserId = () => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    const user = decodeJWT(token)
+    return user.user_id
+  }
+  return null
+}
+computed(() => {
+  getUserId()
+  getUser()
+})
+const getUser = () => {
+  if (!localStorage.getItem('token')) {
+    return '未登录'
+  } else {
+    return localStorage.getItem('username')
+  }
+}
+const cleanToken = () => {
+  localStorage.removeItem('token')
+  localStorage.removeItem('username')
+}
+const user = () => {
+  if (!localStorage.getItem('token') && !localStorage.getItem('username')) {
+    router.push('/login')
+  } else {
+    router.push('/trans')
+  }
 }
 </script>
 
@@ -44,5 +81,9 @@ const handleSelect = (key: string, keyPath: string[]) => {
 
 .flex-grow {
   flex-grow: 1;
+}
+
+.no-left-padding {
+  padding-left: 0px;
 }
 </style>

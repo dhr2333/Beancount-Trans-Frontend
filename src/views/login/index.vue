@@ -68,7 +68,8 @@ const login = async () => {
       });
 
       const storage = localStorage;
-      const expiredTime = Date.parse(res.headers.date) + 60000;
+      const expiredTime = Date.now() + 30000;
+      console.log(expiredTime)
       console.log(res.data);
       storage.setItem('token', res.data.access);
       storage.setItem('refresh', res.data.refresh);

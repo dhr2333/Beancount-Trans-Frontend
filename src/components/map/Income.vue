@@ -74,6 +74,7 @@
 import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import axios from '../../utils/request'
+import router from '~/routers'
 const dialogError = ref(false)
 
 interface Assets {
@@ -90,8 +91,11 @@ const fetchData = async () => {
         const response = await axios.get('assets/')
         AssetsData.value = response.data
         console.log(AssetsData.value);
-    } catch (error) {
+    } catch (error: any) {
         console.error(error)
+        if (error.response.data.code == "token_not_valid") {
+            router.push('/login')
+        }
     }
 }
 

@@ -99,6 +99,8 @@ import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 // import axios from 'axios'
 import axios from '../../utils/request'
+import { ro } from 'element-plus/es/locale'
+import router from '~/routers'
 const dialogError = ref(false)
 
 interface Expense {
@@ -121,9 +123,12 @@ const fetchData = async () => {
     const response = await axios.get('expense/')
     expenseData.value = response.data
     console.log(expenseData.value);
-
-  } catch (error) {
+  } catch (error: any) {
     console.error(error)
+    console.log(error.response.data.code);
+    if (error.response.data.code == "token_not_valid") {
+      router.push('/login')
+    }
   }
 }
 
