@@ -5,11 +5,12 @@
 
     <el-sub-menu index="map">
       <template #title>映射管理</template>
-      <router-link to="/map/income" class="no-underline"><el-menu-item
-          index="/map/income">收入映射</el-menu-item></router-link>
+      <router-link to="/map/assets" class="no-underline"><el-menu-item
+          index="/map/assets">资产映射</el-menu-item></router-link>
       <router-link to="/map/expense" class="no-underline"><el-menu-item
           index="/map/expense">支出映射</el-menu-item></router-link>
-      <router-link to="/map/payee" class="no-underline"><el-menu-item index="/map/payee">商家映射</el-menu-item></router-link>
+      <router-link to="/map/income" class="no-underline"><el-menu-item
+          index="/map/income">收入映射</el-menu-item></router-link>
     </el-sub-menu>
     <el-sub-menu index="bill">
       <template #title>账单管理</template>

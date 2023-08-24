@@ -1,5 +1,5 @@
 import axios from "axios";
-import { ref} from 'vue';
+import { ref } from 'vue';
 // function getCookie(name) {
 //     var value = '; ' + document.cookie;
 //     var parts = value.split('; ' + name + '=');
@@ -11,9 +11,12 @@ import { ref} from 'vue';
 //   return response.data.csrfToken;
 // }
 export const responseData = ref('');
+const apiUrl = import.meta.env.VITE_API_URL;
+console.log(apiUrl);
 // app.config.globalProperties.$axios = axios
 const instance = axios.create({
-    baseURL: "http://localhost:8002",  // npm run dev地址
+    baseURL: apiUrl,
+    // baseURL: "http://localhost:8002",  // npm run dev地址
     // baseURL: "http://127.0.0.1:38001/api",  // docker地址
     timeout: 100000,
     withCredentials: true,  // 传递csrf令牌

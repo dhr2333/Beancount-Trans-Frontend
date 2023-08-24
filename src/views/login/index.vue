@@ -45,13 +45,16 @@ import { ref } from 'vue';
 import axios from '../../utils/request';
 import router from '~/routers';
 
+const apiUrl = import.meta.env.VITE_API_URL;
 const isLogin = ref(true);
 const emailError = ref(false);
 const passwordError = ref(false);
 const existed = ref(false);
-const username = ref("daihaorui");
+const username = ref("");
 const useremail = ref("");
-const password = ref("a13738756428");
+const password = ref("");
+console.log(apiUrl);
+
 
 function changeType() {
   isLogin.value = !isLogin.value;
@@ -62,7 +65,8 @@ function changeType() {
 const login = async () => {
   if (username.value != "" && password.value != "") {
     try {
-      const res = await axios.post('http://localhost:8002/api/token/', {
+      // const res = await axios.post('http://localhost:8002/api/token/', {
+      const res = await axios.post(apiUrl + 'token/', {
         username: username.value,
         password: password.value
       });

@@ -102,6 +102,7 @@ import axios from '../../utils/request'
 import { ro } from 'element-plus/es/locale'
 import router from '~/routers'
 const dialogError = ref(false)
+console.log(import.meta.env);
 
 interface Expense {
   id: number

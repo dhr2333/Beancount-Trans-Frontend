@@ -3,9 +3,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 // 引入组件
 // import Test from "./components/layouts/Test.vue"
 import Trans from "./components/trans/Trans.vue"
-import Income from "./components/map/Income.vue"
+import Assets from "./components/map/Assets.vue"
 import Expense from "./components/map/Expense.vue"
-import Payee from "./components/map/Payee.vue"
+import Income from "./components/map/Income.vue"
 import Event from "./components/bill/Event.vue"
 import Commodity from "./components/bill/Commodity.vue"
 import Account from "./components/assets/Account.vue"
@@ -25,9 +25,9 @@ const router = createRouter({
     // { path: '/', name:"home",component: Home },
     // { path: '/test',name:"test", component: Test },
     { path: '/trans',name:"trans", component: Trans },
-    { path: '/map/income',name:"income", component: Income },
+    { path: '/map/assets',name:"assets", component: Assets },
     { path: '/map/expense',name:"expense", component: Expense },
-    { path: '/map/payee',name:"payee", component: Payee },
+    { path: '/map/income',name:"income", component: Income },
     { path: '/bill/event',name:"event", component: Event },
     { path: '/bill/commodity',name:"commodity", component: Commodity },
     { path: '/assets/account', name: "account", component: Account },

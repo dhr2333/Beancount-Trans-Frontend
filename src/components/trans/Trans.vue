@@ -11,8 +11,13 @@
       </div>
     </template>
   </el-upload>
-  <el-input class="result-textarea" type="textarea" :rows="30" readonly :value="responseData"
-    placeholder="文件上传并解析成功后可复制"></el-input>
+  <el-input class="result-textarea" type="textarea" :rows="30" readonly :value="responseData" placeholder='完成解析后将自动填充到此处,可直接进行复制，解析案例如下：
+
+2023-01-02 * "温州市数据管理发展集团有限公司" "HIK-停车缴费-洞头人民路停车场(人民路区域共享)"
+    time: "15:27:44"
+    uuid: "2022061922001474561419808812"
+    Expenses:TransPort:Private:Park +5.00 CNY
+    Liabilities:CreditCard:Bank:ZhongXin:C6428 -5.00 CNY'></el-input>
 </template>
 
 <script setup lang="ts">
