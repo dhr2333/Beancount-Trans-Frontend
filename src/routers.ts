@@ -4,8 +4,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 // import Test from "./components/layouts/Test.vue"
 import Trans from "./components/trans/Trans.vue"
 import Assets from "./components/map/Assets.vue"
-import Expense from "./components/map/Expense.vue"
+import Expenses from "./components/map/Expenses.vue"
 import Income from "./components/map/Income.vue"
+import Liabilities from "./components/map/Liabilities.vue"
 import Event from "./components/bill/Event.vue"
 import Commodity from "./components/bill/Commodity.vue"
 import Account from "./components/assets/Account.vue"
@@ -26,8 +27,9 @@ const router = createRouter({
     // { path: '/test',name:"test", component: Test },
     { path: '/trans',name:"trans", component: Trans },
     { path: '/map/assets',name:"assets", component: Assets },
-    { path: '/map/expense',name:"expense", component: Expense },
+    { path: '/map/expenses',name:"expenses", component: Expenses },
     { path: '/map/income',name:"income", component: Income },
+    { path: '/map/Liabilities',name:"Liabilities", component: Liabilities },
     { path: '/bill/event',name:"event", component: Event },
     { path: '/bill/commodity',name:"commodity", component: Commodity },
     { path: '/assets/account', name: "account", component: Account },

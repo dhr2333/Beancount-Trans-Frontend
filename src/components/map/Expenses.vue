@@ -2,7 +2,6 @@
   <el-table :data="filterExpenseData" style="width: 98%">
     <!-- <el-table-column label="编号" prop="id" /> -->
     <el-table-column label="关键字" prop="key" />
-    <el-table-column label="优先级" prop="payee_order" />
     <el-table-column label="商家" prop="payee" />
     <el-table-column label="映射账户" prop="expend" />
     <el-table-column label="标签" prop="tag" />
@@ -25,9 +24,6 @@
     <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="120px" class="demo-ruleForm" status-icon>
       <el-form-item label="关键字" prop="key">
         <el-input v-model="ruleForm.key" placeholder="王者荣耀" />
-      </el-form-item>
-      <el-form-item label="优先级" prop="payee_order">
-        <el-input v-model="ruleForm.payee_order" placeholder="100" />
       </el-form-item>
       <el-form-item label="商家" prop="payee">
         <el-input v-model="ruleForm.payee" placeholder="腾讯" />
@@ -54,9 +50,6 @@
     <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="120px" class="demo-ruleForm" status-icon>
       <el-form-item label="关键字" prop="key">
         <el-input v-model="ruleForm.key" />
-      </el-form-item>
-      <el-form-item label="优先级" prop="payee_order">
-        <el-input v-model="ruleForm.payee_order" />
       </el-form-item>
       <el-form-item label="商家" prop="payee">
         <el-input v-model="ruleForm.payee" />
@@ -90,7 +83,7 @@
   <el-dialog v-model="dialogError" title="操作失败" width="30%">
     <el-icon>
       <WarningFilled />
-    </el-icon><span>该关键字已存在</span>
+    </el-icon><span>失败</span>
   </el-dialog>
 </template>
 
@@ -107,8 +100,7 @@ console.log(import.meta.env);
 interface Expense {
   id: number
   key: string
-  payee?: string | null | undefined
-  payee_order: number
+  payee: string | null | undefined
   expend: string
   tag: string
   classification: string
@@ -160,8 +152,8 @@ const handleAdd = () => {
 const ruleFormRef = ref<FormInstance>()
 const ruleForm = ref({
   key: '',
-  payee: null,
-  payee_order: 0,
+  // payee: null,
+  payee: null as string | null | undefined,
   expend: '',
   tag: '',
   classification: '',
@@ -173,9 +165,6 @@ const rules = ref<FormRules>({
     { max: 16, message: '长度应控制在16个字符以内', trigger: 'blur' },
   ],
   payee: [
-    { required: false, message: '', trigger: 'change', },
-  ],
-  payee_order: [
     { required: false, message: '', trigger: 'change', },
   ],
   expend: [
@@ -234,8 +223,9 @@ const dialogEdit = ref(false)
 
 const handleEdit = (index: number, row: Expense) => {
   ruleForm.value.key = row.key
-  ruleForm.value.payee = row.payee as null
-  ruleForm.value.payee_order = row.payee_order
+  // ruleForm.value.payee = row.payee!
+  ruleForm.value.payee = row.payee !== null ? row.payee : null // 为了解决编辑时payee为null时的问题;
+  // ruleForm.value.payee = row.payee !== null ? row.payee : null;
   ruleForm.value.expend = row.expend
   ruleForm.value.tag = row.tag
   ruleForm.value.classification = row.classification
