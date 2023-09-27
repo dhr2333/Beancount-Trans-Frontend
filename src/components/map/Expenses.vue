@@ -1,9 +1,36 @@
 <template>
   <el-table :data="filterExpenseData" style="width: 98%">
-    <!-- <el-table-column label="编号" prop="id" /> -->
     <el-table-column label="关键字" prop="key" />
-    <el-table-column label="商家" prop="payee" />
-    <el-table-column label="映射账户" prop="expend" />
+    <el-table-column label="商家" prop="payee">
+      <template #header="{ column }">
+        <span>
+          {{ column.label }}
+          <span class="tooltip-icon" @mouseover="showTooltip = true" @mouseleave="showTooltip = false">
+            <i class="el-icon-question"></i>
+          </span>
+          <el-tooltip v-if="showTooltip" class="tooltip" effect="dark" placement="top" :content="payeetipContent">
+            <el-icon>
+              <InfoFilled />
+            </el-icon>
+          </el-tooltip>
+        </span>
+      </template>
+    </el-table-column>
+    <el-table-column label="映射账户" prop="expend">
+      <template #header="{ column }">
+        <span>
+          {{ column.label }}
+          <span class="tooltip-icon" @mouseover="showTooltip = true" @mouseleave="showTooltip = false">
+            <i class="el-icon-question"></i>
+          </span>
+          <el-tooltip v-if="showTooltip" class="tooltip" effect="dark" placement="top" :content="expendtipContent">
+            <el-icon>
+              <InfoFilled />
+            </el-icon>
+          </el-tooltip>
+        </span>
+      </template>
+    </el-table-column>
     <el-table-column label="标签" prop="tag" />
     <el-table-column label="类型" prop="classification" />
     <el-table-column align="right">
@@ -34,9 +61,6 @@
       <el-form-item label="标签" prop="tag">
         <el-input v-model="ruleForm.tag" placeholder="影音娱乐" />
       </el-form-item>
-      <!-- <el-form-item label="类型" prop="classification">
-        <el-select-v2 v-model="ruleForm.classification" placeholder="餐饮美食/饮料水果" :options="options" />
-      </el-form-item> -->
       <el-form-item label="类型" prop="classification">
         <el-input v-model="ruleForm.classification" placeholder="文化休闲/影音娱乐" />
       </el-form-item>
@@ -90,9 +114,7 @@
 <script lang="ts" setup>
 import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
-// import axios from 'axios'
 import axios from '../../utils/request'
-import { ro } from 'element-plus/es/locale'
 import router from '~/routers'
 const dialogError = ref(false)
 console.log(import.meta.env);
@@ -106,7 +128,11 @@ interface Expense {
   classification: string
 }
 
-// const base_url = "http://127.0.0.1:38000/api/"
+// 页面增加优先级提示
+const showTooltip = ref(true)
+const payeetipContent = ref("若商家存在，优先级 + 50 ,映射账户中每存在一个 ':' ，优先级以 ':' 数量 * 100计算 ");
+const expendtipContent = ref("优先级越高则映射账户越精准。例如关键字为蜜雪冰城的条目，优先级为 2 * 100 + 50 = 250")
+
 // 页面获取数据
 const expenseData = ref<Expense[]>([])
 console.log(expenseData.value);
@@ -124,7 +150,6 @@ const fetchData = async () => {
     }
   }
 }
-
 
 // 页面数据获取(组件挂载)
 onMounted(() => {
@@ -187,7 +212,6 @@ const resetForm = (formEl: FormInstance | undefined) => {
   formEl.resetFields()
 }
 
-
 // 新增确认
 const submitForm = async (formEl: FormInstance | undefined) => {
   if (!formEl) return
@@ -209,6 +233,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
             console.error(error)
           })
         dialogAdd.value = false
+        setTimeout(updateExpenseData, 1000)
       } catch (error) {
         console.log(error);
       }
@@ -216,16 +241,19 @@ const submitForm = async (formEl: FormInstance | undefined) => {
       console.log('error submit!', fields)
     }
   })
+  async function updateExpenseData() {
+    const response = await axios.get('expense/');
+    expenseData.value = response.data;
+  }
 }
+
 
 // 编辑
 const dialogEdit = ref(false)
 
 const handleEdit = (index: number, row: Expense) => {
   ruleForm.value.key = row.key
-  // ruleForm.value.payee = row.payee!
   ruleForm.value.payee = row.payee !== null ? row.payee : null // 为了解决编辑时payee为null时的问题;
-  // ruleForm.value.payee = row.payee !== null ? row.payee : null;
   ruleForm.value.expend = row.expend
   ruleForm.value.tag = row.tag
   ruleForm.value.classification = row.classification
@@ -252,6 +280,8 @@ const editForm = async (formEl: FormInstance | undefined) => {
         })
           .then(response => {
             console.log(response.data);
+            expenseData.value = response.data
+            fetchData()
           })
           .catch(error => {
             dialogError.value = true
@@ -291,12 +321,6 @@ const confirmDelete = async () => {
     console.error(error);
   }
 }
-
-// classification单选
-// const options = Array.from({ length: 10000 }).map((_, idx) => ({
-//   value: `${idx + 1}`,
-//   label: `${idx + 1}`,
-// }))
 </script>
 
 <style scoped>

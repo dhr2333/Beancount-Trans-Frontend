@@ -44,6 +44,7 @@
 import { ref } from 'vue';
 import axios from '../../utils/request';
 import router from '~/routers';
+import jwt_decode from 'jwt-decode';
 
 const apiUrl = import.meta.env.VITE_API_URL;
 const isLogin = ref(true);
@@ -65,19 +66,19 @@ function changeType() {
 const login = async () => {
   if (username.value != "" && password.value != "") {
     try {
-      // const res = await axios.post('http://localhost:8002/api/token/', {
       const res = await axios.post(apiUrl + 'token/', {
         username: username.value,
         password: password.value
       });
 
       const storage = localStorage;
-      const expiredTime = Date.now() + 30000;
-      console.log(expiredTime)
+      const token = res.data.access;
       console.log(res.data);
       storage.setItem('token', res.data.access);
+      console.log(jwt_decode(token));
       storage.setItem('refresh', res.data.refresh);
-      storage.setItem('expiredTime', expiredTime.toString());
+      storage.setItem('iat', jwt_decode(token).iat);
+      storage.setItem('exp', jwt_decode(token).exp);
       storage.setItem('username', username.value);
       router.push('/map/expense/');
     } catch (error) {

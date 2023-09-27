@@ -26,7 +26,7 @@
 
     <div class="flex-grow" />
     <el-sub-menu index="manager">
-      <template #title>{{ getUser() }}</template>
+      <template #title>{{ username }}</template>
       <router-link to="" class="no-underline"><el-menu-item index="" @click="user()">个人中心</el-menu-item></router-link>
       <el-menu-item index="logout" @click="cleanToken">退出登录</el-menu-item>
     </el-sub-menu>
@@ -34,8 +34,10 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue'
+// import axios from 'axios'
+import { computed, ref, onMounted } from 'vue'
 import router from '~/routers'
+import axios from '../../utils/request'
 
 const handleSelect = (key: string, keyPath: string[]) => {
   console.log(key, keyPath)
@@ -57,16 +59,44 @@ computed(() => {
   getUserId()
   getUser()
 })
-const getUser = () => {
-  if (!localStorage.getItem('token')) {
-    return '未登录'
-  } else {
-    return localStorage.getItem('username')
+const username = ref<string | null>(null)
+
+// export async function getUser() {
+//   try {
+//     const response = await axios.get("expense/");
+//     const username = localStorage.getItem('username');
+//     return username;
+//   } catch (error: any) {
+//     console.error(error);
+//     return "未登录";
+//   }
+// }
+
+const getUser = async () => {
+  try {
+    const tokenExpiration: number = parseInt(localStorage.getItem('exp') || '0');
+    const currentTimestamp: number = Math.floor(Date.now() / 1000);
+    // const response = await axios.get("expense/");
+    if (currentTimestamp <= tokenExpiration) {
+      username.value = localStorage.getItem('username');
+      // cleanToken();
+    }
+    else {
+
+      username.value = "未登录";
+    }
+    // username.value = localStorage.getItem('username');
+  } catch (error: any) {
+    console.error(error);
+    username.value = "未登录";
   }
-}
+};
+
 const cleanToken = () => {
   localStorage.removeItem('token')
   localStorage.removeItem('username')
+  username.value = "未登录";
+  router.push('/login')
 }
 const user = () => {
   if (!localStorage.getItem('token') && !localStorage.getItem('username')) {
@@ -75,6 +105,9 @@ const user = () => {
     router.push('/trans')
   }
 }
+onMounted(() => {
+  getUser();
+});
 </script>
 
 <style>
