@@ -95,6 +95,7 @@ const fetchData = async () => {
         console.error(error)
         if (error.response.data.code == "token_not_valid") {
             router.push('/login')
+            console.log("token_not_valid");
         }
     }
 }

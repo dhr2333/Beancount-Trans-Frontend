@@ -147,6 +147,7 @@ const fetchData = async () => {
     console.log(error.response.data.code);
     if (error.response.data.code == "token_not_valid") {
       router.push('/login')
+      console.log("token_not_valid");
     }
   }
 }
@@ -313,13 +314,14 @@ const confirmDelete = async () => {
     // const response = await axios.delete(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`);
     const response = await axios.delete(`expense/${selectedId.value}/`);
     console.log(response.data);
-    dialogDel.value = false
     // const get = await axios.get('http://127.0.0.1:38001/api/translate/map/expense')
     const get = await axios.get('expense')
     expenseData.value = get.data
   } catch (error) {
     console.error(error);
+    dialogError.value = true
   }
+  dialogDel.value = false
 }
 </script>
 

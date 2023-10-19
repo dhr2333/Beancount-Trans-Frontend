@@ -1,30 +1,30 @@
 <script setup lang="ts">
-// import { ref } from "vue";
-// import { ElMessage } from "element-plus";
+import { ref } from "vue";
+import { ElMessage } from "element-plus";
 
 defineProps<{ msg: string }>();
 
-// const count = ref(0);
-// const input = ref("element-plus");
+const count = ref(0);
+const input = ref("element-plus");
 
-// const curDate = ref("");
+const curDate = ref("");
 
-// const toast = () => {
-//   ElMessage.success("Hello");
-// };
+const toast = () => {
+  ElMessage.success("Hello");
+};
 </script>
 
 <template>
-  <!-- <h1 color="$ep-color-primary">{{ msg }}</h1>
+  <h1 color="$ep-color-primary">{{ msg }}</h1>
 
   <p>
     See
     <a href="https://element-plus.org" target="_blank">element-plus</a> for more
     information.
-  </p> -->
+  </p>
 
   <!-- example components -->
-  <!-- <div class="mb-4">
+  <div class="mb-4">
     <el-button size="large" @click="toast">El Message</el-button>
   </div>
 
@@ -46,12 +46,7 @@ defineProps<{ msg: string }>();
 
   <div class="my-2">
     <el-input class="m-2" v-model="input" style="width: 200px" />
-    <el-date-picker
-      class="m-2"
-      v-model="curDate"
-      type="date"
-      placeholder="Pick a day"
-    ></el-date-picker>
+    <el-date-picker class="m-2" v-model="curDate" type="date" placeholder="Pick a day"></el-date-picker>
   </div>
 
   <p>For example, we can custom primary color to 'green'.</p>
@@ -63,30 +58,24 @@ defineProps<{ msg: string }>();
   <p>
     Edit
     <code>styles/element/var.scss</code> to test scss variables.
-  </p> -->
+  </p>
 
-  <!-- <p>
+  <p>
     Full Example:
-    <a
-      href="https://github.com/element-plus/element-plus-vite-starter"
-      target="_blank"
-      >element-plus-vite-starter</a
-    >
+    <a href="https://github.com/element-plus/element-plus-vite-starter" target="_blank">element-plus-vite-starter</a>
     | On demand Example:
-    <a
-      href="https://github.com/element-plus/unplugin-element-plus"
-      target="_blank"
-      >unplugin-element-plus/examples/vite</a
-    >
-  </p> -->
+    <a href="https://github.com/element-plus/unplugin-element-plus"
+      target="_blank">unplugin-element-plus/examples/vite</a>
+  </p>
 </template>
 
 <style>
-/* .ep-button {
+.ep-button {
   margin: 4px;
 }
-.ep-button + .ep-button {
+
+.ep-button+.ep-button {
   margin-left: 0;
   margin: 4px;
-} */
+}
 </style>

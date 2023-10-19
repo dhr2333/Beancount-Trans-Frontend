@@ -6,7 +6,7 @@
         <div class="big-contain" key="bigContainLogin" v-if="isLogin">
           <div class="btitle">账户登录</div>
           <div class="bform">
-            <input type="username" placeholder="用户名" v-model="username" />
+            <input type="username" placeholder="用户名" v-model="username1" />
             <span class="errTips" v-if="emailError">* 用户名无效 *</span>
             <input type="password" placeholder="密码" v-model="password" />
             <span class="errTips" v-if="emailError">* 密码填写错误 *</span>
@@ -16,7 +16,7 @@
         <div class="big-contain" key="bigContainRegister" v-else>
           <div class="btitle">创建账户</div>
           <div class="bform">
-            <input type="text" placeholder="用户名" v-model="username" />
+            <input type="text" placeholder="用户名" v-model="username1" />
             <span class="errTips" v-if="existed">* 用户名已经存在！ *</span>
             <input type="email" placeholder="邮箱" v-model="useremail" />
             <input type="password" placeholder="密码" v-model="password" />
@@ -45,13 +45,16 @@ import { ref } from 'vue';
 import axios from '../../utils/request';
 import router from '~/routers';
 import jwt_decode from 'jwt-decode';
+import username from '../../components/layouts/BaseHeader.vue';
+//  as headerUsername from '../../components/layouts/BaseHeader.vue'
+
 
 const apiUrl = import.meta.env.VITE_API_URL;
 const isLogin = ref(true);
 const emailError = ref(false);
 const passwordError = ref(false);
 const existed = ref(false);
-const username = ref("");
+const username1 = ref("");
 const useremail = ref("");
 const password = ref("");
 console.log(apiUrl);
@@ -59,15 +62,15 @@ console.log(apiUrl);
 
 function changeType() {
   isLogin.value = !isLogin.value;
-  username.value = "";
+  username1.value = "";
   useremail.value = "";
   password.value = "";
 }
 const login = async () => {
-  if (username.value != "" && password.value != "") {
+  if (username1.value != "" && password.value != "") {
     try {
       const res = await axios.post(apiUrl + 'token/', {
-        username: username.value,
+        username: username1.value,
         password: password.value
       });
 
@@ -79,8 +82,15 @@ const login = async () => {
       storage.setItem('refresh', res.data.refresh);
       storage.setItem('iat', jwt_decode(token).iat);
       storage.setItem('exp', jwt_decode(token).exp);
-      storage.setItem('username', username.value);
-      router.push('/map/expense/');
+      storage.setItem('username', username1.value);
+      username.value = username1.value;
+      const test = localStorage.getItem('username');
+      if (test) {
+        router.push('/map/expenses/')
+        username.value = username1.value;
+        // window.location.reload();
+      }
+      // test.value = username.value;
     } catch (error) {
       console.log(error);
     }

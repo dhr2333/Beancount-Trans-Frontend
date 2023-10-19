@@ -35,30 +35,30 @@
 
 <script lang="ts" setup>
 // import axios from 'axios'
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch, watchEffect } from 'vue'
 import router from '~/routers'
 import axios from '../../utils/request'
 
 const handleSelect = (key: string, keyPath: string[]) => {
   console.log(key, keyPath)
 }
-const decodeJWT = (token: string) => {
-  const base64Url = token.split('.')[1]
-  const base64 = base64Url.replace('-', '+').replace('_', '/')
-  return JSON.parse(window.atob(base64))
-}
-const getUserId = () => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    const user = decodeJWT(token)
-    return user.user_id
-  }
-  return null
-}
-computed(() => {
-  getUserId()
-  getUser()
-})
+// const decodeJWT = (token: string) => {
+//   const base64Url = token.split('.')[1]
+//   const base64 = base64Url.replace('-', '+').replace('_', '/')
+//   return JSON.parse(window.atob(base64))
+// }
+// const getUserId = () => {
+//   const token = localStorage.getItem('token')
+//   if (token) {
+//     const user = decodeJWT(token)
+//     return user.user_id
+//   }
+//   return null
+// }
+// computed(() => {
+//   getUserId()
+//   getUser()
+// })
 const username = ref<string | null>(null)
 
 // export async function getUser() {
@@ -76,21 +76,26 @@ const getUser = async () => {
   try {
     const tokenExpiration: number = parseInt(localStorage.getItem('exp') || '0');
     const currentTimestamp: number = Math.floor(Date.now() / 1000);
-    // const response = await axios.get("expense/");
-    if (currentTimestamp <= tokenExpiration) {
+    if (currentTimestamp <= tokenExpiration && localStorage.getItem('username')) {
       username.value = localStorage.getItem('username');
-      // cleanToken();
     }
     else {
-
       username.value = "未登录";
     }
-    // username.value = localStorage.getItem('username');
   } catch (error: any) {
     console.error(error);
     username.value = "未登录";
   }
 };
+
+// watchEffect(() => {
+//   // 监听localStorage中的username变化，自动更新组件内的username值
+//   username.value = localStorage.getItem('username') || '未登录1';
+// });
+
+// watch(() => localStorage.getItem('username'), () => {
+//   getUser();
+// });
 
 const cleanToken = () => {
   localStorage.removeItem('token')
@@ -108,6 +113,7 @@ const user = () => {
 onMounted(() => {
   getUser();
 });
+
 </script>
 
 <style>
