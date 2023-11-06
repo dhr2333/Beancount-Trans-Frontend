@@ -16,6 +16,8 @@
     </el-sub-menu>
     <el-sub-menu index="bill">
       <template #title>账单管理</template>
+      <router-link to="/bill/account" class="no-underline"><el-menu-item
+          index="/bill/account">账户管理</el-menu-item></router-link>
       <router-link to="/bill/event" class="no-underline"><el-menu-item
           index="/bill/event">事件管理</el-menu-item></router-link>
       <router-link to="/bill/commodity" class="no-underline"><el-menu-item

@@ -9,6 +9,8 @@
                 <div style="display: flex">
                     <el-input v-model="search" size="small" placeholder="搜索 关键字" />
                     <el-button size="small" type="info" @click="handleAdd()" style="margin-left: 12px">新增</el-button>
+                    <el-button size="small" type="default" @click="handleImport()" style="margin-left: 12px">导入</el-button>
+                    <el-button size="small" type="default" @click="handleExport()" style="margin-left: 12px">导出</el-button>
                 </div>
             </template>
             <template #default="scope">
@@ -75,6 +77,8 @@ import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import axios from '../../utils/request'
 import router from '~/routers'
+import * as XLSX from 'xlsx'
+
 const dialogError = ref(false)
 
 interface Assets {
@@ -180,6 +184,59 @@ const submitForm = async (formEl: FormInstance | undefined) => {
             console.log('error submit!', fields)
         }
     })
+}
+
+// 导出
+const handleExport = () => {
+    const data = AssetsData.value
+    data.forEach((item: any) => {
+        delete item.id
+        delete item.url
+        delete item.owner
+    })
+    const fileName = 'export_assets.xlsx'
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.json_to_sheet(data)
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1")
+    XLSX.writeFile(wb, fileName)
+}
+
+// 导入
+const handleImport = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.xlsx'
+    input.onchange = () => {
+        const files = input.files
+        if (files && files.length > 0) {
+            const file = files.item(0)
+            const reader = new FileReader()
+            reader.onload = (e) => {
+                const data = e.target?.result
+                if (data) {
+                    const workbook = XLSX.read(data, { type: 'binary' })
+                    const firstSheetName = workbook.SheetNames[0]
+                    const worksheet = workbook.Sheets[firstSheetName]
+                    const json = XLSX.utils.sheet_to_json(worksheet)
+                    axios({
+                        url: 'assets/',
+                        data: JSON.parse(JSON.stringify(json)),
+                        method: "POST",
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                        .then(response => {
+                            console.log(response.data);
+                        })
+                        .catch(error => {
+                            dialogError.value = true
+                            console.error(error)
+                        })
+                }
+            }
+            reader.readAsBinaryString(file)
+        }
+    }
+    input.click()
 }
 
 // 编辑

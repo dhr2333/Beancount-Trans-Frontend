@@ -69,7 +69,7 @@ function changeType() {
 const login = async () => {
   if (username1.value != "" && password.value != "") {
     try {
-      const res = await axios.post(apiUrl + 'token/', {
+      const res = await axios.post(apiUrl + 'login/', {
         username: username1.value,
         password: password.value
       });
