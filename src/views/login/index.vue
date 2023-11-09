@@ -6,8 +6,8 @@
         <div class="big-contain" key="bigContainLogin" v-if="isLogin">
           <div class="btitle">账户登录</div>
           <div class="bform">
-            <input type="username" placeholder="用户名" v-model="username1" />
-            <span class="errTips" v-if="emailError">* 用户名无效 *</span>
+            <input type="username" placeholder="用户名 或 手机号" v-model="username1" />
+            <span class="errTips" v-if="emailError">* 用户名 或 手机号无效 *</span>
             <input type="password" placeholder="密码" v-model="password" />
             <span class="errTips" v-if="emailError">* 密码填写错误 *</span>
           </div>
@@ -18,8 +18,9 @@
           <div class="bform">
             <input type="text" placeholder="用户名" v-model="username1" />
             <span class="errTips" v-if="existed">* 用户名已经存在！ *</span>
-            <input type="email" placeholder="邮箱" v-model="useremail" />
+            <input type="mobile" placeholder="手机号" v-model="mobile" />
             <input type="password" placeholder="密码" v-model="password" />
+            <input type="password" placeholder="确认密码" v-model="password2" />
           </div>
           <button class="bbutton" @click="register">注册</button>
         </div>
@@ -55,16 +56,18 @@ const emailError = ref(false);
 const passwordError = ref(false);
 const existed = ref(false);
 const username1 = ref("");
-const useremail = ref("");
+const mobile = ref("");
 const password = ref("");
+const password2 = ref("");
 console.log(apiUrl);
 
 
 function changeType() {
   isLogin.value = !isLogin.value;
   username1.value = "";
-  useremail.value = "";
+  mobile.value = "";
   password.value = "";
+  password2.value = "";
 }
 const login = async () => {
   if (username1.value != "" && password.value != "") {
@@ -97,7 +100,29 @@ const login = async () => {
   }
 }
 const register = () => {
-
+  if (username1.value != "" && mobile.value != "" && password.value != "" && password2.value != "") {
+    axios.post(apiUrl + 'user/create/', {
+      username: username1.value,
+      mobile: mobile.value,
+      password: password.value,
+      password2: password2.value
+    })
+      .then((res) => {
+        console.log(res.data);
+        if (res.data.code == 200) {
+          isLogin.value = !isLogin.value;
+          username1.value = "";
+          mobile.value = "";
+          password.value = "";
+          password2.value = "";
+        } else if (res.data.code == 400) {
+          existed.value = true;
+        }
+      })
+      .catch((err) => {
+        console.log(err);
+      })
+  }
 }
 
 // function login() {
