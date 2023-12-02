@@ -31,8 +31,8 @@
         </span>
       </template>
     </el-table-column>
-    <el-table-column label="标签" prop="tag" />
-    <el-table-column label="类型" prop="classification" />
+    <!-- <el-table-column label="标签" prop="tag" />
+    <el-table-column label="类型" prop="classification" /> -->
     <el-table-column align="right">
       <template #header>
         <div style="display: flex">
@@ -60,12 +60,12 @@
       <el-form-item label="映射账户" prop="expend">
         <el-input v-model="ruleForm.expend" placeholder="Expenses:Culture:Entertainment" />
       </el-form-item>
-      <el-form-item label="标签" prop="tag">
+      <!-- <el-form-item label="标签" prop="tag">
         <el-input v-model="ruleForm.tag" placeholder="影音娱乐" />
       </el-form-item>
       <el-form-item label="类型" prop="classification">
         <el-input v-model="ruleForm.classification" placeholder="文化休闲/影音娱乐" />
-      </el-form-item>
+      </el-form-item> -->
       <el-form-item>
         <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
         <el-button @click="resetForm(ruleFormRef)">重置</el-button>
@@ -83,12 +83,12 @@
       <el-form-item label="映射账户" prop="expend">
         <el-input v-model="ruleForm.expend" />
       </el-form-item>
-      <el-form-item label="标签" prop="tag">
+      <!-- <el-form-item label="标签" prop="tag">
         <el-input v-model="ruleForm.tag" />
       </el-form-item>
       <el-form-item label="类型" prop="classification">
         <el-input v-model="ruleForm.classification" />
-      </el-form-item>
+      </el-form-item> -->
       <el-form-item>
         <el-button type="primary" @click="editForm(ruleFormRef)">保存</el-button>
         <el-button @click="dialogEdit = false">取消</el-button>
@@ -128,8 +128,8 @@ interface Expense {
   key: string
   payee: string | null | undefined
   expend: string
-  tag: string
-  classification: string
+  // tag: string
+  // classification: string
 }
 
 // 页面增加优先级提示
@@ -185,8 +185,8 @@ const ruleForm = ref({
   // payee: null,
   payee: null as string | null | undefined,
   expend: '',
-  tag: '',
-  classification: '',
+  // tag: '',
+  // classification: '',
 })
 
 const rules = ref<FormRules>({
@@ -201,14 +201,14 @@ const rules = ref<FormRules>({
     { required: true, message: '请输入映射账户', trigger: 'blur' },
     { max: 64, message: '长度应控制在64个字符以内', trigger: 'blur' },
   ],
-  tag: [
-    { required: true, message: '请输入标签', trigger: 'blur' },
-    { max: 16, message: '长度应控制在16个字符以内', trigger: 'blur' },
-  ],
-  classification: [
-    { required: true, message: '请输入类型', trigger: 'blur' },
-    { max: 16, message: '长度应控制在16个字符以内', trigger: 'blur' },
-  ],
+  // tag: [
+  //   { required: true, message: '请输入标签', trigger: 'blur' },
+  //   { max: 16, message: '长度应控制在16个字符以内', trigger: 'blur' },
+  // ],
+  // classification: [
+  //   { required: true, message: '请输入类型', trigger: 'blur' },
+  //   { max: 16, message: '长度应控制在16个字符以内', trigger: 'blur' },
+  // ],
 })
 
 // 弹窗重置
@@ -313,8 +313,8 @@ const handleEdit = (index: number, row: Expense) => {
   ruleForm.value.key = row.key
   ruleForm.value.payee = row.payee !== null ? row.payee : null // 为了解决编辑时payee为null时的问题;
   ruleForm.value.expend = row.expend
-  ruleForm.value.tag = row.tag
-  ruleForm.value.classification = row.classification
+  // ruleForm.value.tag = row.tag
+  // ruleForm.value.classification = row.classification
   dialogEdit.value = true
   selectedId.value = row.id
   console.log(index)

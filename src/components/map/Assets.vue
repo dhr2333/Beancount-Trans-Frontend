@@ -2,8 +2,23 @@
     <el-table :data="filterExpenseData" style="width: 98%">
         <!-- <el-table-column label="编号" prop="id" /> -->
         <el-table-column label="关键字" prop="key" />
-        <el-table-column label="账户" prop="full" />
-        <el-table-column label="映射账户" prop="income" />
+        <el-table-column label="账户" prop="full">
+            <template #header="{ column }">
+                <span>
+                    {{ column.label }}
+                    <span class="tooltip-icon" @mouseover="showTooltip = true" @mouseleave="showTooltip = false">
+                        <i class="el-icon-question"></i>
+                    </span>
+                    <el-tooltip v-if="showTooltip" class="tooltip" effect="dark" placement="top"
+                        :content="assetstipContent">
+                        <el-icon>
+                            <InfoFilled />
+                        </el-icon>
+                    </el-tooltip>
+                </span>
+            </template>
+        </el-table-column>
+        <el-table-column label="映射账户" prop="assets" />
         <el-table-column align="right">
             <template #header>
                 <div style="display: flex">
@@ -28,8 +43,8 @@
             <el-form-item label="账户" prop="full">
                 <el-input v-model="ruleForm.full" placeholder="中国建设银行储蓄卡(0000)" />
             </el-form-item>
-            <el-form-item label="映射账户" prop="income">
-                <el-input v-model="ruleForm.income" placeholder="Assets:Savings:Bank:Jianshe:C0000" />
+            <el-form-item label="映射账户" prop="assets">
+                <el-input v-model="ruleForm.assets" placeholder="Assets:Savings:Bank:Jianshe:C0000" />
             </el-form-item>
             <el-form-item>
                 <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
@@ -46,7 +61,7 @@
                 <el-input v-model="ruleForm.full" />
             </el-form-item>
             <el-form-item label="映射账户" prop="expend">
-                <el-input v-model="ruleForm.income" />
+                <el-input v-model="ruleForm.assets" />
             </el-form-item>
             <el-form-item>
                 <el-button type="primary" @click="editForm(ruleFormRef)">保存</el-button>
@@ -85,8 +100,12 @@ interface Assets {
     id: number
     key: string
     full: string
-    income: string
+    assets: string
 }
+
+// 页面增加优先级提示
+const showTooltip = ref(true)
+const assetstipContent = ref("固定格式： [银行]+[储蓄卡/信用卡]+([卡号])。用于支付宝还款功能映射 and 支付宝提现至储蓄卡");
 
 // 页面获取数据
 const AssetsData = ref<Assets[]>([])
@@ -132,7 +151,7 @@ const ruleFormRef = ref<FormInstance>()
 const ruleForm = ref({
     key: '',
     full: '',
-    income: '',
+    assets: '',
 })
 
 const rules = ref<FormRules>({
@@ -144,7 +163,7 @@ const rules = ref<FormRules>({
         { required: true, message: '请输入账户', trigger: 'blur' },
         { max: 16, message: '长度应控制在16个字符以内', trigger: 'blur' },
     ],
-    income: [
+    assets: [
         { required: true, message: '请输入映射账户', trigger: 'blur' },
         { max: 64, message: '长度应控制在64个字符以内', trigger: 'blur' },
     ],
@@ -245,7 +264,7 @@ const dialogEdit = ref(false)
 const handleEdit = (index: number, row: Assets) => {
     ruleForm.value.key = row.key
     ruleForm.value.full = row.full
-    ruleForm.value.income = row.income
+    ruleForm.value.assets = row.assets
     dialogEdit.value = true
     selectedId.value = row.id
     console.log(index, row)
