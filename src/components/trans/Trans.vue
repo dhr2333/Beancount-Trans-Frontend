@@ -1,6 +1,6 @@
 <template>
   <el-upload class="upload-demo" :drag="true" :action=action method="POST" :multiple="false" :headers=headers
-    accept=".csv" show-file-list name="trans" @success="handleUploadSuccess">
+    accept=".csv" show-file-list name="trans" @success="handleUploadSuccess" @error="handleUploadError">
     <el-icon class="el-icon--upload"><upload-filled /></el-icon>
     <div class="el-upload__text">
       拖拽文件至此处 或 <em>单击上传</em>
@@ -23,6 +23,7 @@
 </template>
 
 <script setup lang="ts">
+import { ElMessage } from 'element-plus';
 import { UploadFilled } from '@element-plus/icons-vue'
 import { ref, computed } from 'vue';
 import axios from '../../utils/request';
@@ -50,8 +51,22 @@ const headers = computed(() => ({
 }))
 
 const responseData = ref('')
-const handleUploadSuccess = (response: any) => {
+
+const handleUploadSuccess = (response: any, file: any) => {
+  if (file.status === 'error') {
+    return;  // 当状态为'error'时，错误会由handleUploadError处理
+  }
   responseData.value = response.join('');
   console.log(responseData.value);
-}
+};
+
+const handleUploadError = (err: any, file: any) => {
+  if (err.status === 400) {
+    // 假设错误信息在err.message中
+    ElMessage.error("请上传支持的账单文件");
+  } else {
+    // 其他错误
+    ElMessage.error(err.message);
+  }
+};
 </script>

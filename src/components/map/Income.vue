@@ -87,6 +87,7 @@
 </template>
 
 <script lang="ts" setup>
+import { ElMessage } from 'element-plus';
 import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import axios from '../../utils/request'
@@ -191,7 +192,18 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                         console.log(response.data);
                     })
                     .catch(error => {
-                        dialogError.value = true
+                        if (error.response && error.response.status == 401) {
+                            ElMessage.info('权限不足，请登录后重试');
+                        }
+                        else if (error.response && error.response.status == 403) {
+                            ElMessage.info('权限不足，请登录后重试');
+                        }
+                        else if (error.response && error.response.status == 400) {
+                            ElMessage.error('新增失败，请检查关键字是否冲突');
+                        }
+                        else {
+                            dialogError.value = true
+                        }
                         console.error(error)
                     })
                 dialogAdd.value = false
@@ -246,12 +258,25 @@ const handleImport = () => {
                             console.log(response.data);
                         })
                         .catch(error => {
-                            dialogError.value = true
+                            if (error.response && error.response.status == 401) {
+                                ElMessage.info('权限不足，请登录后重试');
+                            }
+                            else if (error.response && error.response.status == 403) {
+                                ElMessage.info('权限不足，请登录后重试');
+                            }
+                            else if (error.response && error.response.status == 400) {
+                                ElMessage.error('导入失败，请按"导出"提供的格式重新导入');
+                            }
+                            else {
+                                dialogError.value = true
+                            }
                             console.error(error)
                         })
                 }
             }
-            reader.readAsBinaryString(file)
+            if (file !== null) {
+                reader.readAsBinaryString(file);
+            }
         }
     }
     input.click()
@@ -284,7 +309,18 @@ const editForm = async (formEl: FormInstance | undefined) => {
                         console.log(response.data);
                     })
                     .catch(error => {
-                        dialogError.value = true
+                        if (error.response && error.response.status == 401) {
+                            ElMessage.info('权限不足，请登录后重试');
+                        }
+                        else if (error.response && error.response.status == 403) {
+                            ElMessage.info('权限不足，请登录后重试');
+                        }
+                        else if (error.response && error.response.status == 400) {
+                            ElMessage.error('修改失败，请检查关键字是否冲突');
+                        }
+                        else {
+                            dialogError.value = true
+                        }
                         console.error(error)
                     })
                 dialogEdit.value = false

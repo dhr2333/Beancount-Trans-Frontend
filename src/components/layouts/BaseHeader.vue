@@ -25,8 +25,13 @@
     </el-sub-menu>
     <router-link to="/assets/account" class="no-underline"><el-menu-item
         index="/account">资产总表</el-menu-item></router-link>
-
     <div class="flex-grow" />
+    <el-menu-item>
+      <el-link href="https://github.com/dhr2333/Beancount-Trans" target="_blank">
+        <img src="/assets/github-logo.png" alt="GitHub Logo" style="width: 30px;">
+        <!-- <i class="el-icon-github"></i> GitHub -->
+      </el-link>
+    </el-menu-item>
     <el-sub-menu index="manager">
       <template #title>{{ username }}</template>
       <router-link to="" class="no-underline"><el-menu-item index="" @click="user()">个人中心</el-menu-item></router-link>
