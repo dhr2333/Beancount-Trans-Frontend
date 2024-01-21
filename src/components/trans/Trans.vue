@@ -1,13 +1,13 @@
 <template>
   <el-upload class="upload-demo" :drag="true" :action=action method="POST" :multiple="false" :headers=headers
-    accept=".csv" show-file-list name="trans" @success="handleUploadSuccess" @error="handleUploadError">
+    accept=".csv,.pdf" show-file-list name="trans" @success="handleUploadSuccess" @error="handleUploadError">
     <el-icon class="el-icon--upload"><upload-filled /></el-icon>
     <div class="el-upload__text">
       拖拽文件至此处 或 <em>单击上传</em>
     </div>
     <template #tip>
       <div class="el-upload__tip">
-        当前仅支持微信账单及支付宝账单
+        当前支持微信、支付宝及招商银行信用卡账单
       </div>
     </template>
   </el-upload>

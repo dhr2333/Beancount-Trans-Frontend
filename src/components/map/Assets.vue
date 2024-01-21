@@ -118,7 +118,8 @@ const fetchData = async () => {
     } catch (error: any) {
         console.error(error)
         if (error.response.data.code == "token_not_valid") {
-            router.push('/login')
+            // router.push('/login')
+            ElMessage("token_not_valid")
             console.log("token_not_valid");
         }
     }

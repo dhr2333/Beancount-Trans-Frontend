@@ -6,7 +6,6 @@ import Trans from "./components/trans/Trans.vue"
 import Assets from "./components/map/Assets.vue"
 import Expenses from "./components/map/Expenses.vue"
 import Income from "./components/map/Income.vue"
-import Liabilities from "./components/map/Liabilities.vue"
 import Event from "./components/bill/Event.vue"
 import Commodity from "./components/bill/Commodity.vue"
 import BillAccount from "./components/bill/Account.vue"
@@ -30,7 +29,6 @@ const router = createRouter({
     { path: '/map/assets',name:"assets", component: Assets },
     { path: '/map/expenses',name:"expenses", component: Expenses },
     { path: '/map/income',name:"income", component: Income },
-    { path: '/map/Liabilities',name:"Liabilities", component: Liabilities },
     { path: '/bill/account',name:"billaccount", component: BillAccount },
     { path: '/bill/event',name:"event", component: Event },
     { path: '/bill/commodity',name:"commodity", component: Commodity },
