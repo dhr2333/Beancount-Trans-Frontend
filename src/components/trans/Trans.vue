@@ -1,6 +1,7 @@
 <template>
-  <el-upload class="upload-demo" :drag="true" :action=action method="POST" :multiple="false" :headers=headers
-    accept=".csv,.pdf" show-file-list name="trans" @success="handleUploadSuccess" @error="handleUploadError">
+  <el-upload class="upload-demo" :drag="true" :action=action method="POST" :data=uploadData :multiple="false"
+    :headers=headers accept=".csv,.pdf" show-file-list name="trans" @success="handleUploadSuccess"
+    @error="handleUploadError">
     <el-icon class="el-icon--upload"><upload-filled /></el-icon>
     <div class="el-upload__text">
       拖拽文件至此处 或 <em>单击上传</em>
@@ -8,6 +9,10 @@
     <template #tip>
       <div class="el-upload__tip">
         当前支持微信、支付宝及招商银行信用卡账单
+        <el-select v-model="value4" multiple collapse-tags collapse-tags-tooltip :max-collapse-tags="2"
+          placeholder="可选功能" style="width: 300px">
+          <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
       </div>
     </template>
   </el-upload>
@@ -25,12 +30,38 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus';
 import { UploadFilled } from '@element-plus/icons-vue'
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import axios from '../../utils/request';
 // import { responseData } from '../../utils/request';
 
+const value4 = ref([])
+const options = [
+  {
+    value: '写入Beancount-Trans-Assets',
+    label: '写入Beancount-Trans-Assets',
+  },
+  {
+    value: '招行信用卡忽略支付宝微信条目',
+    label: '招行信用卡忽略支付宝微信条目',
+  },
+]
+
 const csrfToken = ref('');
 const action = axios.defaults.baseURL + '/translate/trans'
+
+const uploadData = { zhaoshang_ignore: "False", write: "False" }
+watch(value4, (newValue) => {
+  if (newValue.includes('写入Beancount-Trans-Assets')) {
+    uploadData.write = "True";
+  } else {
+    uploadData.write = "False";
+  };
+  if (newValue.includes('招行信用卡忽略支付宝微信条目')) {
+    uploadData.zhaoshang_ignore = "True";
+  } else {
+    uploadData.zhaoshang_ignore = "False";
+  }
+});
 
 axios.defaults.withCredentials = true
 axios.get('translate/trans').then(res => {
@@ -47,7 +78,7 @@ const token = localStorage.getItem("token");
 const headers = computed(() => ({
   //   'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
   'X-CSRFToken': csrfToken.value,
-  "Authorization": `Bearer ${token}`
+  "Authorization": `Bearer ${token}`,
 }))
 
 const responseData = ref('')
