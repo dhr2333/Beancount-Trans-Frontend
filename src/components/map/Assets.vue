@@ -24,8 +24,10 @@
                 <div style="display: flex">
                     <el-input v-model="search" size="small" placeholder="搜索 关键字" />
                     <el-button size="small" type="info" @click="handleAdd()" style="margin-left: 12px">新增</el-button>
-                    <el-button size="small" type="default" @click="handleImport()" style="margin-left: 12px">导入</el-button>
-                    <el-button size="small" type="default" @click="handleExport()" style="margin-left: 12px">导出</el-button>
+                    <el-button size="small" type="default" @click="handleImport()"
+                        style="margin-left: 12px">导入</el-button>
+                    <el-button size="small" type="default" @click="handleExport()"
+                        style="margin-left: 12px">导出</el-button>
                 </div>
             </template>
             <template #default="scope">
@@ -36,7 +38,8 @@
         </el-table-column>
     </el-table>
     <el-dialog v-model="dialogAdd" title="新增映射" width="30%">
-        <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="120px" class="demo-ruleForm" status-icon>
+        <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="120px" class="demo-ruleForm"
+            status-icon>
             <el-form-item label="关键字" prop="key">
                 <el-input v-model="ruleForm.key" placeholder="0000" />
             </el-form-item>
@@ -53,7 +56,8 @@
         </el-form>
     </el-dialog>
     <el-dialog v-model="dialogEdit" title="修改映射" width="30%">
-        <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="120px" class="demo-ruleForm" status-icon>
+        <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="120px" class="demo-ruleForm"
+            status-icon>
             <el-form-item label="关键字" prop="key">
                 <el-input v-model="ruleForm.key" />
             </el-form-item>
@@ -138,7 +142,8 @@ const filterExpenseData = computed(() =>
     AssetsData.value.filter(
         (data) =>
             !search.value ||
-            data.full.toLowerCase().includes(search.value.toLowerCase())
+            data.full.toLowerCase().includes(search.value.toLowerCase()) ||
+            data.assets.toLowerCase().includes(search.value.toLowerCase())
     )
 )
 
