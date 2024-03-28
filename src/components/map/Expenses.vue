@@ -170,7 +170,8 @@ const filterExpenseData = computed(() =>
   expenseData.value.filter(
     (data) =>
       !search.value ||
-      data.key.toLowerCase().includes(search.value.toLowerCase())
+      data.key.toLowerCase().includes(search.value.toLowerCase()) ||
+      data.expend.toLowerCase().includes(search.value.toLowerCase())
   )
 )
 

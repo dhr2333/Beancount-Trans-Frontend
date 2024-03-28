@@ -1,4 +1,3 @@
-
 <template>
   <div class="login-register">
     <div class="contain">
@@ -72,7 +71,7 @@ function changeType() {
 const login = async () => {
   if (username1.value != "" && password.value != "") {
     try {
-      const res = await axios.post(apiUrl + 'login/', {
+      const res = await axios.post(apiUrl + '/login/', {
         username: username1.value,
         password: password.value
       });
@@ -99,9 +98,9 @@ const login = async () => {
     }
   }
 }
-const register = () => {
+const register = async () => {
   if (username1.value != "" && mobile.value != "" && password.value != "" && password2.value != "") {
-    axios.post(apiUrl + 'user/create/', {
+    axios.post(apiUrl + '/user/create/', {
       username: username1.value,
       mobile: mobile.value,
       password: password.value,
