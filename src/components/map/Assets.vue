@@ -1,7 +1,22 @@
 <template>
     <el-table :data="filterExpenseData" style="width: 98%">
         <!-- <el-table-column label="编号" prop="id" /> -->
-        <el-table-column label="关键字" prop="key" />
+        <el-table-column label="关键字" prop="key">
+            <template #header="{ column }">
+                <span>
+                    {{ column.label }}
+                    <span class="tooltip-icon" @mouseover="showTooltip = true" @mouseleave="showTooltip = false">
+                        <i class="el-icon-question"></i>
+                    </span>
+                    <el-tooltip v-if="showTooltip" class="tooltip" effect="dark" placement="top"
+                        :content="keytipContent">
+                        <el-icon>
+                            <InfoFilled />
+                        </el-icon>
+                    </el-tooltip>
+                </span>
+            </template>
+        </el-table-column>
         <el-table-column label="账户" prop="full">
             <template #header="{ column }">
                 <span>
@@ -110,6 +125,7 @@ interface Assets {
 
 // 页面增加优先级提示
 const showTooltip = ref(true)
+const keytipContent = ref("账户相似时，详细账户的优先级应更高，例如'零钱通'应在'零钱'的前面");
 const assetstipContent = ref("固定格式： [银行]+[储蓄卡/信用卡]+([卡号])。用于支付宝还款功能映射 and 支付宝提现至储蓄卡");
 
 // 页面获取数据

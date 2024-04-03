@@ -1,6 +1,6 @@
 <template>
   <el-menu class="el-menu-demo" mode="horizontal" :ellipsis="false" @select="handleSelect">
-    <el-menu-item index="/account"><el-link href="http://127.0.0.1:5000">我的账本</el-link></el-menu-item>
+    <el-menu-item index="/account"><el-link href="http://localhost:5000">我的账本</el-link></el-menu-item>
     <router-link to="/trans" class="no-underline"><el-menu-item index="/trans">格式转换</el-menu-item></router-link>
 
     <el-sub-menu index="map">
@@ -27,6 +27,15 @@
         index="/account">资产总表</el-menu-item></router-link>
     <div class="flex-grow" />
     <el-menu-item>
+      <el-popover placement="top-start" :width="200" trigger="hover">
+        <template #reference>
+          <img src="/assets/openai-icon-2021x2048-4rpe5x7n.png" alt="Openai Logo" style="width: 30px;">
+        </template>
+        <p>基于gpt-3.5-turbo</p>
+        <img src="/assets/wechat-channel.jpg" alt="Wechat-Channel" style="max-width: 100%;" slot="content">
+      </el-popover>
+    </el-menu-item>
+    <el-menu-item>
       <el-link href="https://github.com/dhr2333/Beancount-Trans" target="_blank">
         <img src="/assets/github-logo.png" alt="GitHub Logo" style="width: 30px;">
         <!-- <i class="el-icon-github"></i> GitHub -->
@@ -35,6 +44,8 @@
     <el-sub-menu index="manager">
       <template #title>{{ username }}</template>
       <router-link to="" class="no-underline"><el-menu-item index="" @click="user()">个人中心</el-menu-item></router-link>
+      <el-menu-item><a href="https://www.dhr2333.cn/article/2022/9/10/52.html" class="help-link"
+          target="_blank">帮助手册</a></el-menu-item>
       <el-menu-item index="logout" @click="cleanToken">退出登录</el-menu-item>
     </el-sub-menu>
   </el-menu>
@@ -134,5 +145,13 @@ onMounted(() => {
 
 .no-left-padding {
   padding-left: 0px;
+}
+
+.help-link {
+  display: block;
+  height: 100%;
+  width: 100%;
+  color: inherit;
+  text-decoration: none;
 }
 </style>

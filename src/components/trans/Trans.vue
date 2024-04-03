@@ -8,7 +8,7 @@
     </div>
     <template #tip>
       <div class="el-upload__tip">
-        当前支持微信、支付宝及招商银行信用卡账单
+        当前支持<a :href="wechatUrl" download>微信</a>、<a :href="alipayUrl" download>支付宝</a>及招商银行信用卡账单
         <el-select v-model="value4" multiple collapse-tags collapse-tags-tooltip :max-collapse-tags="2"
           placeholder="可选功能" style="width: 300px">
           <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value" />
@@ -34,6 +34,8 @@ import { ref, computed, watch } from 'vue';
 import axios from '../../utils/request';
 // import { responseData } from '../../utils/request';
 
+const wechatUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E5%BE%AE%E4%BF%A1.csv');
+const alipayUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E6%94%AF%E4%BB%98%E5%AE%9D.csv');
 const value4 = ref([])
 const options = [
   {
