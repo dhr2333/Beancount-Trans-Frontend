@@ -5,9 +5,9 @@
         <div class="big-contain" key="bigContainLogin" v-if="isLogin">
           <div class="btitle">账户登录</div>
           <div class="bform">
-            <input type="username" placeholder="用户名 或 手机号" v-model="username1" />
+            <input type="username" placeholder="用户名(默认admin) 或 手机号(默认11111111111)" v-model="username1" />
             <span class="errTips" v-if="emailError">* 用户名 或 手机号无效 *</span>
-            <input type="password" placeholder="密码" v-model="password" />
+            <input type="password" placeholder="密码(默认123456)" v-model="password" />
             <span class="errTips" v-if="emailError">* 密码填写错误 *</span>
           </div>
           <button class="bbutton" @click="login">登录</button>
