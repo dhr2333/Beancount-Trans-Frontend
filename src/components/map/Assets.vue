@@ -132,7 +132,7 @@ const assetstipContent = ref("固定格式： [银行]+[储蓄卡/信用卡]+([�
 const AssetsData = ref<Assets[]>([])
 const fetchData = async () => {
     try {
-        const response = await axios.get('assets/')
+        const response = await axios.get('aassets/')
         AssetsData.value = response.data
         console.log(AssetsData.value);
     } catch (error: any) {
@@ -206,7 +206,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
         if (valid) {
             try {
                 axios({
-                    url: 'assets/',
+                    url: 'aassets/',
                     data: JSON.parse(JSON.stringify(ruleForm.value)),
                     method: "POST",
                     headers: { 'Content-Type': 'application/json' }
@@ -272,7 +272,7 @@ const handleImport = () => {
                     const worksheet = workbook.Sheets[firstSheetName]
                     const json = XLSX.utils.sheet_to_json(worksheet)
                     axios({
-                        url: 'assets/',
+                        url: 'aassets/',
                         data: JSON.parse(JSON.stringify(json)),
                         method: "POST",
                         headers: { 'Content-Type': 'application/json' }
@@ -323,7 +323,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
         if (valid) {
             try {
                 axios({
-                    url: `assets/${selectedId.value}/`,
+                    url: `aassets/${selectedId.value}/`,
                     data: JSON.parse(JSON.stringify(ruleForm.value)),
                     method: "PUT",
                     headers: { 'Content-Type': 'application/json' }
@@ -370,7 +370,7 @@ const handleDelete = (index: number, row: Assets) => {
 // 删除确认
 const confirmDelete = async () => {
     try {
-        const response = await axios.delete(`assets/${selectedId.value}/`);
+        const response = await axios.delete(`aassets/${selectedId.value}/`);
         console.log(response.data);
         dialogDel.value = false
         // const get = await axios.get('assets')

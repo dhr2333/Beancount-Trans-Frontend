@@ -29,15 +29,15 @@
     <el-menu-item>
       <el-popover placement="top-start" :width="200" trigger="hover">
         <template #reference>
-          <img src="/assets/openai-icon-2021x2048-4rpe5x7n.png" alt="Openai Logo" style="width: 30px;">
+          <img src="/images/openai-icon-2021x2048-4rpe5x7n.png" alt="Openai Logo" style="width: 30px;">
         </template>
         <p>基于gpt-3.5-turbo</p>
-        <img src="/assets/wechat-channel.jpg" alt="Wechat-Channel" style="max-width: 100%;" slot="content">
+        <img src="/images/wechat-channel.jpg" alt="Wechat-Channel" style="max-width: 100%;" slot="content">
       </el-popover>
     </el-menu-item>
     <el-menu-item>
       <el-link href="https://github.com/dhr2333/Beancount-Trans" target="_blank">
-        <img src="/assets/github-logo.png" alt="GitHub Logo" style="width: 30px;">
+        <img src="/images/github-logo.png" alt="GitHub Logo" style="width: 30px;">
         <!-- <i class="el-icon-github"></i> GitHub -->
       </el-link>
     </el-menu-item>

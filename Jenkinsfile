@@ -13,7 +13,7 @@ pipeline {
         }
         stage('Modify Configuration'){
             steps {
-                sh '''sed -i \'s/^# VITE_API_URL = "https:\\/\\/trans.dhr2333.cn\\/api"/VITE_API_URL = "https:\\/\\/trans.dhr2333.cn\\/api"/\' .env\nsed -i \'s/^VITE_API_URL = "http:\\/\\/localhost:38001\\/api"/# VITE_API_URL = "http:\\/\\/localhost:38001\\/api"/\' .env\ncat .env'''
+                sh '''sed -i \'s/^# VITE_API_URL = "https:\\/\\/trans.dhr2333.cn\\"/VITE_API_URL = "https:\\/\\/trans.dhr2333.cn\\"/\' .env\nsed -i \'s/^VITE_API_URL = "http:\\/\\/localhost:38001\\/api"/# VITE_API_URL = "http:\\/\\/localhost:38001\\/api"/\' .env\nsed -i \'s/^VITE_API_URL = "http:\\/\\/localhost:38001\\"/# VITE_API_URL = "http:\\/\\/localhost:38001\\"/\' .env\ncat .env'''
             }
         }
 //         stage('Src Build'){
