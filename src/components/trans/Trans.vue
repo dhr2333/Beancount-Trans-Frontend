@@ -1,5 +1,5 @@
 <template>
-  <el-upload class="upload-demo" :drag="true" :action=action method="POST" :data=uploadData :multiple="false"
+  <el-upload class="upload-demo" :drag="true" :action=action method="POST" :data="getUploadData" :multiple="false"
     :headers=headers accept=".csv,.pdf" show-file-list name="trans" @success="handleUploadSuccess"
     @error="handleUploadError">
     <el-icon class="el-icon--upload"><upload-filled /></el-icon>
@@ -8,11 +8,21 @@
     </div>
     <template #tip>
       <div class="el-upload__tip">
-        当前支持<a :href="wechatUrl" download>微信</a>、<a :href="alipayUrl" download>支付宝</a>及招商银行信用卡账单
+        当前支持<a :href="wechatUrl" download>微信</a>、<a :href="alipayUrl" download>支付宝</a>、
+        <el-popover placement="top-start" :width="200" trigger="hover" content="中国银行储蓄卡（BOC）">
+          <template #reference><a>储蓄卡</a>
+          </template>
+        </el-popover>、
+        <el-popover placement="top-start" :width="200" trigger="hover" content="招商银行信用卡（CMB）">
+          <template #reference><a>信用卡</a>
+          </template>
+        </el-popover>账单
         <el-select v-model="value4" multiple collapse-tags collapse-tags-tooltip :max-collapse-tags="2"
           placeholder="可选功能" style="width: 300px">
           <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
+        <el-input v-model="input" style="width: 250px" type="password" v-if="showPassword"
+          placeholder="输入PDF文件解密密码后再上传文件" show-password />
       </div>
     </template>
   </el-upload>
@@ -33,7 +43,8 @@ import { UploadFilled } from '@element-plus/icons-vue'
 import { ref, computed, watch } from 'vue';
 import axios from '../../utils/request';
 // import { responseData } from '../../utils/request';
-
+const input = ref()
+console.log(input)
 const wechatUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E5%BE%AE%E4%BF%A1.csv');
 const alipayUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E6%94%AF%E4%BB%98%E5%AE%9D.csv');
 const value4 = ref([])
@@ -46,12 +57,24 @@ const options = [
     value: '招行信用卡忽略支付宝微信条目',
     label: '招行信用卡忽略支付宝微信条目',
   },
+  {
+    value: '文件若加密请选择',
+    label: '文件若加密请选择',
+  }
 ]
 
 const csrfToken = ref('');
 const action = axios.defaults.baseURL + '/translate/trans'
 
-const uploadData = { zhaoshang_ignore: "False", write: "False" }
+const uploadData = { zhaoshang_ignore: "False", write: "False", password: input.value }
+const getUploadData = () => {
+  return {
+    zhaoshang_ignore: uploadData.zhaoshang_ignore,
+    write: uploadData.write,
+    password: input.value
+  };
+};
+const showPassword = ref(false)
 watch(value4, (newValue) => {
   if (newValue.includes('写入Beancount-Trans-Assets')) {
     uploadData.write = "True";
@@ -62,6 +85,11 @@ watch(value4, (newValue) => {
     uploadData.zhaoshang_ignore = "True";
   } else {
     uploadData.zhaoshang_ignore = "False";
+  };
+  if (newValue.includes('文件若加密请选择')) {
+    showPassword.value = true;
+  } else {
+    showPassword.value = false;
   }
 });
 
@@ -94,12 +122,20 @@ const handleUploadSuccess = (response: any, file: any) => {
 };
 
 const handleUploadError = (err: any, file: any) => {
-  if (err.status === 400) {
+  if (err.status === 501) {
     // 假设错误信息在err.message中
-    ElMessage.error("请上传支持的账单文件");
+    ElMessage.error(err.message);
+  } else if (err.status === 403) {
+    // pdf文件解密失败
+    ElMessage.error("pdf解密失败或其他问题");
   } else {
     // 其他错误
-    ElMessage.error(err.message);
+    ElMessage.error("请上传支持的账单文件");
   }
 };
 </script>
+<!-- <style scoped>
+.el-button+.el-button {
+  margin-left: 8px;
+}
+</style> -->
