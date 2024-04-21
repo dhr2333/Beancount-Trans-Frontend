@@ -66,10 +66,10 @@ const options = [
 const csrfToken = ref('');
 const action = axios.defaults.baseURL + '/translate/trans'
 
-const uploadData = { zhaoshang_ignore: "False", write: "False", password: input.value }
+const uploadData = { cmb_credit_ignore: "False", write: "False", password: input.value }
 const getUploadData = () => {
   return {
-    zhaoshang_ignore: uploadData.zhaoshang_ignore,
+    cmb_credit_ignore: uploadData.cmb_credit_ignore,
     write: uploadData.write,
     password: input.value
   };
@@ -82,9 +82,9 @@ watch(value4, (newValue) => {
     uploadData.write = "False";
   };
   if (newValue.includes('招行信用卡忽略支付宝微信条目')) {
-    uploadData.zhaoshang_ignore = "True";
+    uploadData.cmb_credit_ignore = "True";
   } else {
-    uploadData.zhaoshang_ignore = "False";
+    uploadData.cmb_credit_ignore = "False";
   };
   if (newValue.includes('文件若加密请选择')) {
     showPassword.value = true;
