@@ -62,7 +62,7 @@
                 <el-input v-model="ruleForm.full" placeholder="中国建设银行储蓄卡(0000)" />
             </el-form-item>
             <el-form-item label="映射账户" prop="assets">
-                <el-input v-model="ruleForm.assets" placeholder="Assets:Savings:Bank:Jianshe:C0000" />
+                <el-input v-model="ruleForm.assets" placeholder="Assets:Savings:Bank:CCB:C0000" />
             </el-form-item>
             <el-form-item>
                 <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>

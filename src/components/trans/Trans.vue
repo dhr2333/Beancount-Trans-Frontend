@@ -1,6 +1,6 @@
 <template>
   <el-upload class="upload-demo" :drag="true" :action=action method="POST" :data="getUploadData" :multiple="false"
-    :headers=headers accept=".csv,.pdf" show-file-list name="trans" @success="handleUploadSuccess"
+    :headers=headers accept=".csv,.pdf,.xls,.xlsx" show-file-list name="trans" @success="handleUploadSuccess"
     @error="handleUploadError">
     <el-icon class="el-icon--upload"><upload-filled /></el-icon>
     <div class="el-upload__text">
@@ -9,11 +9,15 @@
     <template #tip>
       <div class="el-upload__tip">
         当前支持<a :href="wechatUrl" download>微信</a>、<a :href="alipayUrl" download>支付宝</a>、
-        <el-popover placement="top-start" :width="200" trigger="hover" content="中国银行储蓄卡（BOC）">
+        <el-popover placement="top-start" :width="220" trigger="hover" content="
+        中国工商银行储蓄卡（ICBC）
+        中国建设银行储蓄卡（CCB）
+        中国银行储蓄卡（BOC）
+        ">
           <template #reference><a>储蓄卡</a>
           </template>
         </el-popover>、
-        <el-popover placement="top-start" :width="200" trigger="hover" content="招商银行信用卡（CMB）">
+        <el-popover placement="top-start" :width="220" trigger="hover" content="招商银行信用卡（CMB）">
           <template #reference><a>信用卡</a>
           </template>
         </el-popover>账单
@@ -33,12 +37,12 @@
     uuid: "2022061922001474561419808812"
     status: "ALiPay - 交易成功"
     Expenses:TransPort:Private:Park +5.00 CNY
-    Liabilities:CreditCard:Bank:ZhongXin:C6428 -5.00 CNY
+    Liabilities:CreditCard:Bank:CITIC:C6428 -5.00 CNY
 '></el-input>
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElPopover } from 'element-plus';
 import { UploadFilled } from '@element-plus/icons-vue'
 import { ref, computed, watch } from 'vue';
 import axios from '../../utils/request';

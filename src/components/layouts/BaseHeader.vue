@@ -44,7 +44,7 @@
     <el-sub-menu index="manager">
       <template #title>{{ username }}</template>
       <router-link to="" class="no-underline"><el-menu-item index="" @click="user()">个人中心</el-menu-item></router-link>
-      <el-menu-item><a href="https://www.dhr2333.cn/article/2022/9/10/52.html" class="help-link"
+      <el-menu-item><a href="https://www.dhr2333.cn/category/beancountfu-shi-ji-zhang.html" class="help-link"
           target="_blank">帮助手册</a></el-menu-item>
       <el-menu-item index="logout" @click="cleanToken">退出登录</el-menu-item>
     </el-sub-menu>
