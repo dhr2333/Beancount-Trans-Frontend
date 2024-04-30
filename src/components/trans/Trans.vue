@@ -64,6 +64,14 @@ const options = [
   {
     value: '文件若加密请选择',
     label: '文件若加密请选择',
+  },
+  {
+    value: '生成balance对账信息（待实现）',
+    label: '生成balance对账信息（待实现）',
+  },
+  {
+    value: '储蓄卡忽略支付宝微信条目（待实现）',
+    label: '储蓄卡忽略支付宝微信条目（待实现）',
   }
 ]
 
@@ -108,10 +116,11 @@ sessionStorage.setItem("csrf_token", csrfToken.value)
 
 
 const token = localStorage.getItem("token");
+console.log(token)
 
 const headers = computed(() => ({
   //   'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-  'X-CSRFToken': csrfToken.value,
+  "X-CSRFToken": csrfToken.value,
   "Authorization": `Bearer ${token}`,
 }))
 
