@@ -111,7 +111,7 @@ import { ElMessage } from 'element-plus';
 import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import axios from '../../utils/request'
-import router from '~/routers'
+import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
 
 const dialogError = ref(false)
@@ -134,13 +134,14 @@ const fetchData = async () => {
     try {
         const response = await axios.get('aassets/')
         AssetsData.value = response.data
-        console.log(AssetsData.value);
+        // console.log(AssetsData.value);
     } catch (error: any) {
         console.error(error)
         if (error.response.data.code == "token_not_valid") {
+            handleRefresh()
             // router.push('/login')
-            ElMessage("token_not_valid, please log in again.")
-            console.log("token_not_valid");
+            // ElMessage("token_not_valid, please log in again.")
+            // console.log("token_not_valid");
         }
     }
 }
@@ -212,7 +213,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                     headers: { 'Content-Type': 'application/json' }
                 })
                     .then(response => {
-                        console.log(response.data);
+                        // console.log(response.data);
                     })
                     .catch(error => {
                         if (error.response && error.response.status == 401) {
@@ -231,10 +232,10 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                     })
                 dialogAdd.value = false
             } catch (error) {
-                console.log(error);
+                // console.log(error);
             }
         } else {
-            console.log('error submit!', fields)
+            // console.log('error submit!', fields)
         }
     })
 }
@@ -278,7 +279,7 @@ const handleImport = () => {
                         headers: { 'Content-Type': 'application/json' }
                     })
                         .then(response => {
-                            console.log(response.data);
+                            // console.log(response.data);
                         })
                         .catch(error => {
                             if (error.response && error.response.status == 401) {
@@ -314,7 +315,7 @@ const handleEdit = (index: number, row: Assets) => {
     ruleForm.value.assets = row.assets
     dialogEdit.value = true
     selectedId.value = row.id
-    console.log(index, row)
+    // console.log(index, row)
 }
 
 const editForm = async (formEl: FormInstance | undefined) => {
@@ -329,7 +330,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
                     headers: { 'Content-Type': 'application/json' }
                 })
                     .then(response => {
-                        console.log(response.data);
+                        // console.log(response.data);
                     })
                     .catch(error => {
                         if (error.response && error.response.status == 401) {
@@ -349,10 +350,10 @@ const editForm = async (formEl: FormInstance | undefined) => {
                     })
                 dialogEdit.value = false
             } catch (error) {
-                console.log(error);
+                // console.log(error);
             }
         } else {
-            console.log('error submit!', fields)
+            // console.log('error submit!', fields)
         }
     })
 }
@@ -364,17 +365,15 @@ const selectedId = ref(0)  // 编辑 & 删除均用这个
 const handleDelete = (index: number, row: Assets) => {
     dialogDel.value = true
     selectedId.value = row.id
-    console.log(index, row)
+    // console.log(index, row)
 }
 
 // 删除确认
 const confirmDelete = async () => {
     try {
         const response = await axios.delete(`aassets/${selectedId.value}/`);
-        console.log(response.data);
+        // console.log(response.data);
         dialogDel.value = false
-        // const get = await axios.get('assets')
-        // expenseData.value = get.data
     } catch (error) {
         console.error(error);
     }

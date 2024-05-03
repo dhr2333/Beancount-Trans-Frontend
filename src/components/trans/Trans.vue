@@ -44,11 +44,11 @@
 <script setup lang="ts">
 import { ElMessage, ElPopover } from 'element-plus';
 import { UploadFilled } from '@element-plus/icons-vue'
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import axios from '../../utils/request';
 // import { responseData } from '../../utils/request';
 const input = ref()
-console.log(input)
+// console.log(input)
 const wechatUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E5%BE%AE%E4%BF%A1.csv');
 const alipayUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E6%94%AF%E4%BB%98%E5%AE%9D.csv');
 const value4 = ref([])
@@ -72,6 +72,10 @@ const options = [
   {
     value: '储蓄卡忽略支付宝微信条目（待实现）',
     label: '储蓄卡忽略支付宝微信条目（待实现）',
+  },
+  {
+    value: '仅返回CSV格式账单（待实现）',
+    label: '仅返回CSV格式账单（待实现）',
   }
 ]
 
@@ -106,20 +110,26 @@ watch(value4, (newValue) => {
 });
 
 axios.defaults.withCredentials = true
-axios.get('translate/trans').then(res => {
-  csrfToken.value = document.cookie.split('=')[1]
+
+const fetchCsrfToken = async () => {
+  axios.get('translate/trans').then(res => {
+    csrfToken.value = document.cookie.split('=')[1]
+    })
+    .catch(error => {  // 处理请求错误
+      console.error(error);
+    });
+  sessionStorage.setItem("csrf_token", csrfToken.value)
+}
+
+
+onMounted(() => {
+  fetchCsrfToken()
 })
-  .catch(error => {  // 处理请求错误
-    console.error(error);
-  });
-sessionStorage.setItem("csrf_token", csrfToken.value)
 
-
-const token = localStorage.getItem("token");
-console.log(token)
+const token = localStorage.getItem("access");
+// console.log(token)
 
 const headers = computed(() => ({
-  //   'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
   "X-CSRFToken": csrfToken.value,
   "Authorization": `Bearer ${token}`,
 }))
@@ -131,7 +141,7 @@ const handleUploadSuccess = (response: any, file: any) => {
     return;  // 当状态为'error'时，错误会由handleUploadError处理
   }
   responseData.value = response.join('');
-  console.log(responseData.value);
+  // console.log(responseData.value);
 };
 
 const handleUploadError = (err: any, file: any) => {
@@ -147,8 +157,3 @@ const handleUploadError = (err: any, file: any) => {
   }
 };
 </script>
-<!-- <style scoped>
-.el-button+.el-button {
-  margin-left: 8px;
-}
-</style> -->

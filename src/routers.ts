@@ -15,6 +15,7 @@ import Login from "./views/login/index.vue"
 // import News from "./components/Test_News.vue"
 // import User from "./components/Test_User.vue"
 // import NewsContent from "./components/Test_NewsContent.vue"
+import ShowDates from "./components/owntracks/show_log_dates.vue"
 
 // 配置路由
 const router = createRouter({
@@ -34,6 +35,7 @@ const router = createRouter({
     { path: '/bill/commodity',name:"commodity", component: Commodity },
     { path: '/assets/account', name: "account", component: Account },
     { path: '/login', name: "login", component: Login },
+    { path: '/owntracks/show_dates', name: "showdates", component: ShowDates },
     // { path: '/user', component: User },
     // { path: '/newscontent/:aid', component: NewsContent },
   ]

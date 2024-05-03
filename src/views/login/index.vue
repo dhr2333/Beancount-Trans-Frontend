@@ -5,7 +5,7 @@
         <div class="big-contain" key="bigContainLogin" v-if="isLogin">
           <div class="btitle">账户登录</div>
           <div class="bform">
-            <input type="username" placeholder="用户名(默认admin) 或 手机号(默认11111111111)" v-model="username1" />
+            <input type="username" placeholder="用户名(默认admin) 或 手机号(默认11111111111)" v-model="username" />
             <span class="errTips" v-if="emailError">* 用户名 或 手机号无效 *</span>
             <input type="password" placeholder="密码(默认123456)" v-model="password" />
             <span class="errTips" v-if="emailError">* 密码填写错误 *</span>
@@ -15,7 +15,7 @@
         <div class="big-contain" key="bigContainRegister" v-else>
           <div class="btitle">创建账户</div>
           <div class="bform">
-            <input type="text" placeholder="用户名" v-model="username1" />
+            <input type="text" placeholder="用户名" v-model="username" />
             <span class="errTips" v-if="existed">* 用户名已经存在！ *</span>
             <input type="mobile" placeholder="手机号" v-model="mobile" />
             <input type="password" placeholder="密码" v-model="password" />
@@ -45,110 +45,80 @@ import { ref } from 'vue';
 import axios from '../../utils/request';
 import router from '~/routers';
 import jwt_decode from 'jwt-decode';
-import username from '../../components/layouts/BaseHeader.vue';
-//  as headerUsername from '../../components/layouts/BaseHeader.vue'
+import { ElMessage } from 'element-plus'
 
 
+let isRegisteredLogin = false;
 const apiUrl = import.meta.env.VITE_API_URL;
 const isLogin = ref(true);
 const emailError = ref(false);
-const passwordError = ref(false);
 const existed = ref(false);
-const username1 = ref("");
+const username = ref("");
 const mobile = ref("");
 const password = ref("");
 const password2 = ref("");
-console.log(apiUrl);
+// console.log(apiUrl);
 
 
 function changeType() {
   isLogin.value = !isLogin.value;
-  username1.value = "";
-  mobile.value = "";
-  password.value = "";
-  password2.value = "";
+  username.value = "admin";
+  mobile.value = "11111111111";
+  password.value = "123456";
+  password2.value = "123456";
 }
-const login = async () => {
-  if (username1.value != "" && password.value != "") {
-    try {
-      const res = await axios.post(apiUrl + '/login/', {
-        username: username1.value,
-        password: password.value
-      });
 
-      const storage = localStorage;
-      const token = res.data.access;
-      console.log(res.data);
-      storage.setItem('token', res.data.access);
-      console.log(jwt_decode(token));
-      storage.setItem('refresh', res.data.refresh);
-      storage.setItem('iat', jwt_decode(token).iat);
-      storage.setItem('exp', jwt_decode(token).exp);
-      storage.setItem('username', username1.value);
-      username.value = username1.value;
-      const test = localStorage.getItem('username');
-      if (test) {
-        router.push('/map/expenses/')
-        username.value = username1.value;
-        // window.location.reload();
-      }
-      // test.value = username.value;
-    } catch (error) {
-      console.log(error);
+const login = async () => {
+  if (username.value === "" || password.value === "") {
+    ElMessage.error("用户名和密码不能为空");
+    return
+  }
+  try {
+    const res = await axios.post(apiUrl + '/login/', {
+      username: username.value,
+      password: password.value
+    });
+
+    const token = res.data.access;
+    const storage = localStorage;
+
+    // 保存用户信息到LocalStorage
+    storage.setItem('access', res.data.access);
+    storage.setItem('refresh', res.data.refresh);
+    // storage.setItem('token', res.data.token);
+    storage.setItem('iat', jwt_decode(token).iat);
+    storage.setItem('exp', jwt_decode(token).exp);
+    storage.setItem('username', username.value);
+
+    if (!isRegisteredLogin) {
+      ElMessage.success("登录成功");
     }
+    router.push('/map/expenses/')
+
+  } catch (error) {
+    ElMessage.error("用户名或密码错误");
   }
 }
+
 const register = async () => {
-  if (username1.value != "" && mobile.value != "" && password.value != "" && password2.value != "") {
+  if (username.value != "" && mobile.value != "" && password.value != "" && password2.value != "") {
     axios.post(apiUrl + '/user/create/', {
-      username: username1.value,
+      username: username.value,
       mobile: mobile.value,
       password: password.value,
       password2: password2.value
     })
       .then((res) => {
-        console.log(res.data);
-        if (res.data.code == 200) {
-          isLogin.value = !isLogin.value;
-          username1.value = "";
-          mobile.value = "";
-          password.value = "";
-          password2.value = "";
-        } else if (res.data.code == 400) {
-          existed.value = true;
-        }
+        ElMessage.success("注册成功");
+        isRegisteredLogin = true;
+        login(username, password);
       })
       .catch((err) => {
-        console.log(err);
+        ElMessage.error(err.response.data.username + err.response.data.mobile)
       })
   }
 }
 
-// function login() {
-//   console.log(self);
-//   // const self = this;
-//   // console.log(self.$axios.dispatch('login'));
-//   if (username.value != "" && password.value != "") {
-//     self.$axios({
-//       method: "post",
-//       url: "http://localhost:8002/api/token/",
-//       data: {
-//         username: username.value,
-//         password: password.value,
-//       },
-//     })
-//       .then((res) => {
-//         const storage = localStorage;
-//         const expiredTime = Date.parse(res.headers.date) + 60000;
-//         console.log(res.data);
-//         storage.setItem("token", res.data.access);
-//         storage.setItem("refresh", res.data.refresh);
-//         storage.setItem("expiredTime", expiredTime);
-//         storage.setItem("username", this.signinName);
-//         this.$router.push("/expense/");
-//       });
-//   }
-// }
 </script>
 
 <style scoped="scoped">

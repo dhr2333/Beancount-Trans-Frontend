@@ -118,11 +118,12 @@ import { ElMessage } from 'element-plus';
 import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import axios from '../../utils/request'
-import router from '~/routers'
+import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
 
+const apiUrl = import.meta.env.VITE_API_URL;
 const dialogError = ref(false)
-console.log(import.meta.env);
+// console.log(import.meta.env);
 
 interface Expense {
   id: number
@@ -140,20 +141,22 @@ const expendtipContent = ref("优先级越高则映射账户越精准。例如�
 
 // 页面获取数据
 const expenseData = ref<Expense[]>([])
-console.log(expenseData.value);
+// console.log(expenseData.value);
+
+
 
 const fetchData = async () => {
   try {
     const response = await axios.get('expense/')
     expenseData.value = response.data
-    console.log(expenseData.value);
+    // console.log(expenseData.value);
   } catch (error: any) {
     console.error(error)
-    console.log(error.response.data.code);
+    // console.log(error.response.data.code);
     if (error.response.data.code == "token_not_valid") {
-      // router.push('/login')
-      ElMessage("token_not_valid, please log in again.")
-      console.log("token_not_valid");
+      handleRefresh();
+      // ElMessage("token_not_valid, please log in again.")
+      // console.log("token_not_valid");
     }
   }
 }
@@ -232,9 +235,8 @@ const submitForm = async (formEl: FormInstance | undefined) => {
           method: "POST",
           headers: { 'Content-Type': 'application/json' }
         })
-          // axios.post('http://127.0.0.1:8002/translate/map/expense/', ruleForm.value + '/')
           .then(response => {
-            console.log(response.data);
+            // console.log(response.data);
           })
           .catch(error => {
             if (error.response && error.response.status == 401) {
@@ -254,10 +256,10 @@ const submitForm = async (formEl: FormInstance | undefined) => {
         dialogAdd.value = false
         setTimeout(updateExpenseData, 1000)
       } catch (error) {
-        console.log(error);
+        // console.log(error);
       }
     } else {
-      console.log('error submit!', fields)
+      // console.log('error submit!', fields)
     }
   })
   async function updateExpenseData() {
@@ -305,7 +307,7 @@ const handleImport = () => {
             headers: { 'Content-Type': 'application/json' }
           })
             .then(response => {
-              console.log(response.data);
+              // console.log(response.data);
             })
             .catch(error => {
               if (error.response && error.response.status == 401) {
@@ -342,8 +344,8 @@ const handleEdit = (index: number, row: Expense) => {
   // ruleForm.value.classification = row.classification
   dialogEdit.value = true
   selectedId.value = row.id
-  console.log(index)
-  console.log(row);
+  // console.log(index)
+  // console.log(row);
 }
 
 const editForm = async (formEl: FormInstance | undefined) => {
@@ -351,8 +353,6 @@ const editForm = async (formEl: FormInstance | undefined) => {
   await formEl.validate((valid, fields) => {
     if (valid) {
       try {
-        // axios.put(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`, ruleForm.value)
-        // axios.put(base_url + `translate/map/expense/${selectedId.value}/`, ruleForm.value + '/')
         axios({
           url: `expense/${selectedId.value}/`,
           data: JSON.parse(JSON.stringify(ruleForm.value)),
@@ -362,7 +362,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
           }
         })
           .then(response => {
-            console.log(response.data);
+            // console.log(response.data);
             expenseData.value = response.data
             fetchData()
           })
@@ -383,10 +383,10 @@ const editForm = async (formEl: FormInstance | undefined) => {
           })
         dialogEdit.value = false
       } catch (error) {
-        console.log(error);
+        // console.log(error);
       }
     } else {
-      console.log('error submit!', fields)
+      // console.log('error submit!', fields)
     }
   })
 }
@@ -398,16 +398,14 @@ const selectedId = ref(0)  // 编辑 & 删除均用这个
 const handleDelete = (index: number, row: Expense) => {
   dialogDel.value = true
   selectedId.value = row.id
-  console.log(index, row)
+  // console.log(index, row)
 }
 
 // 删除确认
 const confirmDelete = async () => {
   try {
-    // const response = await axios.delete(`http://127.0.0.1:38001/api/translate/map/expense/${selectedId.value}`);
     const response = await axios.delete(`expense/${selectedId.value}/`);
-    console.log(response.data);
-    // const get = await axios.get('http://127.0.0.1:38001/api/translate/map/expense')
+    // console.log(response.data);
     const get = await axios.get('expense')
     expenseData.value = get.data
   } catch (error) {
@@ -416,6 +414,7 @@ const confirmDelete = async () => {
   }
   dialogDel.value = false
 }
+
 </script>
 
 <style scoped>

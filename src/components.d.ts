@@ -40,6 +40,8 @@ declare module '@vue/runtime-core' {
     Logos: typeof import('./components/Logos.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    Show_log_dates: typeof import('./components/owntracks/show_log_dates.vue')['default']
+    Show_maps: typeof import('./components/owntracks/show_maps.vue')['default']
     Trans: typeof import('./components/trans/Trans.vue')['default']
   }
 }
