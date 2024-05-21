@@ -1,7 +1,7 @@
 <template>
   <el-upload class="upload-demo" :drag="true" :action=action method="POST" :data="getUploadData" :multiple="false"
     :headers=headers accept=".csv,.pdf,.xls,.xlsx" show-file-list name="trans" @success="handleUploadSuccess"
-    @error="handleUploadError">
+    @error="handleUploadError" @change="handleChange">
     <el-icon class="el-icon--upload"><upload-filled /></el-icon>
     <div class="el-upload__text">
       拖拽文件至此处 或 <em>单击上传</em>
@@ -38,6 +38,11 @@
     status: "ALiPay - 交易成功"
     Expenses:TransPort:Private:Park +5.00 CNY
     Liabilities:CreditCard:Bank:CITIC:C6428 -5.00 CNY
+
+or 
+
+2024-04-16 balance Assets:Savings:Bank:BOC:C0814 84543.23 CNY
+2024-04-15 pad Assets:Savings:Bank:BOC:C0814 Income:Investment:Interest
 '></el-input>
 </template>
 
@@ -48,6 +53,7 @@ import { ref, computed, watch, onMounted } from 'vue';
 import axios from '../../utils/request';
 // import { responseData } from '../../utils/request';
 const input = ref()
+const filename = ref()
 // console.log(input)
 const wechatUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E5%BE%AE%E4%BF%A1.csv');
 const alipayUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E6%94%AF%E4%BB%98%E5%AE%9D.csv');
@@ -66,68 +72,102 @@ const options = [
     label: '文件若加密请选择',
   },
   {
-    value: '生成balance对账信息（待实现）',
-    label: '生成balance对账信息（待实现）',
+    value: '生成balance对账信息',
+    label: '生成balance对账信息',
   },
   {
     value: '储蓄卡忽略支付宝微信条目（待实现）',
     label: '储蓄卡忽略支付宝微信条目（待实现）',
   },
   {
-    value: '仅返回CSV格式账单（待实现）',
-    label: '仅返回CSV格式账单（待实现）',
+    value: '仅返回CSV格式账单',
+    label: '仅返回CSV格式账单',
   }
 ]
 
 const csrfToken = ref('');
 const action = axios.defaults.baseURL + '/translate/trans'
+const isWrite = ref(false)
+const cmbCreditIgnore = ref(false)
+const showPassword = ref(false)
+const isbalance = ref(false)
+const isCSVOnly = ref(false)
 
-const uploadData = { cmb_credit_ignore: "False", write: "False", password: input.value }
+// const uploadData = { cmb_credit_ignore: cmbCreditIgnore.value, write: isWrite.value, password: input.value }
 const getUploadData = () => {
   return {
-    cmb_credit_ignore: uploadData.cmb_credit_ignore,
-    write: uploadData.write,
-    password: input.value
+    cmb_credit_ignore: cmbCreditIgnore.value,
+    write: isWrite.value,
+    password: input.value,
+    balance: isbalance.value,
+    isCSVOnly: isCSVOnly.value,
+    csrfmiddlewaretoken: csrfToken.value
   };
 };
-const showPassword = ref(false)
 watch(value4, (newValue) => {
   if (newValue.includes('写入Beancount-Trans-Assets')) {
-    uploadData.write = "True";
+    isWrite.value = true;
   } else {
-    uploadData.write = "False";
+    isWrite.value = false;
   };
   if (newValue.includes('招行信用卡忽略支付宝微信条目')) {
-    uploadData.cmb_credit_ignore = "True";
+    cmbCreditIgnore.value = true;
   } else {
-    uploadData.cmb_credit_ignore = "False";
+    cmbCreditIgnore.value = false;
   };
   if (newValue.includes('文件若加密请选择')) {
     showPassword.value = true;
   } else {
     showPassword.value = false;
-  }
+  };
+  if (newValue.includes('生成balance对账信息')) {
+    isbalance.value = true;
+  } else {
+    isbalance.value = false;
+  };
+  if (newValue.includes('仅返回CSV格式账单')) {
+    isCSVOnly.value = true;
+  } else {
+    isCSVOnly.value = false;
+  };
 });
 
 axios.defaults.withCredentials = true
 
-const fetchCsrfToken = async () => {
-  axios.get('translate/trans').then(res => {
-    csrfToken.value = document.cookie.split('=')[1]
-    })
-    .catch(error => {  // 处理请求错误
-      console.error(error);
-    });
-  sessionStorage.setItem("csrf_token", csrfToken.value)
-}
+// const csrfTokenRegex = /<input type="hidden" name="csrfmiddlewaretoken" value="(.*)">/;
+
+// const fetchCsrfToken = async () => {
+//   axios.get('translate/trans').then(res => {
+//     csrfToken.value = document.cookie.split('=')[1]
+//     console.log(csrfToken.value)
+//   })
+//     .catch(error => {  // 处理请求错误
+//       console.error(error);
+//     });
+//   sessionStorage.setItem("csrf_token", csrfToken.value)
+//   try {
+//     const response = await axios.get('/translate/trans')
+//     const match = response.data.match(csrfTokenRegex);
+//     if (match) {
+//       csrfToken.value = match[1];
+//       document.cookie = `csrf_token=${csrfToken.value}; expires=Fri, 31 Dec 9999 23:59:59 GMT; path=/`;
+//       document.cookie = `csrftoken=${csrfToken.value}; expires=Fri, 31 Dec 9999 23:59:59 GMT; path=/`;
+//     } else {
+//       console.error("CSRF token not found in response data");
+//     }
+//     console.log(csrfToken.value);
+
+//   } catch (error) {
+//     console.error(error)
+//   }
+// }
 
 
-onMounted(() => {
-  fetchCsrfToken()
-})
+// onMounted(() => {
+//   fetchCsrfToken()
+// })
 
 const token = localStorage.getItem("access");
-// console.log(token)
 
 const headers = computed(() => ({
   "X-CSRFToken": csrfToken.value,
@@ -140,15 +180,41 @@ const handleUploadSuccess = (response: any, file: any) => {
   if (file.status === 'error') {
     return;  // 当状态为'error'时，错误会由handleUploadError处理
   }
-  responseData.value = response.join('');
-  // console.log(responseData.value);
+  if (isCSVOnly.value == true) {
+    responseData.value = response
+    downloadCSV(responseData.value)
+  } else {
+    responseData.value = response.join('');
+  }
 };
+// 函数用于下载CSV文件
+
+const downloadCSV = (csvData: string) => {
+  // 假设csvData已经是正确格式的CSV文本
+  const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  if (link.download !== undefined) { // 检查浏览器是否支持下载属性
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename.value + ".csv");  // 设定下载文件名
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();  // 触发下载
+    document.body.removeChild(link); // 下载后移除元素
+  }
+}
+
+const handleChange = (file: File, fileList: File[]) => {
+  filename.value = file.name.split('.')[0]
+};
+
+
 
 const handleUploadError = (err: any, file: any) => {
   if (err.status === 501) {
     // 假设错误信息在err.message中
     ElMessage.error(err.message);
-  } else if (err.status === 403) {
+  } else if (JSON.parse(err.message).error === "Decryption failed") { // 若返回JSON数据则需要解析后使用
     // pdf文件解密失败
     ElMessage.error("pdf解密失败或其他问题");
   } else {
