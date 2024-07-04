@@ -64,8 +64,8 @@ const options = [
     label: '写入Beancount-Trans-Assets',
   },
   {
-    value: '招行信用卡忽略支付宝微信条目',
-    label: '招行信用卡忽略支付宝微信条目',
+    value: '储蓄卡/信用卡忽略支付宝微信条目',
+    label: '储蓄卡/信用卡忽略支付宝微信条目',
   },
   {
     value: '文件若加密请选择',
@@ -76,10 +76,6 @@ const options = [
     label: '生成balance对账信息',
   },
   {
-    value: '储蓄卡忽略支付宝微信条目（待实现）',
-    label: '储蓄卡忽略支付宝微信条目（待实现）',
-  },
-  {
     value: '仅返回CSV格式账单',
     label: '仅返回CSV格式账单',
   }
@@ -88,7 +84,7 @@ const options = [
 const csrfToken = ref('');
 const action = axios.defaults.baseURL + '/translate/trans'
 const isWrite = ref(false)
-const cmbCreditIgnore = ref(false)
+const CardIgnore = ref(false)
 const showPassword = ref(false)
 const isbalance = ref(false)
 const isCSVOnly = ref(false)
@@ -96,7 +92,7 @@ const isCSVOnly = ref(false)
 // const uploadData = { cmb_credit_ignore: cmbCreditIgnore.value, write: isWrite.value, password: input.value }
 const getUploadData = () => {
   return {
-    cmb_credit_ignore: cmbCreditIgnore.value,
+    card_ignore: CardIgnore.value,
     write: isWrite.value,
     password: input.value,
     balance: isbalance.value,
@@ -110,10 +106,10 @@ watch(value4, (newValue) => {
   } else {
     isWrite.value = false;
   };
-  if (newValue.includes('招行信用卡忽略支付宝微信条目')) {
-    cmbCreditIgnore.value = true;
+  if (newValue.includes('储蓄卡/信用卡忽略支付宝微信条目')) {
+    CardIgnore.value = true;
   } else {
-    cmbCreditIgnore.value = false;
+    CardIgnore.value = false;
   };
   if (newValue.includes('文件若加密请选择')) {
     showPassword.value = true;

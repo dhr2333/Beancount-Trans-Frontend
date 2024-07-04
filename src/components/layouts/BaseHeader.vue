@@ -1,6 +1,21 @@
 <template>
   <el-menu class="el-menu-demo" mode="horizontal" :ellipsis="false" @select="handleSelect">
-    <el-menu-item index="/account"><el-link href="http://localhost:5000">我的账本</el-link></el-menu-item>
+    <el-sub-menu index="/account">
+      <template #title>我的账本</template>
+      <el-menu-item index="/account/myaccount">
+        <a href="http://localhost:5000/" class="custom-link">本地账本</a>
+      </el-menu-item>
+      <el-menu-item index="/account/demo">
+        <a href="https://beancount.dhr2333.cn/" class="custom-link">案例账本</a>
+      </el-menu-item>
+      <el-menu-item index="/account/demo">
+        <a href="https://fava.pythonanywhere.com/huge-example-file/balance_sheet/" class="custom-link">官方账本</a>
+      </el-menu-item>
+    </el-sub-menu>
+    <!-- <el-menu-item index="/account">
+    <el-link href="http://localhost:5000">我的账本</el-link>
+  </el-menu-item> -->
+    <!-- <el-menu-item index="/account"><el-link href="http://localhost:5000">我的账本</el-link></el-menu-item> -->
     <router-link to="/trans" class="no-underline"><el-menu-item index="/trans">格式转换</el-menu-item></router-link>
 
     <el-sub-menu index="map">
@@ -112,5 +127,10 @@ const user = () => {
   width: 100%;
   color: inherit;
   text-decoration: none;
+}
+
+.custom-link {
+  text-decoration: none;
+  color: inherit;
 }
 </style>
