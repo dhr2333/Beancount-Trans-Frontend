@@ -241,6 +241,19 @@ const submitForm = async (formEl: FormInstance | undefined) => {
 }
 
 // 导出
+// const handleExport = () => {
+//     const data = AssetsData.value
+//     data.forEach((item: any) => {
+//         delete item.id
+//         delete item.url
+//         delete item.owner
+//     })
+//     const fileName = 'export_assets.xlsx'
+//     const wb = XLSX.utils.book_new()
+//     const ws = XLSX.utils.json_to_sheet(data)
+//     XLSX.utils.book_append_sheet(wb, ws, "Sheet1")
+//     XLSX.writeFile(wb, fileName)
+// }
 const handleExport = () => {
     const data = AssetsData.value
     data.forEach((item: any) => {
@@ -248,30 +261,90 @@ const handleExport = () => {
         delete item.url
         delete item.owner
     })
-    const fileName = 'export_assets.xlsx'
-    const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.json_to_sheet(data)
-    XLSX.utils.book_append_sheet(wb, ws, "Sheet1")
-    XLSX.writeFile(wb, fileName)
+    const csv = XLSX.utils.sheet_to_csv(ws)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', 'export_assets.csv')
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
 }
 
+
 // 导入
+// const handleImport = () => {
+//     const input = document.createElement('input')
+//     input.type = 'file'
+//     input.accept = '.xlsx'
+//     input.onchange = () => {
+//         const files = input.files
+//         if (files && files.length > 0) {
+//             const file = files.item(0)
+//             const reader = new FileReader()
+//             reader.onload = (e) => {
+//                 const data = e.target?.result
+//                 if (data) {
+//                     const workbook = XLSX.read(data, { type: 'binary' })
+//                     const firstSheetName = workbook.SheetNames[0]
+//                     const worksheet = workbook.Sheets[firstSheetName]
+//                     const json = XLSX.utils.sheet_to_json(worksheet)
+//                     axios({
+//                         url: 'aassets/',
+//                         data: JSON.parse(JSON.stringify(json)),
+//                         method: "POST",
+//                         headers: { 'Content-Type': 'application/json' }
+//                     })
+//                         .then(response => {
+//                             // console.log(response.data);
+//                         })
+//                         .catch(error => {
+//                             if (error.response && error.response.status == 401) {
+//                                 ElMessage.info('权限不足，请登录后重试');
+//                             }
+//                             else if (error.response && error.response.status == 403) {
+//                                 ElMessage.info('权限不足，请登录后重试');
+//                             }
+//                             else if (error.response && error.response.status == 400) {
+//                                 ElMessage.error('导入失败，请按"导出"提供的格式重新导入');
+//                             }
+//                             else {
+//                                 dialogError.value = true
+//                             }
+//                             console.error(error)
+//                         })
+//                 }
+//             }
+//             if (file !== null) {
+//                 reader.readAsBinaryString(file);
+//             }
+//         }
+//     }
+//     input.click()
+// }
 const handleImport = () => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.xlsx'
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
     input.onchange = () => {
-        const files = input.files
+        const files = input.files;
         if (files && files.length > 0) {
-            const file = files.item(0)
-            const reader = new FileReader()
+            const file = files.item(0);
+            const reader = new FileReader();
             reader.onload = (e) => {
-                const data = e.target?.result
+                const data = e.target?.result;
                 if (data) {
-                    const workbook = XLSX.read(data, { type: 'binary' })
-                    const firstSheetName = workbook.SheetNames[0]
-                    const worksheet = workbook.Sheets[firstSheetName]
-                    const json = XLSX.utils.sheet_to_json(worksheet)
+                    // 使用XLSX.read来解析CSV数据
+                    const workbook = XLSX.read(data, { type: 'string' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    let json = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+
+                    console.log(JSON.stringify(json));
+
                     axios({
                         url: 'aassets/',
                         data: JSON.parse(JSON.stringify(json)),
@@ -291,19 +364,17 @@ const handleImport = () => {
                             else if (error.response && error.response.status == 400) {
                                 ElMessage.error('导入失败，请按"导出"提供的格式重新导入');
                             }
-                            else {
-                                dialogError.value = true
-                            }
-                            console.error(error)
-                        })
+                            // dialogError.value = true
+                            console.error(error);
+                        });
                 }
-            }
+            };
             if (file !== null) {
-                reader.readAsBinaryString(file);
+                reader.readAsText(file);  // 读取文件为文本
             }
         }
-    }
-    input.click()
+    };
+    input.click();
 }
 
 // 编辑

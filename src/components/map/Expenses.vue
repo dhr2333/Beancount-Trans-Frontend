@@ -276,30 +276,49 @@ const handleExport = () => {
     delete item.url
     delete item.owner
   })
-  const fileName = 'export_expense.xlsx'
-  const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.json_to_sheet(data)
-  XLSX.utils.book_append_sheet(wb, ws, "Sheet1")
-  XLSX.writeFile(wb, fileName)
+  const csv = XLSX.utils.sheet_to_csv(ws)
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+  link.setAttribute('href', url)
+  link.setAttribute('download', 'export_expense.csv')
+  link.style.visibility = 'hidden'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
+
 
 // 导入
 const handleImport = () => {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = '.xlsx'
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv';
   input.onchange = () => {
-    const files = input.files
+    const files = input.files;
     if (files && files.length > 0) {
-      const file = files.item(0)
-      const reader = new FileReader()
+      const file = files.item(0);
+      const reader = new FileReader();
       reader.onload = (e) => {
-        const data = e.target?.result
+        const data = e.target?.result;
         if (data) {
-          const workbook = XLSX.read(data, { type: 'binary' })
-          const firstSheetName = workbook.SheetNames[0]
-          const worksheet = workbook.Sheets[firstSheetName]
-          const json = XLSX.utils.sheet_to_json(worksheet)
+          // 使用XLSX.read来解析CSV数据
+          const workbook = XLSX.read(data, { type: 'string' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          let json = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+
+          // 遍历JSON数据，确保所有字段存在
+          json = json.map((item: any) => {
+            return {
+              key: item.key || "",
+              payee: item.payee || "",
+              expend: item.expend || ""
+            };
+          });
+
+
           axios({
             url: 'expense/',
             data: JSON.parse(JSON.stringify(json)),
@@ -320,17 +339,18 @@ const handleImport = () => {
                 ElMessage.error('导入失败，请按"导出"提供的格式重新导入');
               }
               // dialogError.value = true
-              console.error(error)
-            })
+              console.error(error);
+            });
         }
-      }
+      };
       if (file !== null) {
-        reader.readAsBinaryString(file);
+        reader.readAsText(file);  // 读取文件为文本
       }
     }
-  }
-  input.click()
+  };
+  input.click();
 }
+
 
 
 // 编辑
