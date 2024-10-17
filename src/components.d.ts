@@ -35,13 +35,13 @@ declare module '@vue/runtime-core' {
     ElUpload: typeof import('element-plus/es')['ElUpload']
     Event: typeof import('./components/bill/Event.vue')['default']
     Expenses: typeof import('./components/map/Expenses.vue')['default']
+    GitHubCallback: typeof import('./components/GitHubCallback.vue')['default']
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
     Income: typeof import('./components/map/Income.vue')['default']
     Logos: typeof import('./components/Logos.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     Show_log_dates: typeof import('./components/owntracks/show_log_dates.vue')['default']
-    Show_maps: typeof import('./components/owntracks/show_maps.vue')['default']
     Trans: typeof import('./components/trans/Trans.vue')['default']
   }
 }

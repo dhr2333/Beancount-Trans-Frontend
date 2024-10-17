@@ -6,11 +6,15 @@
           <div class="btitle">账户登录</div>
           <div class="bform">
             <input type="username" placeholder="用户名(默认admin) 或 手机号(默认11111111111)" v-model="username" />
-            <span class="errTips" v-if="emailError">* 用户名 或 手机号无效 *</span>
+            <span class="errTips" v-if="emailError">* 用户名无效 *</span>
             <input type="password" placeholder="密码(默认123456)" v-model="password" />
             <span class="errTips" v-if="emailError">* 密码填写错误 *</span>
           </div>
           <button class="bbutton" @click="login">登录</button>
+          <!-- <button class="bbutton" @click="loginWithGitHub">使用 GitHub 登录</button> -->
+          <!-- <button class="bbutton" @click="loginWithGoogle">使用 Google 登录</button> -->
+          <!-- <button class="bbutton" @click="sendPostRequest">使用 Dummy 登录</button> -->
+          <!-- <button class="bbutton" @click="handleGitHubCallback">使用 GitHub 登录</button> -->
         </div>
         <div class="big-contain" key="bigContainRegister" v-else>
           <div class="btitle">创建账户</div>
@@ -41,11 +45,12 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import axios from '../../utils/request';
 import router from '~/routers';
 import jwt_decode from 'jwt-decode';
 import { ElMessage } from 'element-plus'
+import { log } from 'console';
 
 
 let isRegisteredLogin = false;
@@ -57,15 +62,106 @@ const username = ref("");
 const mobile = ref("");
 const password = ref("");
 const password2 = ref("");
-// console.log(apiUrl);
 
+// GitHub OAuth 登录逻辑
+const loginWithGitHub = () => {
+  const clientId = 'Ov23liuJwXE0syF3flmO'; // 替换为你的GitHub客户端ID
+  const redirectUri = 'http://127.0.0.1:38001/accounts/github/login/callback/'; // 替换为你的回调URL
+
+  window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user:email`;
+};
+
+// Google OAuth 登录逻辑
+const loginWithGoogle = () => {
+  const clientId = '27533849710-0ot3fj14f5vqkinena7is5ms08nfe2kl.apps.googleusercontent.com'; // 替换为你的Google客户端ID
+  const redirectUri = 'http://127.0.0.1:38001/accounts/google/login/callback/'; // 替换为你的回调URL
+  const scope = 'openid email profile'; // 请求的权限范围
+
+  // 生成一个随机的状态值
+  // const state = "111111111111111111" + Math.random().toString(36).substring(2); // 简单的随机字符串
+  // console.log(state);
+
+  // localStorage.setItem('oauth_state', state); // 存储状态值以便后续验证
+
+  // 构造Google OAuth授权URL
+  const authUrl = `https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${encodeURIComponent(scope)}`;
+  // const authUrl = `http://127.0.0.1:8002/accounts/google/login/?process=login`;
+
+  // 重定向到Google登录页面
+  window.location.href = authUrl;
+};
+
+const sendPostRequest = async () => {
+  try {
+    const response = await fetch('http://127.0.0.1:38001/_allauth/app/v1/auth/provider/redirect', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        // 你可以在这里添加需要发送的数据
+        provider: 'google',
+        callback_url: 'http://127.0.0.1:38001/_allauth/app/v1/auth/google/callback/',
+        process: 'login'
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('成功:', data);
+    } else {
+      console.error('请求失败:', response.statusText);
+    }
+  } catch (error) {
+    console.error('请求错误:', error);
+  }
+};
+
+
+// GitHub OAuth 回调处理
+const handleGitHubCallback = async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+
+  if (code) {
+    try {
+      const res = await axios.post(apiUrl + '/auth/social/github/login/callback/', {
+        code: code,
+        redirect_uri: 'http://127.0.0.1:8002/auth/social/github/login/callback/', // 替换为你的回调URL
+      });
+
+      const token = res.data.access_token;
+      const storage = localStorage;
+
+      // 保存用户信息到LocalStorage
+      storage.setItem('access_token', res.data.access_token);
+      storage.setItem('refresh_token', res.data.refresh_token);
+      storage.setItem('username', res.data.username);
+
+      ElMessage.success("登录成功");
+      router.push('/map/expenses/');
+    } catch (error) {
+      ElMessage.error("GitHub 登录失败");
+    }
+  }
+};
+// GitHub OAuth 登录逻辑
+const loginWithDummy = () => {
+  window.location.href = 'http://127.0.0.1:8002/accounts/dummy/login/';
+};
+
+
+// onMounted(() => {
+// handleGitHubCallback();
+// sendPostRequest();
+// });
 
 function changeType() {
   isLogin.value = !isLogin.value;
   username.value = "admin";
-  mobile.value = "11111111111";
-  password.value = "123456";
-  password2.value = "123456";
+  mobile.value = "example@163.com";
+  password.value = "!QAZse4rfv";
+  password2.value = "!QAZse4rfv";
 }
 
 const login = async () => {
@@ -74,7 +170,8 @@ const login = async () => {
     return
   }
   try {
-    const res = await axios.post(apiUrl + '/login/', {
+    // const res = await axios.post(apiUrl + '/auth/login/', {
+    const res = await axios.post(apiUrl + '/token/', {
       username: username.value,
       password: password.value
     });
@@ -102,10 +199,10 @@ const login = async () => {
 
 const register = async () => {
   if (username.value != "" && mobile.value != "" && password.value != "" && password2.value != "") {
-    axios.post(apiUrl + '/user/create/', {
+    axios.post(apiUrl + '/auth/registration/', {
       username: username.value,
-      mobile: mobile.value,
-      password: password.value,
+      email: mobile.value,
+      password1: password.value,
       password2: password2.value
     })
       .then((res) => {

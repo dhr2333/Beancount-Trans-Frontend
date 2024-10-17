@@ -16,6 +16,7 @@ import Login from "./views/login/index.vue"
 // import User from "./components/Test_User.vue"
 // import NewsContent from "./components/Test_NewsContent.vue"
 import ShowDates from "./components/owntracks/show_log_dates.vue"
+import GitHubCallback from './components/GitHubCallback.vue';
 
 // 配置路由
 const router = createRouter({
@@ -24,8 +25,10 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '',name:"index", component: Trans },
+    { path: '/auth/social/github/callback', component: GitHubCallback },
     // { path: '/', name:"home",component: Home },
     // { path: '/test',name:"test", component: Test },
+    // { path: '/auth/callback', component: GitHubCallback },
     { path: '/trans',name:"trans", component: Trans },
     { path: '/map/assets',name:"assets", component: Assets },
     { path: '/map/expenses',name:"expenses", component: Expenses },
