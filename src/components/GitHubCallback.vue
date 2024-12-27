@@ -1,49 +1,41 @@
+<!-- src/views/Callback.vue -->
 <template>
-    <div>正在登录...</div>
+    <div>
+        <p>正在处理登录...</p>
+    </div>
 </template>
 
 <script lang="ts" setup>
 import { onMounted } from 'vue';
+import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
+import { ElMessage } from 'element-plus';
 
 const router = useRouter();
-const route = useRoute();
 
 onMounted(async () => {
-    const code = route.query.code;
+    // 假设后端在回调 URL 中返回了一个状态，或者您可能需要从 URL 中提取参数
+    // 这里假设后端已经处理了 OAuth，并提供了一个新的 API 来获取用户信息
 
-    if (code) {
-        try {
-            // 向后端发送 POST 请求以交换 JWT 令牌
-            const response = await fetch('http://127.0.0.1:8002/auth/social/github/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    code: code,
-                    redirect_uri: 'http://localhost:5173/auth/social/github/callback',
-                }),
-            });
+    try {
+        // 向后端请求用户信息
+        const response = await axios.get('http://trans.localhost/api/_allauth/browser/v1/auth/github/token', {
+            withCredentials: true, // 如果后端使用了 cookies 进行认证
+        });
 
-            const data = await response.json();
+        const data = response.data;
+        console.log(data);
+        const storage = localStorage;
+        storage.setItem('access', data.access);
+        storage.setItem('refresh', data.refresh);
+        storage.setItem('username', data.username);
 
-            if (response.ok) {
-                // 假设后端返回一个 JWT 令牌
-                const token = data.key;
-                // 存储 JWT 令牌，例如在 localStorage 中
-                localStorage.setItem('authToken', token);
-
-                // 重定向到首页或其他页面
-                router.push('/');
-            } else {
-                console.error('登录失败:', data);
-            }
-        } catch (error) {
-            console.error('请求失败:', error);
-        }
-    } else {
-        console.error('没有收到授权码');
+        ElMessage.success("GitHub 登录成功");
+        router.push('/map/expenses/');
+    } catch (error) {
+        console.error('GitHub 登录失败', error);
+        ElMessage.error("GitHub 登录失败");
+        router.push('/');
     }
 });
 </script>

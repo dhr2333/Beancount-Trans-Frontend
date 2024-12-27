@@ -11,10 +11,9 @@
             <span class="errTips" v-if="emailError">* 密码填写错误 *</span>
           </div>
           <button class="bbutton" @click="login">登录</button>
-          <!-- <button class="bbutton" @click="loginWithGitHub">使用 GitHub 登录</button> -->
+          <button class="bbutton" @click="loginWithGitHub">使用 GitHub 登录</button>
           <!-- <button class="bbutton" @click="loginWithGoogle">使用 Google 登录</button> -->
           <!-- <button class="bbutton" @click="sendPostRequest">使用 Dummy 登录</button> -->
-          <!-- <button class="bbutton" @click="handleGitHubCallback">使用 GitHub 登录</button> -->
         </div>
         <div class="big-contain" key="bigContainRegister" v-else>
           <div class="btitle">创建账户</div>
@@ -45,12 +44,11 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import axios from '../../utils/request';
 import router from '~/routers';
 import jwt_decode from 'jwt-decode';
 import { ElMessage } from 'element-plus'
-import { log } from 'console';
 
 
 let isRegisteredLogin = false;
@@ -63,98 +61,62 @@ const mobile = ref("");
 const password = ref("");
 const password2 = ref("");
 
-// GitHub OAuth 登录逻辑
-const loginWithGitHub = () => {
-  const clientId = 'Ov23liuJwXE0syF3flmO'; // 替换为你的GitHub客户端ID
-  const redirectUri = 'http://127.0.0.1:38001/accounts/github/login/callback/'; // 替换为你的回调URL
 
-  window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=user:email`;
+const loginWithGitHub = () => {
+  const providerId = 'github'; // 指定 GitHub 作为 OAuth 提供商
+  const callbackURL = 'http://trans.localhost/auth/github/token'; // 该路由负责获取后端传回的认证令牌和用户名，将其写入浏览器localstorage中
+
+  // 创建一个隐藏的表单
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = 'http://trans.localhost/api/_allauth/browser/v1/auth/provider/redirect';
+  form.style.display = 'none';
+
+  // 添加表单字段
+  const providerInput = document.createElement('input');
+  providerInput.type = 'hidden';
+  providerInput.name = 'provider';
+  providerInput.value = providerId;
+  form.appendChild(providerInput);
+
+  const callbackInput = document.createElement('input');
+  callbackInput.type = 'hidden';
+  callbackInput.name = 'callback_url';
+  callbackInput.value = callbackURL;
+  form.appendChild(callbackInput);
+
+  const processInput = document.createElement('input');
+  processInput.type = 'hidden';
+  processInput.name = 'process';
+  processInput.value = 'login'; // 或 'connect'
+  form.appendChild(processInput);
+
+  // 将表单添加到 body 并提交
+  document.body.appendChild(form);
+  form.submit();
 };
 
 // Google OAuth 登录逻辑
-const loginWithGoogle = () => {
-  const clientId = '27533849710-0ot3fj14f5vqkinena7is5ms08nfe2kl.apps.googleusercontent.com'; // 替换为你的Google客户端ID
-  const redirectUri = 'http://127.0.0.1:38001/accounts/google/login/callback/'; // 替换为你的回调URL
-  const scope = 'openid email profile'; // 请求的权限范围
+// const loginWithGoogle = () => {
+//   const clientId = '27533849710-0ot3fj14f5vqkinena7is5ms08nfe2kl.apps.googleusercontent.com'; // 替换为你的Google客户端ID
+//   const redirectUri = 'http://127.0.0.1:38001/accounts/google/login/callback/'; // 替换为你的回调URL
+//   const scope = 'openid email profile'; // 请求的权限范围
 
-  // 生成一个随机的状态值
-  // const state = "111111111111111111" + Math.random().toString(36).substring(2); // 简单的随机字符串
-  // console.log(state);
+//   // 生成一个随机的状态值
+//   // const state = "111111111111111111" + Math.random().toString(36).substring(2); // 简单的随机字符串
+//   // console.log(state);
 
-  // localStorage.setItem('oauth_state', state); // 存储状态值以便后续验证
+//   // localStorage.setItem('oauth_state', state); // 存储状态值以便后续验证
 
-  // 构造Google OAuth授权URL
-  const authUrl = `https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${encodeURIComponent(scope)}`;
-  // const authUrl = `http://127.0.0.1:8002/accounts/google/login/?process=login`;
+//   // 构造Google OAuth授权URL
+//   const authUrl = `https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${encodeURIComponent(scope)}`;
+//   // const authUrl = `http://127.0.0.1:8002/accounts/google/login/?process=login`;
 
-  // 重定向到Google登录页面
-  window.location.href = authUrl;
-};
-
-const sendPostRequest = async () => {
-  try {
-    const response = await fetch('http://127.0.0.1:38001/_allauth/app/v1/auth/provider/redirect', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        // 你可以在这里添加需要发送的数据
-        provider: 'google',
-        callback_url: 'http://127.0.0.1:38001/_allauth/app/v1/auth/google/callback/',
-        process: 'login'
-      }),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log('成功:', data);
-    } else {
-      console.error('请求失败:', response.statusText);
-    }
-  } catch (error) {
-    console.error('请求错误:', error);
-  }
-};
+//   // 重定向到Google登录页面
+//   window.location.href = authUrl;
+// };
 
 
-// GitHub OAuth 回调处理
-const handleGitHubCallback = async () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const code = urlParams.get('code');
-
-  if (code) {
-    try {
-      const res = await axios.post(apiUrl + '/auth/social/github/login/callback/', {
-        code: code,
-        redirect_uri: 'http://127.0.0.1:8002/auth/social/github/login/callback/', // 替换为你的回调URL
-      });
-
-      const token = res.data.access_token;
-      const storage = localStorage;
-
-      // 保存用户信息到LocalStorage
-      storage.setItem('access_token', res.data.access_token);
-      storage.setItem('refresh_token', res.data.refresh_token);
-      storage.setItem('username', res.data.username);
-
-      ElMessage.success("登录成功");
-      router.push('/map/expenses/');
-    } catch (error) {
-      ElMessage.error("GitHub 登录失败");
-    }
-  }
-};
-// GitHub OAuth 登录逻辑
-const loginWithDummy = () => {
-  window.location.href = 'http://127.0.0.1:8002/accounts/dummy/login/';
-};
-
-
-// onMounted(() => {
-// handleGitHubCallback();
-// sendPostRequest();
-// });
 
 function changeType() {
   isLogin.value = !isLogin.value;
@@ -170,7 +132,6 @@ const login = async () => {
     return
   }
   try {
-    // const res = await axios.post(apiUrl + '/auth/login/', {
     const res = await axios.post(apiUrl + '/token/', {
       username: username.value,
       password: password.value

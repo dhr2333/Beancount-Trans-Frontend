@@ -36,7 +36,6 @@ declare module '@vue/runtime-core' {
     Event: typeof import('./components/bill/Event.vue')['default']
     Expenses: typeof import('./components/map/Expenses.vue')['default']
     GitHubCallback: typeof import('./components/GitHubCallback.vue')['default']
-    HelloWorld: typeof import('./components/HelloWorld.vue')['default']
     Income: typeof import('./components/map/Income.vue')['default']
     Logos: typeof import('./components/Logos.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
