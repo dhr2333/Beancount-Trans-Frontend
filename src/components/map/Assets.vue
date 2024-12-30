@@ -275,56 +275,6 @@ const handleExport = () => {
 }
 
 
-// 导入
-// const handleImport = () => {
-//     const input = document.createElement('input')
-//     input.type = 'file'
-//     input.accept = '.xlsx'
-//     input.onchange = () => {
-//         const files = input.files
-//         if (files && files.length > 0) {
-//             const file = files.item(0)
-//             const reader = new FileReader()
-//             reader.onload = (e) => {
-//                 const data = e.target?.result
-//                 if (data) {
-//                     const workbook = XLSX.read(data, { type: 'binary' })
-//                     const firstSheetName = workbook.SheetNames[0]
-//                     const worksheet = workbook.Sheets[firstSheetName]
-//                     const json = XLSX.utils.sheet_to_json(worksheet)
-//                     axios({
-//                         url: 'aassets/',
-//                         data: JSON.parse(JSON.stringify(json)),
-//                         method: "POST",
-//                         headers: { 'Content-Type': 'application/json' }
-//                     })
-//                         .then(response => {
-//                             // console.log(response.data);
-//                         })
-//                         .catch(error => {
-//                             if (error.response && error.response.status == 401) {
-//                                 ElMessage.info('权限不足，请登录后重试');
-//                             }
-//                             else if (error.response && error.response.status == 403) {
-//                                 ElMessage.info('权限不足，请登录后重试');
-//                             }
-//                             else if (error.response && error.response.status == 400) {
-//                                 ElMessage.error('导入失败，请按"导出"提供的格式重新导入');
-//                             }
-//                             else {
-//                                 dialogError.value = true
-//                             }
-//                             console.error(error)
-//                         })
-//                 }
-//             }
-//             if (file !== null) {
-//                 reader.readAsBinaryString(file);
-//             }
-//         }
-//     }
-//     input.click()
-// }
 const handleImport = () => {
     const input = document.createElement('input');
     input.type = 'file';

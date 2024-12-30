@@ -61,15 +61,14 @@ const mobile = ref("");
 const password = ref("");
 const password2 = ref("");
 
-
 const loginWithGitHub = () => {
   const providerId = 'github'; // 指定 GitHub 作为 OAuth 提供商
-  const callbackURL = 'http://trans.localhost/auth/github/token'; // 该路由负责获取后端传回的认证令牌和用户名，将其写入浏览器localstorage中
+  const callbackURL = 'https://trans.dhr2333.cn/auth/github/token'; // 该路由负责获取后端传回的认证令牌和用户名，将其写入浏览器localstorage中
 
   // 创建一个隐藏的表单
   const form = document.createElement('form');
   form.method = 'POST';
-  form.action = 'http://trans.localhost/api/_allauth/browser/v1/auth/provider/redirect';
+  form.action = apiUrl + '/_allauth/browser/v1/auth/provider/redirect';
   form.style.display = 'none';
 
   // 添加表单字段

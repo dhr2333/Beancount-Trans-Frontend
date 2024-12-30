@@ -28,6 +28,5 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 app.use(route)
 app.use(ElementPlus)
 // app.use(ElementPlus, { size: 'small', zIndex: 3000 })
-// axios.defaults.baseURL = "http://localhost:8002/api"
 app.config.globalProperties.$axios = axios  // 全局注册 $axios
 app.mount("#app");

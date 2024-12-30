@@ -12,6 +12,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 
 const router = useRouter();
+const apiUrl = import.meta.env.VITE_API_URL;
 
 onMounted(async () => {
     // 假设后端在回调 URL 中返回了一个状态，或者您可能需要从 URL 中提取参数
@@ -19,7 +20,7 @@ onMounted(async () => {
 
     try {
         // 向后端请求用户信息
-        const response = await axios.get('http://trans.localhost/api/_allauth/browser/v1/auth/github/token', {
+        const response = await axios.get(apiUrl + '/_allauth/browser/v1/auth/github/token', {
             withCredentials: true, // 如果后端使用了 cookies 进行认证
         });
 

@@ -134,39 +134,6 @@ watch(value4, (newValue) => {
 
 axios.defaults.withCredentials = true
 
-// const csrfTokenRegex = /<input type="hidden" name="csrfmiddlewaretoken" value="(.*)">/;
-
-// const fetchCsrfToken = async () => {
-//   axios.get('translate/trans').then(res => {
-//     csrfToken.value = document.cookie.split('=')[1]
-//     console.log(csrfToken.value)
-//   })
-//     .catch(error => {  // 处理请求错误
-//       console.error(error);
-//     });
-//   sessionStorage.setItem("csrf_token", csrfToken.value)
-//   try {
-//     const response = await axios.get('/translate/trans')
-//     const match = response.data.match(csrfTokenRegex);
-//     if (match) {
-//       csrfToken.value = match[1];
-//       document.cookie = `csrf_token=${csrfToken.value}; expires=Fri, 31 Dec 9999 23:59:59 GMT; path=/`;
-//       document.cookie = `csrftoken=${csrfToken.value}; expires=Fri, 31 Dec 9999 23:59:59 GMT; path=/`;
-//     } else {
-//       console.error("CSRF token not found in response data");
-//     }
-//     console.log(csrfToken.value);
-
-//   } catch (error) {
-//     console.error(error)
-//   }
-// }
-
-
-// onMounted(() => {
-//   fetchCsrfToken()
-// })
-
 const token = localStorage.getItem("access");
 
 const headers = computed(() => ({

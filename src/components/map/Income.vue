@@ -223,21 +223,6 @@ const submitForm = async (formEl: FormInstance | undefined) => {
 }
 
 
-
-// 导出
-// const handleExport = () => {
-//     const data = AssetsData.value
-//     data.forEach((item: any) => {
-//         delete item.id
-//         delete item.url
-//         delete item.owner
-//     })
-//     const fileName = 'export_income.xlsx'
-//     const wb = XLSX.utils.book_new()
-//     const ws = XLSX.utils.json_to_sheet(data)
-//     XLSX.utils.book_append_sheet(wb, ws, "Sheet1")
-//     XLSX.writeFile(wb, fileName)
-// }
 // 导出
 const handleExport = () => {
     const data = AssetsData.value
