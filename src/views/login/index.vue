@@ -5,12 +5,12 @@
         <div class="big-contain" key="bigContainLogin" v-if="isLogin">
           <div class="btitle">账户登录</div>
           <div class="bform">
-            <input type="username" placeholder="用户名(默认admin) 或 手机号(默认11111111111)" v-model="username" />
+            <input type="username" placeholder="用户名(默认admin)" v-model="username" />
             <span class="errTips" v-if="emailError">* 用户名无效 *</span>
             <input type="password" placeholder="密码(默认123456)" v-model="password" />
             <span class="errTips" v-if="emailError">* 密码填写错误 *</span>
           </div>
-          <button class="bbutton" @click="login">登录</button>
+          <button class="bbutton" @click="login">登录</button><br>
           <button class="bbutton" @click="loginWithGitHub">使用 GitHub 登录</button>
           <!-- <button class="bbutton" @click="loginWithGoogle">使用 Google 登录</button> -->
           <!-- <button class="bbutton" @click="sendPostRequest">使用 Dummy 登录</button> -->
@@ -18,11 +18,10 @@
         <div class="big-contain" key="bigContainRegister" v-else>
           <div class="btitle">创建账户</div>
           <div class="bform">
-            <input type="text" placeholder="用户名" v-model="username" />
+            <input type="text" placeholder="用户名（必填）" v-model="username" />
             <span class="errTips" v-if="existed">* 用户名已经存在！ *</span>
-            <input type="mobile" placeholder="手机号" v-model="mobile" />
-            <input type="password" placeholder="密码" v-model="password" />
-            <input type="password" placeholder="确认密码" v-model="password2" />
+            <input type="email" placeholder="邮箱（选填）" v-model="email" />
+            <input type="password" placeholder="密码（必填）" v-model="password" />
           </div>
           <button class="bbutton" @click="register">注册</button>
         </div>
@@ -47,7 +46,6 @@
 import { ref } from 'vue';
 import axios from '../../utils/request';
 import router from '~/routers';
-import jwt_decode from 'jwt-decode';
 import { ElMessage } from 'element-plus'
 
 
@@ -57,9 +55,8 @@ const isLogin = ref(true);
 const emailError = ref(false);
 const existed = ref(false);
 const username = ref("");
-const mobile = ref("");
+const email = ref("");
 const password = ref("");
-const password2 = ref("");
 
 const loginWithGitHub = () => {
   const providerId = 'github'; // 指定 GitHub 作为 OAuth 提供商
@@ -119,10 +116,10 @@ const loginWithGitHub = () => {
 
 function changeType() {
   isLogin.value = !isLogin.value;
-  username.value = "admin";
-  mobile.value = "example@163.com";
-  password.value = "!QAZse4rfv";
-  password2.value = "!QAZse4rfv";
+  username.value = "";
+  email.value = "";
+  password.value = "";
+  // password2.value = "!QAZse4rfv";
 }
 
 const login = async () => {
@@ -131,21 +128,14 @@ const login = async () => {
     return
   }
   try {
-    const res = await axios.post(apiUrl + '/token/', {
+    const res = await axios.post(apiUrl + '/_allauth/app/v1/auth/login', {
       username: username.value,
       password: password.value
     });
 
-    const token = res.data.access;
     const storage = localStorage;
-
-    // 保存用户信息到LocalStorage
-    storage.setItem('access', res.data.access);
-    storage.setItem('refresh', res.data.refresh);
-    // storage.setItem('token', res.data.token);
-    storage.setItem('iat', jwt_decode(token).iat);
-    storage.setItem('exp', jwt_decode(token).exp);
-    storage.setItem('username', username.value);
+    storage.setItem('access', res.data.meta.access_token);
+    storage.setItem('username', res.data.data.user.username);
 
     if (!isRegisteredLogin) {
       ElMessage.success("登录成功");
@@ -153,28 +143,36 @@ const login = async () => {
     router.push('/map/expenses/')
 
   } catch (error) {
+    console.log(error);
+
     ElMessage.error("用户名或密码错误");
   }
 }
 
 const register = async () => {
-  if (username.value != "" && mobile.value != "" && password.value != "" && password2.value != "") {
-    axios.post(apiUrl + '/auth/registration/', {
+  try {
+    const res = await axios.post(apiUrl + '/_allauth/app/v1/auth/signup', {
       username: username.value,
-      email: mobile.value,
-      password1: password.value,
-      password2: password2.value
-    })
-      .then((res) => {
-        ElMessage.success("注册成功");
-        isRegisteredLogin = true;
-        login(username, password);
-      })
-      .catch((err) => {
-        ElMessage.error(err.response.data.username + err.response.data.mobile)
-      })
+      password: password.value
+    });
+
+    if (res.status === 200 && res.data) {
+      const storage = localStorage;
+      storage.setItem('access', res.data.meta.access_token);
+      storage.setItem('username', res.data.data.user.username);
+      ElMessage.success("登录成功");
+      router.push('/map/expenses/');
+    } else {
+      ElMessage.error('注册失败，请稍后再试。');
+    }
+  } catch (error) {
+    if (error.response) {
+      ElMessage.error(error.response.data.errors[0].message);
+    } else {
+      ElMessage.error('请求出错，请稍后再试。');
+    }
   }
-}
+};
 
 </script>
 
