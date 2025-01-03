@@ -1,6 +1,26 @@
 <template>
   <el-menu class="el-menu-demo" mode="horizontal" :ellipsis="false" @select="handleSelect">
-    <el-menu-item index="/account"><el-link href="http://localhost:5000">我的账本</el-link></el-menu-item>
+    <!-- <el-sub-menu index="account">
+      <template #title>账本管理</template>
+<el-link href="http://localhost:5000/" class="no-underline"><el-menu-item>本地账本</el-menu-item></el-link><br></br>
+<el-link href="https://beancount.dhr2333.cn/" class="no-underline"><el-menu-item>系统账本</el-menu-item></el-link><br></br>
+<el-link href="https://fava.pythonanywhere.com/example-beancount-file/income_statement/"
+  class="no-underline"><el-menu-item>官方账本</el-menu-item></el-link>
+</el-sub-menu> -->
+    <el-sub-menu index="account">
+      <template #title>账本管理</template>
+      <el-link href="http://localhost:5000/" target="_blank" rel="noopener noreferrer" class="no-underline">
+        <el-menu-item index="local-ledger">本地账本</el-menu-item>
+      </el-link><br></br>
+      <el-link href="https://beancount.dhr2333.cn/" target="_blank" rel="noopener noreferrer" class="no-underline">
+        <el-menu-item index="system-ledger">系统账本</el-menu-item>
+      </el-link><br></br>
+      <el-link href="https://fava.pythonanywhere.com/example-beancount-file/income_statement/" target="_blank"
+        rel="noopener noreferrer" class="no-underline">
+        <el-menu-item index="official-ledger">官方账本</el-menu-item>
+      </el-link>
+    </el-sub-menu>
+
     <router-link to="/trans" class="no-underline"><el-menu-item index="/trans">格式转换</el-menu-item></router-link>
 
     <el-sub-menu index="map">
@@ -12,6 +32,7 @@
       <router-link to="/map/assets" class="no-underline"><el-menu-item
           index="/map/assets">资产映射</el-menu-item></router-link>
     </el-sub-menu>
+
     <el-sub-menu index="bill">
       <template #title>账单管理</template>
       <router-link to="/bill/account" class="no-underline"><el-menu-item
@@ -21,9 +42,11 @@
       <router-link to="/bill/commodity" class="no-underline"><el-menu-item
           index="/bill/commodity">通货管理</el-menu-item></router-link>
     </el-sub-menu>
+
     <router-link to="/assets/account" class="no-underline"><el-menu-item
         index="/account">资产总表</el-menu-item></router-link>
     <div class="flex-grow" />
+
     <el-menu-item>
       <el-popover placement="top-start" :width="200" trigger="hover">
         <template #reference>
