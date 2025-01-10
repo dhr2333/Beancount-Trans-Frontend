@@ -3,7 +3,7 @@ import App from "./App.vue";
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import route from "./routers"
-import axios, { Axios } from "axios"
+import axios from "axios"
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
 // import "~/styles/element/index.scss";

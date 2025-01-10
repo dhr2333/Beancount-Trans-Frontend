@@ -49,12 +49,11 @@ or
 <script setup lang="ts">
 import { ElMessage, ElPopover } from 'element-plus';
 import { UploadFilled } from '@element-plus/icons-vue'
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch } from 'vue';
 import axios from '../../utils/request';
-// import { responseData } from '../../utils/request';
+
 const input = ref()
 const filename = ref()
-// console.log(input)
 const wechatUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E5%BE%AE%E4%BF%A1.csv');
 const alipayUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E6%94%AF%E4%BB%98%E5%AE%9D.csv');
 const value4 = ref([])
@@ -94,7 +93,6 @@ const showPassword = ref(false)
 const isbalance = ref(false)
 const isCSVOnly = ref(false)
 
-// const uploadData = { cmb_credit_ignore: cmbCreditIgnore.value, write: isWrite.value, password: input.value }
 const getUploadData = () => {
   return {
     cmb_credit_ignore: cmbCreditIgnore.value,
@@ -161,8 +159,8 @@ const handleUploadSuccess = (response: any, file: any) => {
     responseData.value = response.join('');
   }
 };
-// 函数用于下载CSV文件
 
+// 函数用于下载CSV文件
 const downloadCSV = (csvData: string) => {
   // 假设csvData已经是正确格式的CSV文本
   const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
@@ -181,8 +179,6 @@ const downloadCSV = (csvData: string) => {
 const handleChange = (file: File, fileList: File[]) => {
   filename.value = file.name.split('.')[0]
 };
-
-
 
 const handleUploadError = (err: any, file: any) => {
   if (err.status === 501) {
