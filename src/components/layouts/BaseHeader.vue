@@ -49,6 +49,31 @@
     </router-link>
     <div class="flex-grow" />
 
+    <!-- 公告弹窗 -->
+    <el-dialog v-model="announceVisible" title="最新公告 & 经验分享" close-on-click-modal="true" width="70%" top="5vh"
+      :close-on-click-modal="false">
+      <div v-loading="loading" element-loading-text="正在加载公告...">
+        <template v-if="announcements.length > 0">
+          <div v-for="item in announcements" :key="item.id" class="announce-item">
+            <div class="announce-header">
+              <h3 class="announce-title">{{ item.title }}</h3>
+              <div class="announce-time">{{ formatTime(item.createTime) }}</div>
+            </div>
+            <div class="announce-content" v-html="item.content"></div>
+          </div>
+        </template>
+        <div v-else class="empty-announce">
+          <el-empty description="暂无最新公告" />
+        </div>
+      </div>
+    </el-dialog>
+    <el-menu-item index="announcement" @click="showAnnouncements"> <el-icon :size="26">
+        <svg viewBox="0 0 1024 1024">
+          <path
+            d="M512 128c-212.8 0-384 171.2-384 384 0 132.8 67.2 249.6 170.4 318.4l-46.4 132.8 150.4-80c32 8 64 12.8 96 12.8 212.8 0 384-171.2 384-384S724.8 128 512 128z m0 704c-32 0-64-4.8-96-12.8l-88 46.4 33.6-96C280 763.2 224 649.6 224 512 224 299.2 356.8 160 512 160s288 139.2 288 352-128.8 352-288 352z">
+          </path>
+        </svg>
+      </el-icon></el-menu-item>
     <el-menu-item>
       <el-popover placement="top-start" :width="200" trigger="hover">
         <template #reference>
@@ -118,6 +143,23 @@ const user = () => {
   }
 };
 
+// 新增的公告相关代码
+const announceVisible = ref(false)
+const announcements = ref<Array<{ id: number; title: string; content: string; createTime: string }>>([])
+const loading = ref(false)
+
+// 只有点击事件才会触发显示
+const showAnnouncements = async () => {
+  // ...获取数据后手动设置为 true
+  announceVisible.value = true
+}
+
+// 时间格式化函数
+const formatTime = (timestamp: string) => {
+  const date = new Date(timestamp)
+  return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+}
+
 // 在组件挂载时验证令牌
 onMounted(async () => {
   const accessToken = localStorage.getItem("access");
@@ -150,6 +192,14 @@ watchEffect(() => {
 const handleSelect = (key: string, keyPath: string[]) => {
   // 你可以在这里添加自定义逻辑
 };
+
+// 临时测试数据
+announcements.value = [{
+  id: 1,
+  title: "系统使用指南",
+  content: "<ul><li>建议所有交易有优惠时尽量使用优惠</li><li>线下交易建议使用 \"微信+备注\" 的形式，如\"食物\"、\"停车\"、\"装修尾款 #DECORATION\"等</li><li>线上交易建议使用 \"支付宝\" (支付宝商业信息较全，但是备注信息在账单中无法体现)</li></li></ul>",
+  createTime: "2025-03-18T16:12:11"
+}]
 </script>
 
 <style>
@@ -171,5 +221,55 @@ const handleSelect = (key: string, keyPath: string[]) => {
   width: 100%;
   color: inherit;
   text-decoration: none;
+}
+
+/* 公告弹窗样式 */
+.announce-item {
+  padding: 20px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  background: #f8f9fa;
+  transition: all 0.3s;
+
+  &:hover {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+  }
+
+  .announce-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .announce-title {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.1em;
+  }
+
+  .announce-time {
+    color: #95a5a6;
+    font-size: 0.9em;
+  }
+
+  .announce-content {
+    line-height: 1.6;
+    color: #34495e;
+
+    /* 处理富文本内容样式 */
+    p {
+      margin: 8px 0;
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+  }
+}
+
+.empty-announce {
+  padding: 40px 0;
 }
 </style>
