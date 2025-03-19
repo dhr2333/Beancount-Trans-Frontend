@@ -30,6 +30,13 @@
       </div>
     </template>
   </el-upload>
+  <!-- 添加复制按钮和结果框 -->
+  <div class="result-container">
+    <el-input class="result-textarea"></el-input>
+    <el-button class="copy-btn" type="success" :icon="DocumentCopy" @click="copyResponseData" :disabled="!responseData">
+      复制结果
+    </el-button>
+  </div>
   <el-input class="result-textarea" type="textarea" :rows="30" readonly :value="responseData" placeholder='完成解析后将自动填充到此处,可直接进行复制，解析案例如下：
 
 2022-06-19 * "温州市数据管理发展集团有限公司" "HIK-停车缴费-洞头人民路停车场(人民路区域共享)"
@@ -48,9 +55,10 @@ or
 
 <script setup lang="ts">
 import { ElMessage, ElPopover } from 'element-plus';
-import { UploadFilled } from '@element-plus/icons-vue'
+import { UploadFilled, DocumentCopy } from '@element-plus/icons-vue'
 import { ref, computed, watch } from 'vue';
 import axios from '../../utils/request';
+
 
 const input = ref()
 const filename = ref()
@@ -192,4 +200,34 @@ const handleUploadError = (err: any, file: any) => {
     ElMessage.error("请上传支持的账单文件");
   }
 };
+
+// 在原有代码基础上添加复制方法
+const copyResponseData = async () => {
+  try {
+    await navigator.clipboard.writeText(responseData.value);
+    ElMessage.success('复制成功');
+  } catch (err) {
+    console.error('复制失败:', err);
+    ElMessage.error('复制失败，请手动选择内容复制');
+  }
+};
 </script>
+<style>
+/* 添加样式 */
+.result-container {
+  position: relative;
+  margin-top: 20px;
+}
+
+.copy-btn {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 100;
+}
+
+.result-textarea textarea {
+  font-family: Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+}
+</style>
