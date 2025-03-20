@@ -20,6 +20,9 @@
 
     <el-sub-menu index="map">
       <template #title>映射管理</template>
+      <router-link to="/format" class="no-underline">
+        <el-menu-item index="/format">格式化输出</el-menu-item>
+      </router-link>
       <router-link to="/map/expenses" class="no-underline">
         <el-menu-item index="/map/expense">支出映射</el-menu-item>
       </router-link>
