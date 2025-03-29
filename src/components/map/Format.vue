@@ -99,6 +99,7 @@ const formatSettings = ref<string[]>([])
 const incomeTemplate = ref('')
 const commissionTemplate = ref('')
 const currency = ref('')
+
 const flagSymbol = ref('*')
 const loading = ref({
     save: false,
@@ -112,6 +113,7 @@ const convertToFrontend = (config: Config) => {
         incomeTemplate: config.income_template || '',
         commissionTemplate: config.commission_template || '',
         currency: config.currency || '',
+
         formatSettings: [
             ...(config.show_note ? ['showNote'] : []),
             ...(config.show_tag ? ['showTag'] : []),
@@ -153,6 +155,7 @@ const currentConfig = computed(() => ({
     income_template: incomeTemplate.value,
     commission_template: commissionTemplate.value,
     currency: currency.value
+
 }))
 
 // 应用配置
@@ -163,6 +166,7 @@ const applyConfig = async () => {
         ElMessage.success('配置已保存')
     } catch (error) {
         ElMessage.error('保存失败，请重新登录或检查格式是否正确')
+
     } finally {
         loading.value.save = false
     }
@@ -183,11 +187,13 @@ const resetToDefault = async () => {
             income_template: 'Income:Discount',
             commission_template: 'Expenses:Finance:Commission',
             currency: 'CNY'
+
         })
         await loadConfig() // 重新加载最新配置
         ElMessage.success('已恢复默认配置')
     } catch (error) {
         ElMessage.error('重置失败,请确保已经登录')
+
     } finally {
         loading.value.reset = false
     }
@@ -221,3 +227,4 @@ const resetToDefault = async () => {
     gap: 6px;
 }
 </style>
+
