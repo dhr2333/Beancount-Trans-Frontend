@@ -18,13 +18,44 @@
         <!-- 高级格式设置 -->
         <el-collapse-item title="高级格式设置" name="advanced">
             <div class="config-group">
-                <el-divider>账户模板</el-divider>
-                <el-input v-model="incomeTemplate" placeholder="输入自定义收入账户（如：Income:Discount）" clearable>
-                    <template #prepend>优惠收入模板</template>
-                </el-input>
+                <el-divider>账户模板配置</el-divider>
 
-                <el-divider>标记符号</el-divider>
-                <el-select v-model="flagSymbol" placeholder="选择日期标记符号" style="width: 200px">
+                <!-- 收入模板组 -->
+                <div class="template-group">
+                    <el-input v-model="incomeTemplate" placeholder="输入自定义收入账户（如：Income:Discount）" clearable
+                        class="template-input">
+                        <template #prepend>优惠收入模板</template>
+                    </el-input>
+
+                    <el-input v-model="commissionTemplate" placeholder="输入手续费账户（如：Expenses:Finance:Commission）"
+                        clearable class="template-input">
+                        <template #prepend>手续费模板</template>
+                    </el-input>
+
+                    <el-form-item prop="currency" :rules="[
+                        {
+                            pattern: /^[A-Z][A-Z0-9'._-]{0,22}([A-Z0-9])?$/,
+                            message: '货币必须以大写字母开头，以大写字母/数字结尾，并且只能包含 [A-Z0-9\'._-]',
+                            trigger: 'blur'
+                        }
+                    ]">
+                        <el-input v-model="currency" placeholder="输入基础货币（如：CNY）" clearable class="template-input">
+                            <template #prepend>
+                                <div class="label-with-tip">
+                                    <span>基础货币模板</span>
+                                    <el-tooltip content="货币必须以大写字母开头，以大写字母/数字结尾，并且只能包含 [A-Z0-9'._-]" placement="top">
+                                        <el-icon class="tip-icon">
+                                            <Warning />
+                                        </el-icon>
+                                    </el-tooltip>
+                                </div>
+                            </template>
+                        </el-input>
+                    </el-form-item>
+                </div>
+
+                <el-divider>标记符号设置</el-divider>
+                <el-select v-model="flagSymbol" placeholder="选择日期标记符号" class="symbol-selector">
                     <el-option label="星号 *" value="*" />
                     <el-option label="叹号 !" value="!" />
                     <el-option label="井号 #" value="#" />
@@ -58,12 +89,17 @@ interface Config {
     show_status: boolean
     show_discount: boolean
     income_template?: string
+    commission_template?: string
+    currency?: string
 }
 
 // 响应式配置状态
 const activePanels = ref(['basic', 'advanced'])
 const formatSettings = ref<string[]>([])
 const incomeTemplate = ref('')
+const commissionTemplate = ref('')
+const currency = ref('')
+
 const flagSymbol = ref('*')
 const loading = ref({
     save: false,
@@ -75,6 +111,9 @@ const convertToFrontend = (config: Config) => {
     return {
         flag: config.flag,
         incomeTemplate: config.income_template || '',
+        commissionTemplate: config.commission_template || '',
+        currency: config.currency || '',
+
         formatSettings: [
             ...(config.show_note ? ['showNote'] : []),
             ...(config.show_tag ? ['showTag'] : []),
@@ -93,9 +132,11 @@ const loadConfig = async () => {
         const frontendConfig = convertToFrontend(data)
         formatSettings.value = frontendConfig.formatSettings
         incomeTemplate.value = frontendConfig.incomeTemplate
+        commissionTemplate.value = frontendConfig.commissionTemplate
         flagSymbol.value = frontendConfig.flag
+        currency.value = frontendConfig.currency
     } catch (error) {
-        ElMessage.error('配置加载失败')
+        ElMessage.error('配置加载失败，请确保已经登录')
     }
 }
 
@@ -111,7 +152,10 @@ const currentConfig = computed(() => ({
     show_uuid: formatSettings.value.includes('showUUID'),
     show_status: formatSettings.value.includes('showStatus'),
     show_discount: formatSettings.value.includes('showDiscount'),
-    income_template: incomeTemplate.value
+    income_template: incomeTemplate.value,
+    commission_template: commissionTemplate.value,
+    currency: currency.value
+
 }))
 
 // 应用配置
@@ -121,7 +165,8 @@ const applyConfig = async () => {
         await axios.put('config/', currentConfig.value)
         ElMessage.success('配置已保存')
     } catch (error) {
-        ElMessage.error('保存失败，请检查网络或配置')
+        ElMessage.error('保存失败，请重新登录或检查格式是否正确')
+
     } finally {
         loading.value.save = false
     }
@@ -139,12 +184,16 @@ const resetToDefault = async () => {
             show_uuid: true,
             show_status: true,
             show_discount: true,
-            income_template: null
+            income_template: 'Income:Discount',
+            commission_template: 'Expenses:Finance:Commission',
+            currency: 'CNY'
+
         })
         await loadConfig() // 重新加载最新配置
         ElMessage.success('已恢复默认配置')
     } catch (error) {
-        ElMessage.error('重置失败')
+        ElMessage.error('重置失败,请确保已经登录')
+
     } finally {
         loading.value.reset = false
     }
@@ -152,3 +201,30 @@ const resetToDefault = async () => {
 </script>
 
 <!-- 保持原有样式不变 -->
+<style scoped>
+.template-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.template-input {
+    margin-bottom: 10px;
+}
+
+.symbol-selector {
+    width: 220px;
+    /* 比原来稍宽 */
+}
+
+.config-group {
+    padding: 0 16px;
+}
+
+.label-with-tip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+</style>
+

@@ -31,6 +31,18 @@
         </span>
       </template>
     </el-table-column>
+    <el-table-column label="货币" prop="currency" width="120">
+      <template #header="{ column }">
+        <div class="currency-header">
+          {{ column.label }}
+          <el-tooltip v-if="showTooltip" class="tooltip" effect="dark" placement="top" :content="currencyContent">
+            <el-icon>
+              <InfoFilled />
+            </el-icon>
+          </el-tooltip>
+        </div>
+      </template>
+    </el-table-column>
     <!-- <el-table-column label="标签" prop="tag" />
     <el-table-column label="类型" prop="classification" /> -->
     <el-table-column align="right">
@@ -60,6 +72,10 @@
       <el-form-item label="映射账户" prop="expend">
         <el-input v-model="ruleForm.expend" placeholder="Expenses:Culture:Entertainment" />
       </el-form-item>
+      <el-form-item label="货币" prop="currency">
+        <el-input v-model="ruleForm.currency" placeholder="CNY" clearable>
+        </el-input>
+      </el-form-item>
       <!-- <el-form-item label="标签" prop="tag">
         <el-input v-model="ruleForm.tag" placeholder="影音娱乐" />
       </el-form-item>
@@ -82,6 +98,9 @@
       </el-form-item>
       <el-form-item label="映射账户" prop="expend">
         <el-input v-model="ruleForm.expend" />
+      </el-form-item>
+      <el-form-item label="货币" prop="currency">
+        <el-input v-model="ruleForm.currency" />
       </el-form-item>
       <!-- <el-form-item label="标签" prop="tag">
         <el-input v-model="ruleForm.tag" />
@@ -121,7 +140,7 @@ import axios from '../../utils/request'
 import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
 
-const apiUrl = import.meta.env.VITE_API_URL;
+// const apiUrl = import.meta.env.VITE_API_URL;
 const dialogError = ref(false)
 // console.log(import.meta.env);
 
@@ -130,6 +149,7 @@ interface Expense {
   key: string
   payee: string | null | undefined
   expend: string
+  currency: string | null | undefined
   // tag: string
   // classification: string
 }
@@ -138,12 +158,11 @@ interface Expense {
 const showTooltip = ref(true)
 const payeetipContent = ref("若商家存在，优先级 + 50 ,映射账户中每存在一个 ':' ，优先级以 ':' 数量 * 100计算 ");
 const expendtipContent = ref("优先级越高则映射账户越精准。例如关键字为蜜雪冰城的条目，优先级为 2 * 100 + 50 = 250")
+const currencyContent = ref("若该货币与格式化输出中的基础货币模板不同，则会使用\"@@\"来指定总成本，留空默认为\"CNY\"")
 
 // 页面获取数据
 const expenseData = ref<Expense[]>([])
 // console.log(expenseData.value);
-
-
 
 const fetchData = async () => {
   try {
@@ -191,6 +210,7 @@ const ruleForm = ref({
   // payee: null,
   payee: null as string | null | undefined,
   expend: '',
+  currency: null as string | null | undefined,
   // tag: '',
   // classification: '',
 })
@@ -206,6 +226,18 @@ const rules = ref<FormRules>({
   expend: [
     { required: true, message: '请输入映射账户', trigger: 'blur' },
     { max: 64, message: '长度应控制在64个字符以内', trigger: 'blur' },
+  ],
+  currency: [
+    {
+      required: false,
+      message: '请输入货币',
+      trigger: 'blur'
+    },
+    {
+      pattern: /^[A-Z][A-Z0-9'._-]{0,22}([A-Z0-9])?$/,
+      message: '必须以大写字母开头，以大写字母/数字结尾，允许字符 [A-Z0-9\'._-]',
+      trigger: 'blur'
+    }
   ],
   // tag: [
   //   { required: true, message: '请输入标签', trigger: 'blur' },
@@ -314,7 +346,8 @@ const handleImport = () => {
             return {
               key: item.key || "",
               payee: item.payee || "",
-              expend: item.expend || ""
+              expend: item.expend || "",
+              currency: item.currency || "",
             };
           });
 
@@ -360,6 +393,7 @@ const handleEdit = (index: number, row: Expense) => {
   ruleForm.value.key = row.key
   ruleForm.value.payee = row.payee !== null ? row.payee : null // 为了解决编辑时payee为null时的问题;
   ruleForm.value.expend = row.expend
+  ruleForm.value.currency = row.currency
   // ruleForm.value.tag = row.tag
   // ruleForm.value.classification = row.classification
   dialogEdit.value = true
