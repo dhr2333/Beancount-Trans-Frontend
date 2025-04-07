@@ -55,6 +55,8 @@
         </div>
       </template>
       <template #default="scope">
+        <el-switch v-model="scope.row.enable" style="margin-right: 12px;" @change="handleSwitchChange(scope.row)"
+          inline-prompt inactive-text="禁用" />
         <el-button size="small" @click="handleEdit(scope.$index, scope.row)">编辑</el-button>
         <el-button size="small" type="danger" @click="handleDelete(scope.$index, scope.row)"
           style="margin-left: 12px">删除</el-button>
@@ -150,6 +152,7 @@ interface Expense {
   payee: string | null | undefined
   expend: string
   currency: string | null | undefined
+  enable: boolean
   // tag: string
   // classification: string
 }
@@ -158,7 +161,7 @@ interface Expense {
 const showTooltip = ref(true)
 const payeetipContent = ref("若商家存在，优先级 + 50 ,映射账户中每存在一个 ':' ，优先级以 ':' 数量 * 100计算 ");
 const expendtipContent = ref("优先级越高则映射账户越精准。例如关键字为蜜雪冰城的条目，优先级为 2 * 100 + 50 = 250")
-const currencyContent = ref("若该货币与格式化输出中的基础货币模板不同，则会使用\"@@\"来指定总成本，留空默认为\"CNY\"")
+const currencyContent = ref("若该货币与格式化输出中的基础货币模板不同，则会使用\"@@\"来指定总成本，建议储值类使用非CNY货币，留空默认为\"CNY\"")
 
 // 页面获取数据
 const expenseData = ref<Expense[]>([])
@@ -189,12 +192,17 @@ onMounted(() => {
 const search = ref('')
 
 const filterExpenseData = computed(() =>
-  expenseData.value.filter(
-    (data) =>
-      !search.value ||
-      data.key.toLowerCase().includes(search.value.toLowerCase()) ||
-      data.expend.toLowerCase().includes(search.value.toLowerCase())
-  )
+  expenseData.value.filter((data) => {
+    const searchTerm = search.value?.toLowerCase() || ''
+    if (!searchTerm) return true
+
+    return [
+      data.key.toLowerCase(),
+      data.payee?.toLowerCase() ?? '',
+      data.expend.toLowerCase(),
+      data.currency?.toLowerCase() ?? ''
+    ].some(field => field.includes(searchTerm))
+  })
 )
 
 // 新增
@@ -211,6 +219,7 @@ const ruleForm = ref({
   payee: null as string | null | undefined,
   expend: '',
   currency: null as string | null | undefined,
+  // enable: '',
   // tag: '',
   // classification: '',
 })
@@ -222,22 +231,15 @@ const rules = ref<FormRules>({
   ],
   payee: [
     { required: false, message: '', trigger: 'change', },
+    { max: 32, message: '长度应控制在32个字符以内', trigger: 'blur' },
   ],
   expend: [
     { required: true, message: '请输入映射账户', trigger: 'blur' },
     { max: 64, message: '长度应控制在64个字符以内', trigger: 'blur' },
   ],
   currency: [
-    {
-      required: false,
-      message: '请输入货币',
-      trigger: 'blur'
-    },
-    {
-      pattern: /^[A-Z][A-Z0-9'._-]{0,22}([A-Z0-9])?$/,
-      message: '必须以大写字母开头，以大写字母/数字结尾，允许字符 [A-Z0-9\'._-]',
-      trigger: 'blur'
-    }
+    { required: false, message: '请输入货币', trigger: 'blur' },
+    { pattern: /^[A-Z][A-Z0-9'._-]{0,22}([A-Z0-9])?$/, message: '必须以大写字母开头，以大写字母/数字结尾，允许字符 [A-Z0-9\'._-]', trigger: 'blur' }
   ],
   // tag: [
   //   { required: true, message: '请输入标签', trigger: 'blur' },
@@ -348,6 +350,7 @@ const handleImport = () => {
               payee: item.payee || "",
               expend: item.expend || "",
               currency: item.currency || "",
+              enable: item.enable || "",
             };
           });
 
@@ -384,8 +387,6 @@ const handleImport = () => {
   input.click();
 }
 
-
-
 // 编辑
 const dialogEdit = ref(false)
 
@@ -394,6 +395,7 @@ const handleEdit = (index: number, row: Expense) => {
   ruleForm.value.payee = row.payee !== null ? row.payee : null // 为了解决编辑时payee为null时的问题;
   ruleForm.value.expend = row.expend
   ruleForm.value.currency = row.currency
+  // ruleForm.value.enable = row.enable
   // ruleForm.value.tag = row.tag
   // ruleForm.value.classification = row.classification
   dialogEdit.value = true
@@ -401,6 +403,26 @@ const handleEdit = (index: number, row: Expense) => {
   // console.log(index)
   // console.log(row);
 }
+
+const handleSwitchChange = async (row: Expense) => {
+  try {
+    // 立即更新本地状态
+    row.enable = row.enable
+
+    // 发送 API 请求
+    await axios.patch(`expense/${row.id}/`, {
+      enable: row.enable
+    })
+
+    ElMessage.success('状态更新成功')
+  } catch (error) {
+    // 请求失败时回滚状态
+    row.enable = !row.enable
+    ElMessage.error('状态更新失败')
+    console.error(error)
+  }
+}
+
 
 const editForm = async (formEl: FormInstance | undefined) => {
   if (!formEl) return
