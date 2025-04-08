@@ -209,8 +209,11 @@ const filterExpenseData = computed(() =>
 const dialogAdd = ref(false)
 
 const handleAdd = () => {
-  dialogAdd.value = true
-}
+  if (ruleFormRef.value) {
+    ruleFormRef.value.resetFields();
+  }
+  dialogAdd.value = true;
+};
 
 const ruleFormRef = ref<FormInstance>()
 const ruleForm = ref({
@@ -270,6 +273,9 @@ const submitForm = async (formEl: FormInstance | undefined) => {
           headers: { 'Content-Type': 'application/json' }
         })
           .then(response => {
+            ElMessage.success('新增成功')
+            dialogAdd.value = false
+            fetchData();
             // console.log(response.data);
           })
           .catch(error => {
@@ -287,19 +293,17 @@ const submitForm = async (formEl: FormInstance | undefined) => {
             }
             console.error(error)
           })
-        dialogAdd.value = false
-        setTimeout(updateExpenseData, 1000)
       } catch (error) {
-        // console.log(error);
+        console.log(error);
       }
     } else {
-      // console.log('error submit!', fields)
+      console.log('error submit!', fields)
     }
   })
-  async function updateExpenseData() {
-    const response = await axios.get('expense/');
-    expenseData.value = response.data;
-  }
+  // async function updateExpenseData() {
+  //   const response = await axios.get('expense/');
+  //   expenseData.value = response.data;
+  // }
 }
 
 // 导出
@@ -439,7 +443,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
         })
           .then(response => {
             // console.log(response.data);
-            expenseData.value = response.data
+            // expenseData.value = response.data
             fetchData()
           })
           .catch(error => {

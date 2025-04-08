@@ -1,11 +1,12 @@
 <template>
-    <el-table :data="filterExpenseData" style="width: 98%">
+    <el-table v-loading="loading" :data="filterExpenseData" style="width: 98%">
         <!-- <el-table-column label="编号" prop="id" /> -->
         <el-table-column label="关键字" prop="key">
             <template #header="{ column }">
                 <span>
                     {{ column.label }}
-                    <span class="tooltip-icon" @mouseover="showTooltip = true" @mouseleave="showTooltip = false">
+                    <span class="tooltip-icon" @mouseover="keyTooltipVisible = true"
+                        @mouseleave="keyTooltipVisible = false">
                         <i class="el-icon-question"></i>
                     </span>
                     <el-tooltip v-if="showTooltip" class="tooltip" effect="dark" placement="top"
@@ -21,7 +22,8 @@
             <template #header="{ column }">
                 <span>
                     {{ column.label }}
-                    <span class="tooltip-icon" @mouseover="showTooltip = true" @mouseleave="showTooltip = false">
+                    <span class="tooltip-icon" @mouseover="keyTooltipVisible = true"
+                        @mouseleave="keyTooltipVisible = false">
                         <i class="el-icon-question"></i>
                     </span>
                     <el-tooltip v-if="showTooltip" class="tooltip" effect="dark" placement="top"
@@ -46,6 +48,8 @@
                 </div>
             </template>
             <template #default="scope">
+                <el-switch v-model="scope.row.enable" style="margin-right: 12px;"
+                    @change="handleSwitchChange(scope.row)" inline-prompt inactive-text="禁用" />
                 <el-button size="small" @click="handleEdit(scope.$index, scope.row)">编辑</el-button>
                 <el-button size="small" type="danger" @click="handleDelete(scope.$index, scope.row)"
                     style="margin-left: 12px">删除</el-button>
@@ -121,16 +125,22 @@ interface Assets {
     key: string
     full: string
     assets: string
+    enable: boolean
 }
 
 // 页面增加优先级提示
 const showTooltip = ref(true)
+const keyTooltipVisible = ref(false)
+const fullTooltipVisible = ref(false)
+const assetsTooltipVisible = ref(false)
 const keytipContent = ref("账户相似时，详细账户的优先级应更高，例如'零钱通'应在'零钱'的前面");
 const assetstipContent = ref("固定格式： [银行]+[储蓄卡/信用卡]+([卡号])。用于支付宝还款功能映射 and 支付宝提现至储蓄卡");
+const loading = ref(false)
 
 // 页面获取数据
 const AssetsData = ref<Assets[]>([])
 const fetchData = async () => {
+    loading.value = true
     try {
         const response = await axios.get('aassets/')
         AssetsData.value = response.data
@@ -143,6 +153,8 @@ const fetchData = async () => {
             // ElMessage("token_not_valid, please log in again.")
             // console.log("token_not_valid");
         }
+    } finally {
+        loading.value = false
     }
 }
 
@@ -213,7 +225,9 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                     headers: { 'Content-Type': 'application/json' }
                 })
                     .then(response => {
-                        // console.log(response.data);
+                        ElMessage.success('新增成功')
+                        dialogAdd.value = false
+                        fetchData()
                     })
                     .catch(error => {
                         if (error.response && error.response.status == 401) {
@@ -230,12 +244,11 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                         }
                         console.error(error)
                     })
-                dialogAdd.value = false
             } catch (error) {
-                // console.log(error);
+                console.log(error);
             }
         } else {
-            // console.log('error submit!', fields)
+            console.log('error submit!', fields)
         }
     })
 }
@@ -303,6 +316,8 @@ const handleImport = () => {
                     })
                         .then(response => {
                             // console.log(response.data);
+                            ElMessage.success('导入成功')
+                            fetchData()
                         })
                         .catch(error => {
                             if (error.response && error.response.status == 401) {
@@ -339,6 +354,24 @@ const handleEdit = (index: number, row: Assets) => {
     // console.log(index, row)
 }
 
+const handleSwitchChange = async (row: Assets) => {
+    try {
+        // 立即更新本地状态
+        row.enable = row.enable
+
+        // 发送 API 请求
+        await axios.patch(`aassets/${row.id}/`, {
+            enable: row.enable
+        })
+        ElMessage.success('状态更新成功')
+    } catch (error) {
+        // 请求失败时回滚状态
+        row.enable = !row.enable
+        ElMessage.error('状态更新失败')
+        console.error(error)
+    }
+}
+
 const editForm = async (formEl: FormInstance | undefined) => {
     if (!formEl) return
     await formEl.validate((valid, fields) => {
@@ -351,7 +384,8 @@ const editForm = async (formEl: FormInstance | undefined) => {
                     headers: { 'Content-Type': 'application/json' }
                 })
                     .then(response => {
-                        // console.log(response.data);
+                        dialogEdit.value = false
+                        fetchData()
                     })
                     .catch(error => {
                         if (error.response && error.response.status == 401) {
@@ -369,7 +403,6 @@ const editForm = async (formEl: FormInstance | undefined) => {
                         console.error(error)
 
                     })
-                dialogEdit.value = false
             } catch (error) {
                 // console.log(error);
             }
@@ -395,6 +428,7 @@ const confirmDelete = async () => {
         const response = await axios.delete(`aassets/${selectedId.value}/`);
         // console.log(response.data);
         dialogDel.value = false
+        fetchData()
     } catch (error) {
         console.error(error);
     }

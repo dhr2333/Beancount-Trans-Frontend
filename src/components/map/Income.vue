@@ -1,5 +1,5 @@
 <template>
-    <el-table :data="filterExpenseData" style="width: 98%">
+    <el-table v-loading="loading" :data="filterExpenseData" style="width: 98%">
         <el-table-column label="关键字" prop="key" />
         <!-- <el-table-column label="账户" prop="full">
             <template #header="{ column }">
@@ -30,6 +30,8 @@
                 </div>
             </template>
             <template #default="scope">
+                <el-switch v-model="scope.row.enable" style="margin-right: 12px;"
+                    @change="handleSwitchChange(scope.row)" inline-prompt inactive-text="禁用" />
                 <el-button size="small" @click="handleEdit(scope.$index, scope.row)">编辑</el-button>
                 <el-button size="small" type="danger" @click="handleDelete(scope.$index, scope.row)"
                     style="margin-left: 12px">删除</el-button>
@@ -100,12 +102,14 @@ import router from '~/routers'
 import * as XLSX from 'xlsx'
 
 const dialogError = ref(false)
+const loading = ref(false)
 
 interface Income {
     id: number
     key: string
     // full: string
     income: string
+    enable: boolean
 }
 
 // 页面增加优先级提示
@@ -115,6 +119,7 @@ const incometipContent = ref("固定格式： [银行]+[储蓄卡/信用卡]+([�
 // 页面获取数据
 const AssetsData = ref<Income[]>([])
 const fetchData = async () => {
+    loading.value = true
     try {
         const response = await axios.get('income/')
         AssetsData.value = response.data
@@ -126,6 +131,8 @@ const fetchData = async () => {
             // ElMessage("token_not_valid, please log in again.")
             // console.log("token_not_valid");
         }
+    } finally {
+        loading.value = false
     }
 }
 
@@ -195,6 +202,10 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                     headers: { 'Content-Type': 'application/json' }
                 })
                     .then(response => {
+                        ElMessage.success('新增成功')
+                        dialogAdd.value = false
+                        fetchData() // 新增刷新
+                        resetForm(formEl) // 重置表单
                         // console.log(response.data);
                     })
                     .catch(error => {
@@ -212,7 +223,6 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                         }
                         console.error(error)
                     })
-                dialogAdd.value = false
             } catch (error) {
                 // console.log(error);
             }
@@ -270,7 +280,8 @@ const handleImport = () => {
                         headers: { 'Content-Type': 'application/json' }
                     })
                         .then(response => {
-                            // console.log(response.data);
+                            ElMessage.success('导入成功')
+                            fetchData()
                         })
                         .catch(error => {
                             if (error.response && error.response.status == 401) {
@@ -282,7 +293,6 @@ const handleImport = () => {
                             else if (error.response && error.response.status == 400) {
                                 ElMessage.error('导入失败，请按"导出"提供的格式重新导入');
                             }
-                            // dialogError.value = true
                             console.error(error);
                         });
                 }
@@ -307,6 +317,24 @@ const handleEdit = (index: number, row: Income) => {
     // console.log(index, row)
 }
 
+const handleSwitchChange = async (row: Income) => {
+    try {
+        // 立即更新本地状态
+        row.enable = row.enable
+
+        // 发送 API 请求
+        await axios.patch(`income/${row.id}/`, {
+            enable: row.enable
+        })
+        ElMessage.success('状态更新成功')
+    } catch (error) {
+        // 请求失败时回滚状态
+        row.enable = !row.enable
+        ElMessage.error('状态更新失败')
+        console.error(error)
+    }
+}
+
 const editForm = async (formEl: FormInstance | undefined) => {
     if (!formEl) return
     await formEl.validate((valid, fields) => {
@@ -319,7 +347,9 @@ const editForm = async (formEl: FormInstance | undefined) => {
                     headers: { 'Content-Type': 'application/json' }
                 })
                     .then(response => {
-                        // console.log(response.data);
+                        ElMessage.success('修改成功')
+                        dialogEdit.value = false
+                        fetchData() // 新增刷新
                     })
                     .catch(error => {
                         if (error.response && error.response.status == 401) {
@@ -336,7 +366,6 @@ const editForm = async (formEl: FormInstance | undefined) => {
                         }
                         console.error(error)
                     })
-                dialogEdit.value = false
             } catch (error) {
                 // console.log(error);
             }
@@ -360,8 +389,9 @@ const handleDelete = (index: number, row: Income) => {
 const confirmDelete = async () => {
     try {
         const response = await axios.delete(`income/${selectedId.value}/`);
-        // console.log(response.data);
+        ElMessage.success('删除成功')
         dialogDel.value = false
+        await fetchData() // 新增刷新
     } catch (error) {
         console.error(error);
     }
