@@ -144,6 +144,7 @@ import * as XLSX from 'xlsx'
 
 // const apiUrl = import.meta.env.VITE_API_URL;
 const dialogError = ref(false)
+const lastEditedData = ref<Partial<Expense> | null>(null)
 // console.log(import.meta.env);
 
 interface Expense {
@@ -209,11 +210,22 @@ const filterExpenseData = computed(() =>
 const dialogAdd = ref(false)
 
 const handleAdd = () => {
-  if (ruleFormRef.value) {
-    ruleFormRef.value.resetFields();
-  }
+  if (lastEditedData.value) {
+    // 使用上一次编辑的值
+    ruleForm.value = {
+      key: lastEditedData.value.key || '',
+      payee: lastEditedData.value.payee ?? null,
+      expend: lastEditedData.value.expend || '',
+      currency: lastEditedData.value.currency ?? null
+    };
+  } else {
+    // 没有编辑记录则重置
+    if (ruleFormRef.value) {
+      ruleFormRef.value.resetFields();
+    }
+  };
   dialogAdd.value = true;
-};
+}
 
 const ruleFormRef = ref<FormInstance>()
 const ruleForm = ref({
@@ -395,6 +407,9 @@ const handleImport = () => {
 const dialogEdit = ref(false)
 
 const handleEdit = (index: number, row: Expense) => {
+  const { id, enable, ...rest } = row;
+  lastEditedData.value = rest;
+
   ruleForm.value.key = row.key
   ruleForm.value.payee = row.payee !== null ? row.payee : null // 为了解决编辑时payee为null时的问题;
   ruleForm.value.expend = row.expend
