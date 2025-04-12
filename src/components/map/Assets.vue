@@ -119,6 +119,7 @@ import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
 
 const dialogError = ref(false)
+const lastEditedData = ref<Partial<Assets> | null>(null)
 
 interface Assets {
     id: number
@@ -180,7 +181,20 @@ const filterExpenseData = computed(() =>
 const dialogAdd = ref(false)
 
 const handleAdd = () => {
-    dialogAdd.value = true
+    if (lastEditedData.value) {
+        // 使用上一次编辑的值
+        ruleForm.value = {
+            key: lastEditedData.value.key || '',
+            full: lastEditedData.value.full || '',
+            assets: lastEditedData.value.assets || '',
+        };
+    } else {
+        // 没有编辑记录则重置
+        if (ruleFormRef.value) {
+            ruleFormRef.value.resetFields();
+        }
+    };
+    dialogAdd.value = true;
 }
 
 const ruleFormRef = ref<FormInstance>()
@@ -346,6 +360,9 @@ const handleImport = () => {
 const dialogEdit = ref(false)
 
 const handleEdit = (index: number, row: Assets) => {
+    const { id, enable, ...rest } = row;
+    lastEditedData.value = rest;
+
     ruleForm.value.key = row.key
     ruleForm.value.full = row.full
     ruleForm.value.assets = row.assets
