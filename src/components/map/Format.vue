@@ -135,8 +135,10 @@ const loadConfig = async () => {
         commissionTemplate.value = frontendConfig.commissionTemplate
         flagSymbol.value = frontendConfig.flag
         currency.value = frontendConfig.currency
-    } catch (error) {
-        ElMessage.error('配置加载失败，请确保已经登录')
+    } catch (error: any) {
+        if (error.response && error.response.status == 401) {
+            ElMessage.info('未认证，请登录后重试');
+        }
     }
 }
 
@@ -164,9 +166,10 @@ const applyConfig = async () => {
         loading.value.save = true
         await axios.put('config/', currentConfig.value)
         ElMessage.success('配置已保存')
-    } catch (error) {
-        ElMessage.error('保存失败，请重新登录或检查格式是否正确')
-
+    } catch (error: any) {
+        if (error.response && error.response.status == 401) {
+            ElMessage.info('未认证，请登录后重试');
+        }
     } finally {
         loading.value.save = false
     }
@@ -191,9 +194,10 @@ const resetToDefault = async () => {
         })
         await loadConfig() // 重新加载最新配置
         ElMessage.success('已恢复默认配置')
-    } catch (error) {
-        ElMessage.error('重置失败,请确保已经登录')
-
+    } catch (error: any) {
+        if (error.response && error.response.status == 401) {
+            ElMessage.info('未认证，请登录后重试');
+        }
     } finally {
         loading.value.reset = false
     }
@@ -227,4 +231,3 @@ const resetToDefault = async () => {
     gap: 6px;
 }
 </style>
-
