@@ -85,11 +85,11 @@
             </span>
         </template>
     </el-dialog>
-    <el-dialog v-model="dialogError" title="操作失败" width="30%">
+    <!-- <el-dialog v-model="dialogError" title="操作失败" width="30%">
         <el-icon>
             <WarningFilled />
         </el-icon><span>>新增/修改/删除 失败，请登录后重试</span>
-    </el-dialog>
+    </el-dialog> -->
 </template>
 
 <script lang="ts" setup>
@@ -223,7 +223,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                     })
                     .catch(error => {
                         if (error.response && error.response.status == 401) {
-                            ElMessage.info('权限不足，请登录后重试');
+                            ElMessage.info('未认证，请登录后重试');
                         }
                         else if (error.response && error.response.status == 403) {
                             ElMessage.info('权限不足，请登录后重试');
@@ -231,9 +231,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                         else if (error.response && error.response.status == 400) {
                             ElMessage.error('新增失败，请检查关键字是否冲突');
                         }
-                        else {
-                            dialogError.value = true
-                        }
+                        dialogError.value = false
                         console.error(error)
                     })
             } catch (error) {
@@ -298,7 +296,7 @@ const handleImport = () => {
                         })
                         .catch(error => {
                             if (error.response && error.response.status == 401) {
-                                ElMessage.info('权限不足，请登录后重试');
+                                ElMessage.info('未认证，请登录后重试');
                             }
                             else if (error.response && error.response.status == 403) {
                                 ElMessage.info('权限不足，请登录后重试');
@@ -343,10 +341,13 @@ const handleSwitchChange = async (row: Income) => {
             enable: row.enable
         })
         ElMessage.success('状态更新成功')
-    } catch (error) {
+    } catch (error: any) {
         // 请求失败时回滚状态
         row.enable = !row.enable
-        ElMessage.error('状态更新失败')
+        // ElMessage.error('状态更新失败')
+        if (error.response && error.response.status == 401) {
+            ElMessage.info('未认证，请登录后重试');
+        }
         console.error(error)
     }
 }
@@ -369,7 +370,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
                     })
                     .catch(error => {
                         if (error.response && error.response.status == 401) {
-                            ElMessage.info('权限不足，请登录后重试');
+                            ElMessage.info('未认证，请登录后重试');
                         }
                         else if (error.response && error.response.status == 403) {
                             ElMessage.info('权限不足，请登录后重试');
@@ -408,8 +409,21 @@ const confirmDelete = async () => {
         ElMessage.success('删除成功')
         dialogDel.value = false
         await fetchData() // 新增刷新
-    } catch (error) {
+    } catch (error: any) {
+        dialogDel.value = false
         console.error(error);
+        if (error.response && error.response.status == 401) {
+            ElMessage.info('未认证，请登录后重试');
+        }
+        else if (error.response && error.response.status == 403) {
+            ElMessage.info('权限不足，请登录后重试');
+        }
+        else if (error.response && error.response.status == 400) {
+            ElMessage.error('修改失败，请检查关键字是否冲突');
+        }
+        else {
+            dialogError.value = true
+        }
     }
 }
 </script>

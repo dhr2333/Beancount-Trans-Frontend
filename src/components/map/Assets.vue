@@ -103,11 +103,11 @@
             </span>
         </template>
     </el-dialog>
-    <el-dialog v-model="dialogError" title="操作失败" width="30%">
+    <!-- <el-dialog v-model="dialogError" title="操作失败" width="30%">
         <el-icon>
             <WarningFilled />
         </el-icon><span>>新增/修改/删除 失败，请登录后重试</span>
-    </el-dialog>
+    </el-dialog> -->
 </template>
 
 <script lang="ts" setup>
@@ -245,7 +245,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                     })
                     .catch(error => {
                         if (error.response && error.response.status == 401) {
-                            ElMessage.info('权限不足，请登录后重试');
+                            ElMessage.info('为认证，请登录后重试');
                         }
                         else if (error.response && error.response.status == 403) {
                             ElMessage.info('权限不足，请登录后重试');
@@ -335,7 +335,7 @@ const handleImport = () => {
                         })
                         .catch(error => {
                             if (error.response && error.response.status == 401) {
-                                ElMessage.info('权限不足，请登录后重试');
+                                ElMessage.info('未认证，请登录后重试');
                             }
                             else if (error.response && error.response.status == 403) {
                                 ElMessage.info('权限不足，请登录后重试');
@@ -381,10 +381,13 @@ const handleSwitchChange = async (row: Assets) => {
             enable: row.enable
         })
         ElMessage.success('状态更新成功')
-    } catch (error) {
+    } catch (error: any) {
         // 请求失败时回滚状态
         row.enable = !row.enable
-        ElMessage.error('状态更新失败')
+        // ElMessage.error('状态更新失败')
+        if (error.response && error.response.status == 401) {
+            ElMessage.info('未认证，请登录后重试');
+        }
         console.error(error)
     }
 }
@@ -406,7 +409,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
                     })
                     .catch(error => {
                         if (error.response && error.response.status == 401) {
-                            ElMessage.info('权限不足，请登录后重试');
+                            ElMessage.info('未认证，请登录后重试');
                         }
                         else if (error.response && error.response.status == 403) {
                             ElMessage.info('权限不足，请登录后重试');
@@ -446,8 +449,15 @@ const confirmDelete = async () => {
         // console.log(response.data);
         dialogDel.value = false
         fetchData()
-    } catch (error) {
+    } catch (error: any) {
         console.error(error);
+        dialogDel.value = false
+        if (error.response && error.response.status == 401) {
+            ElMessage.info('未认证，请登录后重试');
+        }
+        else if (error.response && error.response.status == 403) {
+            ElMessage.info('权限不足，请登录后重试');
+        }
     }
 }
 </script>

@@ -127,11 +127,11 @@
       </span>
     </template>
   </el-dialog>
-  <el-dialog v-model="dialogError" title="操作失败" width="30%">
+  <!-- <el-dialog v-model="dialogError" title="操作失败" width="30%">
     <el-icon>
       <WarningFilled />
-    </el-icon><span>失败</span>
-  </el-dialog>
+    </el-icon><span>{{ errorMessage }}</span>
+  </el-dialog> -->
 </template>
 
 <script lang="ts" setup>
@@ -292,7 +292,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
           })
           .catch(error => {
             if (error.response && error.response.status == 401) {
-              ElMessage.info('权限不足，请登录后重试');
+              ElMessage.info('未认证，请登录后重试');
             }
             else if (error.response && error.response.status == 403) {
               ElMessage.info('权限不足，请登录后重试');
@@ -382,7 +382,7 @@ const handleImport = () => {
             })
             .catch(error => {
               if (error.response && error.response.status == 401) {
-                ElMessage.info('权限不足，请登录后重试');
+                ElMessage.info('未认证，请登录后重试');
               }
               else if (error.response && error.response.status == 403) {
                 ElMessage.info('权限不足，请登录后重试');
@@ -434,10 +434,13 @@ const handleSwitchChange = async (row: Expense) => {
     })
 
     ElMessage.success('状态更新成功')
-  } catch (error) {
+  } catch (error:any) {
     // 请求失败时回滚状态
     row.enable = !row.enable
-    ElMessage.error('状态更新失败')
+    // ElMessage.error('状态更新失败')
+            if (error.response && error.response.status == 401) {
+            ElMessage.info('未认证，请登录后重试');
+        }
     console.error(error)
   }
 }
@@ -463,7 +466,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
           })
           .catch(error => {
             if (error.response && error.response.status === 401) {
-              ElMessage.info('权限不足，请登录后重试');
+              ElMessage.info('未认证，请登录后重试');
             }
             else if (error.response && error.response.status == 403) {
               ElMessage.info('权限不足，请登录后重试');
@@ -497,15 +500,23 @@ const handleDelete = (index: number, row: Expense) => {
 }
 
 // 删除确认
+// const errorMessage = ref('') // 存储错误信息
 const confirmDelete = async () => {
   try {
     const response = await axios.delete(`expense/${selectedId.value}/`);
     // console.log(response.data);
     const get = await axios.get('expense')
     expenseData.value = get.data
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
-    dialogError.value = true
+    // 从错误响应中提取后端信息
+    if (error.response && error.response.status === 401) {
+      ElMessage.info('未认证，请登录后重试');
+    }
+    // errorMessage.value = error.response?.data?.error ||
+    //   error.response?.data?.detail ||
+    //   '请求失败，请稍后重试'
+    // dialogError.value = true
   }
   dialogDel.value = false
 }

@@ -189,15 +189,12 @@ const handleChange = (file: File, fileList: File[]) => {
 };
 
 const handleUploadError = (err: any, file: any) => {
-  if (err.status === 501) {
-    // 假设错误信息在err.message中
-    ElMessage.error(err.message);
-  } else if (JSON.parse(err.message).error === "Decryption failed") { // 若返回JSON数据则需要解析后使用
-    // pdf文件解密失败
-    ElMessage.error("pdf解密失败或其他问题");
-  } else {
-    // 其他错误
+  if (JSON.parse(err.message).error === "Decryption failed") {
+    ElMessage.error("PDF解密失败");
+  } else if (JSON.parse(err.message).error === "当前账单不支持") {
     ElMessage.error("请上传支持的账单文件");
+  } else {
+    ElMessage.error("未知错误：" + err.message);
   }
 };
 
