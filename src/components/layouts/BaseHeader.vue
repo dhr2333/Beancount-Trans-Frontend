@@ -200,7 +200,7 @@ const handleSelect = (key: string, keyPath: string[]) => {
 announcements.value = [{
   id: 1,
   title: "系统使用指南",
-  content: "<ul><li>建议所有交易有优惠时尽量使用优惠</li><li>线下交易建议使用 \"微信+备注\" 的形式，如\"食物\"、\"停车\"、\"装修尾款 #DECORATION\"等</li><li>线上交易建议使用 \"支付宝\" (支付宝商业信息较全，但是备注信息在账单中无法体现)</li></li></ul>",
+  content: "<ul><li>建议所有交易有优惠时尽量使用优惠</li><li>线下交易建议使用 \"微信+备注\" 的形式，如\"食物\"、\"停车\"、\"装修尾款 #DECORATION\"等</li><li>线上交易建议使用 \"支付宝\" (支付宝商业信息较全，但是转账备注信息在账单中无法体现)</li></li></ul>",
   createTime: "2025-03-18T16:12:11"
 }]
 </script>
