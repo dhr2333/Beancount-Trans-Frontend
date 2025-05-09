@@ -189,11 +189,19 @@ const handleChange = (file: File, fileList: File[]) => {
 };
 
 const handleUploadError = (err: any, file: any) => {
-  if (JSON.parse(err.message).error === "Decryption failed") {
+  if (JSON.parse(err.message).error === "PDF解密失败") {
     ElMessage.error("PDF解密失败");
-  } else if (JSON.parse(err.message).error === "当前账单不支持") {
-    ElMessage.error("请上传支持的账单文件");
-  } else {
+  }
+  else if (JSON.parse(err.message).error === "当前账单不支持") {
+    ElMessage.error("当前账单不支持");
+  }
+  else if (JSON.parse(err.message).error === "使用DeepSeek模型需要API密钥") {
+    ElMessage.error("使用DeepSeek模型需要API密钥");
+  }
+  else if (JSON.parse(err.message).error === "DeepSeek调用失败，请检查API密钥是否正确") {
+    ElMessage.error("DeepSeek调用失败，请检查API密钥是否正确");
+  }
+  else {
     ElMessage.error("未知错误：" + err.message);
   }
 };
