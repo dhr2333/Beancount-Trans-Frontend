@@ -1,5 +1,5 @@
 <template>
-    <el-table v-loading="loading" :data="filterExpenseData" style="width: 98%">
+    <el-table v-loading="loading" :data="filterExpenseData" style="width: 99%;margin-left: 10px;">
         <el-table-column label="关键字" prop="key" />
         <!-- <el-table-column label="账户" prop="full">
             <template #header="{ column }">

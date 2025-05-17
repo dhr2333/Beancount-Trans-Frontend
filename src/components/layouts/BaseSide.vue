@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <el-menu default-active="2" class="el-menu-vertical-demo" :collapse="isCollapse" @open="handleOpen"
     @close="handleClose">
     <el-menu-item index="1" @click="handleMenuItemClick">
@@ -41,7 +41,7 @@
       <template #title>Navigator Four</template>
     </el-menu-item>
   </el-menu>
-</template>
+</template> -->
 
 <script lang="ts" setup>
 import { ref } from "vue";

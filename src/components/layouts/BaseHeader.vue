@@ -34,7 +34,7 @@
       </router-link>
     </el-sub-menu>
 
-    <el-sub-menu index="bill">
+    <!-- <el-sub-menu index="bill">
       <template #title>账单管理</template>
       <router-link to="/bill/account" class="no-underline">
         <el-menu-item index="/bill/account">账户管理</el-menu-item>
@@ -49,7 +49,7 @@
 
     <router-link to="/assets/account" class="no-underline">
       <el-menu-item index="/account">资产总表</el-menu-item>
-    </router-link>
+    </router-link> -->
     <div class="flex-grow" />
 
     <!-- 公告弹窗 -->

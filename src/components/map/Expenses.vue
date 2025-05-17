@@ -1,5 +1,5 @@
 <template>
-  <el-table :data="filterExpenseData" style="width: 98%">
+  <el-table :data="filterExpenseData" style="width: 99%;margin-left: 10px;">
     <el-table-column label="关键字" prop="key" />
     <el-table-column label="商家" prop="payee">
       <template #header="{ column }">
@@ -434,13 +434,13 @@ const handleSwitchChange = async (row: Expense) => {
     })
 
     ElMessage.success('状态更新成功')
-  } catch (error:any) {
+  } catch (error: any) {
     // 请求失败时回滚状态
     row.enable = !row.enable
     // ElMessage.error('状态更新失败')
-            if (error.response && error.response.status == 401) {
-            ElMessage.info('未认证，请登录后重试');
-        }
+    if (error.response && error.response.status == 401) {
+      ElMessage.info('未认证，请登录后重试');
+    }
     console.error(error)
   }
 }
