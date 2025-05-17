@@ -3,7 +3,7 @@
     <el-form :model="formModel" :rules="formRules" ref="configForm">
         <el-collapse v-model="activePanels" class="config-panel">
             <!-- 基础字段显示 -->
-            <el-collapse-item title="基础字段显示" name="basic">
+            <el-collapse-item title="基础字段显示" name="basic" class="config-item">
                 <div class="config-group">
                     <el-checkbox-group v-model="formatSettings">
                         <el-checkbox label="showNote">显示备注内容</el-checkbox>
@@ -17,7 +17,7 @@
             </el-collapse-item>
 
             <!-- 高级格式设置 -->
-            <el-collapse-item title="高级格式设置" name="advanced">
+            <el-collapse-item title="高级格式设置" name="advanced" class="config-item">
                 <div class="config-group">
                     <el-divider>账户模板配置</el-divider>
 
@@ -63,7 +63,7 @@
                     </el-select>
                 </div>
             </el-collapse-item>
-            <el-collapse-item title="AI模型配置" name="ai">
+            <el-collapse-item title="AI模型配置" name="ai" class="config-item">
                 <div class="config-group">
                     <el-divider>模型选择</el-divider>
 
@@ -302,8 +302,13 @@ const resetToDefault = async () => {
     width: 220px;
 }
 
+.config-item {
+    padding: 0 16px;
+}
+
 .config-group {
     padding: 0 16px;
+    
 }
 
 .label-with-tip {
@@ -320,4 +325,5 @@ const resetToDefault = async () => {
 .el-form-item {
     margin-bottom: 18px;
 }
+
 </style>

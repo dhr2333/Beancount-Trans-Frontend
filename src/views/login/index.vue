@@ -4,26 +4,27 @@
       <div class="big-box" :class="{ active: isLogin }">
         <div class="big-contain" key="bigContainLogin" v-if="isLogin">
           <div class="btitle">账户登录</div>
-          <div class="bform">
-            <input type="username" placeholder="用户名(默认admin)" v-model="username" />
+          <form class="bform" @submit.prevent="login">
+            <input type="text" placeholder="用户名(默认admin)" v-model="username">
             <span class="errTips" v-if="emailError">* 用户名无效 *</span>
-            <input type="password" placeholder="密码(默认123456)" v-model="password" />
+            <input type="password" placeholder="密码(默认123456)" v-model="password">
             <span class="errTips" v-if="emailError">* 密码填写错误 *</span>
-          </div>
-          <button class="bbutton" @click="login">登录</button><br>
-          <button class="bbutton" @click="loginWithGitHub">使用 GitHub 登录</button>
-          <!-- <button class="bbutton" @click="loginWithGoogle">使用 Google 登录</button> -->
-          <!-- <button class="bbutton" @click="sendPostRequest">使用 Dummy 登录</button> -->
+            <button type="submit" class="bbutton">登录</button>
+            <button type="button" class="bbutton" @click="loginWithGitHub">使用 GitHub 登录</button>
+            <!-- <button class="bbutton" @click="loginWithGoogle">使用 Google 登录</button> -->
+            <!-- <button class="bbutton" @click="sendPostRequest">使用 Dummy 登录</button> -->
+          </form>
         </div>
+
         <div class="big-contain" key="bigContainRegister" v-else>
           <div class="btitle">创建账户</div>
-          <div class="bform">
-            <input type="text" placeholder="用户名（必填）" v-model="username" />
+          <form class="bform" @submit.prevent="register"> <!-- 关键修改：添加表单和 submit 事件 -->
+            <input type="text" placeholder="用户名（必填）" v-model="username">
             <span class="errTips" v-if="existed">* 用户名已经存在！ *</span>
-            <input type="email" placeholder="邮箱（选填）" v-model="email" />
-            <input type="password" placeholder="密码（必填）" v-model="password" />
-          </div>
-          <button class="bbutton" @click="register">注册</button>
+            <input type="email" placeholder="邮箱（选填）" v-model="email">
+            <input type="password" placeholder="密码（必填）" v-model="password">
+            <button type="submit" class="bbutton">注册</button> <!-- 改为 submit 类型 -->
+          </form>
         </div>
       </div>
       <div class="small-box" :class="{ active: isLogin }">

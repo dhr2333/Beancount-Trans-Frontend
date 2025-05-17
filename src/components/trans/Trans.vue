@@ -32,7 +32,6 @@
   </el-upload>
   <!-- 添加复制按钮和结果框 -->
   <div class="result-container">
-    <el-input class="result-textarea"></el-input>
     <el-button class="copy-btn" type="success" :icon="DocumentCopy" @click="copyResponseData" :disabled="!responseData">
       复制结果
     </el-button>
@@ -219,6 +218,17 @@ const copyResponseData = async () => {
 </script>
 <style>
 /* 添加样式 */
+.upload-demo,
+.result-container,
+.result-textarea {
+  width: calc(100% - 24px);
+  margin-left: 5px;
+}
+
+.upload-demo {
+  margin-left: 14px;
+}
+
 .result-container {
   position: relative;
   margin-top: 20px;
@@ -229,6 +239,7 @@ const copyResponseData = async () => {
   right: 10px;
   top: 10px;
   z-index: 100;
+
 }
 
 .result-textarea textarea {
