@@ -70,6 +70,8 @@
                     <!-- 精简后的AI模型选择 -->
                     <el-form-item label="AI引擎" prop="aiModel">
                         <el-select v-model="aiModel" placeholder="选择AI处理引擎" class="model-selector">
+                            <el-option label="单规则匹配" value="None"
+                                description="选择第一个" />
                             <el-option label="BERT - 本地模型 (平衡模式)" value="BERT"
                                 description="基于Transformer架构，适合复杂语义理解，准确度较高（F1 0.87），推理速度 32ms/token" />
                             <el-option label="spaCy - 本地模型 (极速模式)" value="spaCy"
