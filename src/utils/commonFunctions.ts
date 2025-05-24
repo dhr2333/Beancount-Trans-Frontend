@@ -23,4 +23,4 @@ const handleRefresh = async () => {
     }
 }
 
-export default handleRefresh 
+export default handleRefresh

@@ -45,7 +45,7 @@
     Expenses:TransPort:Private:Park +5.00 CNY
     Liabilities:CreditCard:Bank:CITIC:C6428 -5.00 CNY
 
-or 
+or
 
 2024-04-16 balance Assets:Savings:Bank:BOC:C0814 84543.23 CNY
 2024-04-15 pad Assets:Savings:Bank:BOC:C0814 Income:Investment:Interest
