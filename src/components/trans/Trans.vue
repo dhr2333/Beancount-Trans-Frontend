@@ -26,7 +26,13 @@
           <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
         <el-input v-model="input" style="width: 250px" type="password" v-if="showPassword"
-          placeholder="输入PDF文件解密密码后再上传文件" show-password />
+          placeholder="输入PDF文件解密密码后再上传文件" show-password>
+          <template #prefix>
+            <el-icon>
+              <Lock />
+            </el-icon>
+          </template>
+        </el-input>
       </div>
     </template>
   </el-upload>
@@ -50,6 +56,46 @@ or
 2024-04-16 balance Assets:Savings:Bank:BOC:C0814 84543.23 CNY
 2024-04-15 pad Assets:Savings:Bank:BOC:C0814 Income:Investment:Interest
 '></el-input>
+  <div class="table-container">
+    <el-table :data="responseList" style="width: 100%;" border highlight-current-row>
+      <el-table-column label="账单格式化内容" min-width="400">
+        <template #default="scope">
+          <pre class="bill-formatted-content" style="white-space: pre-wrap; margin: 0; cursor: pointer;"
+            @click="copySingleFormatted(scope.row.formatted)" :title="'点击复制该条账单内容'">{{ scope.row.formatted }}</pre>
+        </template>
+      </el-table-column>
+      <el-table-column label="AI分类反馈" min-width="400">
+        <template #default="scope">
+          <div class="ai-classification-container">
+            <div class="current-selection">
+              <span class="label">当前分类：</span>
+              <el-tag v-if="scope.row.ai_choose" type="success" class="selected-tag">{{ scope.row.ai_choose }}</el-tag>
+              <span v-else class="no-category-tip">无分类建议</span>
+            </div>
+            <div v-if="scope.row.ai_candidates && scope.row.ai_candidates.length > 1" class="candidates">
+              <span class="label">候选分类：</span>
+              <div class="candidate-tags">
+                <el-tag v-for="(candidate, idx) in scope.row.ai_candidates" :key="idx"
+                  :type="candidate.key === scope.row.ai_choose ? 'success' : 'info'" class="candidate-tag"
+                  @click="handleAiChoose(scope.$index, candidate.key)">
+                  {{ candidate.key }}
+                  <span class="score" v-if="candidate.score !== undefined">
+                    ({{ candidate.score }})
+                  </span>
+                </el-tag>
+              </div>
+            </div>
+            <div v-else-if="scope.row.ai_candidates && scope.row.ai_candidates.length === 1" class="candidates">
+              <span class="label" style="color: #909399;">仅有一个分类建议</span>
+            </div>
+            <div v-else class="candidates">
+              <span class="label" style="color: #909399;">无候选分类</span>
+            </div>
+          </div>
+        </template>
+      </el-table-column>
+    </el-table>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -154,16 +200,16 @@ const headers = computed(() => ({
 }))
 
 const responseData = ref('')
+const responseList = ref([]); // 存储所有账单条目
 
 const handleUploadSuccess = (response: any, file: any) => {
-  if (file.status === 'error') {
-    return;  // 当状态为'error'时，错误会由handleUploadError处理
-  }
+  if (file.status === 'error') return;
   if (isCSVOnly.value == true) {
     responseData.value = response
     downloadCSV(responseData.value)
   } else {
-    responseData.value = response.join('');
+    responseList.value = response.results; // 存储所有条目
+    responseData.value = response.results.map((item: any) => item.formatted).join(''); // 存储所有条目
   }
 };
 
@@ -215,6 +261,23 @@ const copyResponseData = async () => {
     ElMessage.error('复制失败，请手动选择内容复制');
   }
 };
+
+// 复制单条账单内容
+const copySingleFormatted = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text.trim())
+    ElMessage.success('已复制该条账单内容')
+  } catch (err) {
+    ElMessage.error('复制失败，请手动复制')
+  }
+}
+
+// 反馈AI选择
+const handleAiChoose = (rowIndex, key) => {
+  // 只更新前端显示，后端逻辑可后续实现
+  responseList.value[rowIndex].ai_choose = key
+  ElMessage.success('已反馈AI选择')
+}
 </script>
 <style>
 /* 添加样式 */
@@ -245,5 +308,91 @@ const copyResponseData = async () => {
 .result-textarea textarea {
   font-family: Monaco, Consolas, 'Courier New', monospace;
   font-size: 12px;
+}
+
+.ai-classification-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.current-selection,
+.candidates {
+  display: flex;
+  align-items: center;
+}
+
+.label {
+  font-size: 12px;
+  color: #606266;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.candidate-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.candidate-tag {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.candidate-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.candidate-tag.is-selected {
+  font-weight: bold;
+  border-width: 2px;
+}
+
+.score {
+  font-size: 0.85em;
+  color: #909399;
+  margin-left: 2px;
+}
+
+.candidate-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.no-category-tip {
+  color: #909399;
+  font-size: 12px;
+  display: inline-block;
+  line-height: 22px;
+  /* 与 el-tag 高度一致 */
+  padding: 0 9px;
+  border-radius: 4px;
+  background: #f4f4f5;
+  vertical-align: middle;
+}
+
+.bill-formatted-content {
+  font-size: 12px;
+  font-family: Monaco, Consolas, 'Courier New', monospace;
+  line-height: 1.6;
+  background: none;
+  border: none;
+  box-shadow: none;
+  margin: 0;
+  padding: 0;
+}
+
+.table-container {
+  padding-left: 15px;
+  padding-right: 10px;
+  box-sizing: border-box;
+}
+
+.el-table {
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
 }
 </style>
