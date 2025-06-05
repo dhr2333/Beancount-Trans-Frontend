@@ -18,6 +18,10 @@
       <el-menu-item index="/trans">格式转换</el-menu-item>
     </router-link>
 
+    <router-link to="/file" class="no-underline">
+      <el-menu-item index="/file">文件管理</el-menu-item>
+    </router-link>
+
     <el-sub-menu index="map">
       <template #title>映射管理</template>
       <router-link to="/format" class="no-underline">
