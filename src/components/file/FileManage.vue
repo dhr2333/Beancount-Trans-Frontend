@@ -1,294 +1,672 @@
 <template>
-    <div class="file-manager-container">
-        <!-- 文件上传区域 -->
-        <el-upload class="upload-area" drag multiple :action="uploadUrl" :headers="headers"
-            :on-success="handleUploadSuccess" :on-error="handleUploadError" :show-file-list="false">
-            <el-icon class="upload-icon"><upload-filled /></el-icon>
-            <div class="upload-text">
-                拖拽文件到此处或<em>点击上传</em>
-            </div>
-            <template #tip>
-                <div class="upload-tip">
-                    支持上传任意格式文件，单个文件不超过 10MB
-                </div>
-            </template>
-        </el-upload>
-
-        <!-- 文件列表区域 -->
-        <div class="file-list-container">
-            <el-table :data="fileList" v-loading="loading" style="width: 100%" height="calc(100vh - 250px)">
-                <el-table-column prop="original_name" label="文件名" min-width="200">
-                    <template #default="{ row }">
-                        <div class="file-name-cell">
-                            <el-icon class="file-icon">
-                                <files />
-                            </el-icon>
-                            <span class="file-name">{{ row.original_name }}</span>
-                        </div>
-                    </template>
-                </el-table-column>
-
-                <el-table-column prop="file_size" label="大小" width="120">
-                    <template #default="{ row }">
-                        {{ formatFileSize(row.file_size) }}
-                    </template>
-                </el-table-column>
-                <el-table-column prop="uploaded_at" label="上传时间" width="180">
-                    <template #default="{ row }">
-                        {{ formatDateTime(row.uploaded_at) }}
-                    </template>
-                </el-table-column>
-                <el-table-column label="操作" width="150" fixed="right">
-                    <template #default="{ row }">
-                        <el-button type="primary" size="small" @click="handleDownload(row.id)"
-                            :loading="downloadingId === row.id">
-                            <el-icon>
-                                <download />
-                            </el-icon>下载
-                        </el-button>
-                        <el-button type="danger" size="small" @click="handleDelete(row.id)"
-                            :loading="deletingId === row.id">
-                            <el-icon>
-                                <delete />
-                            </el-icon>删除
-                        </el-button>
-                    </template>
-                </el-table-column>
-            </el-table>
+    <div class="file-management">
+        <!-- 文件路径展示 -->
+        <div class="path-display">
+            <el-breadcrumb separator="/">
+                <el-breadcrumb-item v-for="(item, index) in breadcrumb" :key="index" @click="navigateTo(item.id)">
+                    {{ item.name }}
+                </el-breadcrumb-item>
+            </el-breadcrumb>
         </div>
+
+        <!-- 工具栏 -->
+        <div class="toolbar">
+            <el-input v-model="searchQuery" placeholder="搜索文件" class="search-input" clearable>
+                <template #prefix>
+                    <el-icon>
+                        <Search />
+                    </el-icon>
+                </template>
+                <template #append v-if="isGlobalSearch">
+                    <el-tag type="info" size="small">全局搜索</el-tag>
+                </template>
+            </el-input>
+            <el-dropdown @command="handleNewCommand">
+                <el-button type="primary">
+                    <el-icon>
+                        <Plus />
+                    </el-icon>新建
+                </el-button>
+                <template #dropdown>
+                    <el-dropdown-menu>
+                        <el-dropdown-item command="folder">
+                            <el-icon>
+                                <Folder />
+                            </el-icon>新建文件夹
+                        </el-dropdown-item>
+                        <el-dropdown-item command="file">
+                            <el-icon>
+                                <Document />
+                            </el-icon>上传文件
+                        </el-dropdown-item>
+                    </el-dropdown-menu>
+                </template>
+            </el-dropdown>
+
+            <!-- 隐藏的上传组件 -->
+            <el-upload :show-file-list="false" :http-request="customUpload" :before-upload="validateUpload">
+                <button ref="uploadTrigger" style="display: none"></button>
+                <template #tip>
+                    <div v-if="uploadProgress > 0" class="upload-progress">
+                        <el-progress :percentage="uploadProgress" :stroke-width="6" status="success"
+                            v-show="uploadProgress < 100" />
+                    </div>
+                </template>
+            </el-upload>
+
+
+            <el-select v-model="batchAction" placeholder="批量操作" class="batch-select"
+                :disabled="selectedItems.length === 0" @change="executeBatchAction">
+                <el-option label="解析" value="trans"></el-option>
+                <el-option label="下载" value="download"></el-option>
+                <el-option label="删除" value="delete"></el-option>
+            </el-select>
+        </div>
+
+        <!-- 文件列表 -->
+        <el-table :data="filteredItems" style="width: 100%" @selection-change="handleSelectionChange"
+            highlight-current-row class="file-table">
+            <el-table-column type="selection" width="55" />
+
+            <el-table-column v-if="isGlobalSearch" prop="path" label="路径">
+                <template #default="{ row }">
+                    <el-text type="info">{{ row.path || '根目录' }}</el-text>
+                </template>
+            </el-table-column>
+
+            <el-table-column prop="name" label="名称">
+                <template #default="{ row }">
+                    <div class="flex items-center cursor-pointer" @click="handleNodeClick(row)">
+                        <el-icon :color="row.node_type === 'directory' ? '#F7C242' : '#409EFF'">
+                            <component :is="row.node_type === 'directory' ? Folder : Document" />
+                        </el-icon>
+                        <span class="ml-2">{{ row.name }}</span>
+                    </div>
+                </template>
+            </el-table-column>
+
+            <el-table-column prop="date" label="修改日期">
+                <template #default="{ row }">
+                    {{ formatDateTime(row.node_type === 'directory' ? row.created_at : row.uploaded_at) }}
+                </template>
+            </el-table-column>
+
+            <el-table-column prop="size" label="大小">
+                <template #default="{ row }">
+                    {{ row.node_type === 'file' ? row.size_display : '-' }}
+                </template>
+            </el-table-column>
+
+            <el-table-column label="操作" width="120">
+                <template #default="{ row }">
+                    <el-tooltip content="解析" placement="top">
+                        <el-button icon="Tickets" circle size="small" @click="downloadFile(row.id)" />
+                    </el-tooltip>
+
+                    <el-tooltip v-if="row.node_type === 'file'" content="下载" placement="top">
+                        <el-button icon="Download" circle size="small" @click="downloadFile(row.id)" />
+                    </el-tooltip>
+
+                    <el-tooltip content="删除" placement="top">
+                        <el-popconfirm title="确认删除？" @confirm="deleteItem(row)">
+                            <template #reference>
+                                <el-button icon="Delete" circle size="small" />
+                            </template>
+                        </el-popconfirm>
+                    </el-tooltip>
+                </template>
+            </el-table-column>
+        </el-table>
+
+        <!-- 分页 -->
+        <!-- <div class="pagination">
+            <el-pagination background layout="total, prev, pager, next" :total="items.length" :page-size="pageSize"
+                :current-page="currentPage" @current-change="handlePageChange" />
+        </div> -->
+        <div class="pagination" v-if="!isGlobalSearch">
+            <el-pagination background layout="total, prev, pager, next" :total="items.length" :page-size="pageSize"
+                :current-page="currentPage" @current-change="handlePageChange" />
+        </div>
+
+        <el-dialog v-model="createFolderDialog" title="新建文件夹">
+            <el-form @submit.prevent="createFolder">
+                <el-form-item label="文件夹名称">
+                    <el-input v-model="newFolderName" autofocus />
+                </el-form-item>
+                <div class="text-right">
+                    <el-button @click="createFolderDialog = false">取消</el-button>
+                    <el-button type="primary" native-type="submit">创建</el-button>
+                </div>
+            </el-form>
+        </el-dialog>
     </div>
 </template>
 
-<script lang="ts" setup>
-import { ref, computed, onMounted } from 'vue'
-import {
-    UploadFilled,
-    Picture,
-    Document,
-    Files,
-    Download,
-    Delete
-} from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import axios from 'axios'
-import type { UploadFile, UploadFiles } from 'element-plus'
+<script setup lang="ts">
+import { Folder, Document, Plus } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import axios from '../../utils/request'
+import { ElMessage } from 'element-plus'
 
-// 文件类型定义
+
 interface FileItem {
-    id: string;  // 改为 string 类型以匹配 UUID
-    original_name: string;  // 改为后端返回的字段名
-    file_size: number;
-    uploaded_at: string;
-    download_url: string;
-    is_active: boolean;
+    id: string
+    name: string
+    node_type: 'file' | 'directory'
+    size_display?: string
+    uploaded_at?: string
+    updated_at?: string
+    created_at?: string
 }
 
-// API基础URL
-const apiUrl = import.meta.env.VITE_API_URL
-
-// 响应式数据
-const fileList = ref<FileItem[]>([])
-const loading = ref(false)
+// 状态管理
+const items = ref<FileItem[]>([])
+const breadcrumb = ref<Array<{ id: string | null, name: string }>>([])
+const currentDirectoryId = ref<string | null>(null)
+const searchQuery = ref('')
+const batchAction = ref('')
+const selectedItems = ref<FileItem[]>([])
+const createFolderDialog = ref(false)
+const moveDialog = ref(false)
+const newFolderName = ref('')
+const targetDirectoryId = ref<string | null>(null)
 const currentPage = ref(1)
-const pageSize = ref(10)
-const totalFiles = ref(0)
-const downloadingId = ref<number | null>(null)
-const deletingId = ref<number | null>(null)
+const pageSize = ref(20)
+const uploadProgress = ref(0)
+const isUploading = ref(false)
+const rootDirectoryId = ref<string | null>(null)
+const isGlobalSearch = ref(false);
+const globalSearchResults = ref<FileItem[]>([]);
+const uploadTrigger = ref<HTMLButtonElement | null>(null)
 
-// 计算上传URL和请求头
-const uploadUrl = computed(() => `${apiUrl}/files/`)
-const headers = computed(() => ({
-    Authorization: `Bearer ${localStorage.getItem('access')}`,
-    'X-CSRFToken': getCookie('csrftoken')
-}))
+function handleNewCommand(command: string) {
+    if (command === 'folder') {
+        showCreateFolderDialog()
+    } else if (command === 'file') {
+        // 触发隐藏的上传按钮
+        if (uploadTrigger.value) {
+            uploadTrigger.value.click()
+        }
+    }
+}
 
-// 获取文件列表
-const fetchFiles = async () => {
+async function customUpload(options: any) {
+    const { file, onProgress, onSuccess, onError } = options;
+
     try {
-        loading.value = true;
-        const response = await axios.get(`${apiUrl}/files/`, {
+        isUploading.value = true;
+        uploadProgress.value = 0;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const directoryId = currentDirectoryId.value !== null
+            ? currentDirectoryId.value
+            : rootDirectoryId.value;
+
+        if (directoryId) {
+            formData.append('directory', directoryId);
+        }
+
+        const response = await axios.post('/files/', formData, {
             headers: {
-                Authorization: `Bearer ${localStorage.getItem('access')}`
+                // 覆盖默认的Content-Type，因为我们要上传文件
+                'Content-Type': 'multipart/form-data'
+            },
+            onUploadProgress: (progressEvent) => {
+                const percent = Math.round(
+                    (progressEvent.loaded * 100) / (progressEvent.total || 1)
+                );
+                uploadProgress.value = percent;
+                onProgress({ percent });
             }
         });
 
-        // 直接使用返回的数组，无需 .results
-        fileList.value = response.data.map((file: any) => ({
-            ...file,
-            // 如果需要可以在这里做字段名转换
-            filename: file.original_name,
-            size: file.file_size,
-            created_at: file.uploaded_at,
-            url: file.download_url
-        }));
-
-        // 如果没有分页，可以设置固定值或移除分页功能
-        totalFiles.value = response.data.length;
+        onSuccess(response);
+        ElMessage.success('文件上传成功');
+        await loadDirectoryContent();
     } catch (error) {
-        console.error('获取文件列表失败:', error);
-        ElMessage.error('获取文件列表失败');
+        console.error('文件上传失败:', error);
+        let errorMsg = '文件上传失败';
+
+        ElMessage.error(errorMsg);
+        onError(error);
     } finally {
-        loading.value = false;
+        isUploading.value = false;
+        setTimeout(() => {
+            uploadProgress.value = 0;
+        }, 2000);
     }
-};
+}
 
-// 文件上传成功处理
-const handleUploadSuccess = (response: any, file: UploadFile) => {
-  if (response.status === 200) {
-    // 文件已存在的情况
-    ElMessage.success(response.data.message)
-    if (response.data.existing_file) {
-      // 更新文件列表显示
-      const index = fileList.value.findIndex(f => f.id === response.data.existing_file.id)
-      if (index >= 0) {
-        fileList.value[index] = response.data.existing_file
-      } else {
-        fileList.value.unshift(response.data.existing_file)
-      }
+// 上传前验证
+function validateUpload(file: File) {
+    // 验证文件大小 (限制为100MB)
+    const maxSize = 100 * 1024 * 1024
+    if (file.size > maxSize) {
+        ElMessage.error('文件大小不能超过100MB')
+        return false
     }
-  } else {
-    // 新文件上传成功
-    ElMessage.success(`${file.name} 上传成功`)
-    fetchFiles()
-  }
+
+    // 验证目录是否已选择
+    if (!currentDirectoryId.value && !rootDirectoryId.value) {
+        ElMessage.error('请先选择目录或等待目录加载完成')
+        return false
+    }
+
+    return true
 }
 
-// 文件上传失败处理
-const handleUploadError = (error: Error) => {
-    console.error('上传失败:', error)
-    ElMessage.error('文件上传失败')
+function formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// 下载文件
-const handleDownload = async (fileId: string) => {  // 改为 string 类型
-  try {
-    downloadingId.value = fileId;
-    const file = fileList.value.find(f => f.id === fileId);
-    if (!file) return;
 
-    // 直接使用 download_url
-    window.open(file.download_url, '_blank');
-    ElMessage.success('文件下载已开始');
-  } catch (error) {
-    console.error('下载失败:', error);
-    ElMessage.error('文件下载失败');
-  } finally {
-    downloadingId.value = null;
-  }
-};
+// 认证头部
+const headers = computed(() => ({
+    Authorization: `Bearer ${localStorage.getItem('access_token')}`
+}))
+
+watch(searchQuery, async (newQuery) => {
+    if (newQuery) {
+        isGlobalSearch.value = true;
+        globalSearchResults.value = await performGlobalSearch(newQuery);
+    } else {
+        isGlobalSearch.value = false;
+        // 清空搜索结果，显示当前目录内容
+        await loadDirectoryContent();
+    }
+});
+
+// 计算属性
+const filteredItems = computed(() => {
+    if (isGlobalSearch.value && searchQuery.value) {
+        // 全局搜索模式 - 显示全局结果
+        return globalSearchResults.value;
+    } else {
+        // 本地搜索模式 - 在当前目录中搜索
+        let result = items.value.filter(item =>
+            item.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+        );
+
+        // 分页处理
+        const start = (currentPage.value - 1) * pageSize.value;
+        return result.slice(start, start + pageSize.value);
+    }
+});
 
 
-// 删除文件
-const handleDelete = (fileId: number) => {
-    ElMessageBox.confirm('确定要删除此文件吗？', '警告', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-    }).then(async () => {
-        try {
-            deletingId.value = fileId
-            await axios.delete(`${apiUrl}/files/${fileId}/`, {
-                headers: {
-                    Authorization: `Bearer ${localStorage.getItem('access')}`
-                }
-            })
-
-            ElMessage.success('文件删除成功')
-            fetchFiles()
-        } catch (error) {
-            console.error('删除失败:', error)
-            ElMessage.error('文件删除失败')
-        } finally {
-            deletingId.value = null
-        }
-    }).catch(() => { })
-}
-
-// 格式化文件大小
-const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i])
-}
-
-// 格式化日期时间
-const formatDateTime = (dateString: string): string => {
-    const date = new Date(dateString)
-    return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
-}
-
-// 获取Cookie
-const getCookie = (name: string): string | null => {
-    const value = `; ${document.cookie}`
-    const parts = value.split(`; ${name}=`)
-    if (parts.length === 2) return parts.pop()?.split(';').shift() || null
-    return null
-}
-
-// 组件挂载时获取文件列表
-onMounted(() => {
-    fetchFiles()
+// 初始化加载
+onMounted(async () => {
+    await loadDirectoryContent()
 })
+
+// 加载当前目录内容
+async function loadDirectoryContent() {
+    try {
+        let response;
+        if (currentDirectoryId.value) {
+            // 已有目录ID时获取内容
+            response = await axios.get(`/directories/${currentDirectoryId.value}/contents/`, {
+                headers: headers.value
+            });
+        } else {
+            // 使用新的根目录专用接口
+            response = await axios.get('/directories/root_contents/', {
+                headers: headers.value
+            });
+            if (response.data.id) {
+                rootDirectoryId.value = response.data.id;
+
+                // 仅在根目录时初始化面包屑
+                if (breadcrumb.value.length === 0) {
+                    breadcrumb.value = [{
+                        id: rootDirectoryId.value,
+                        name: response.data.root_name || '根目录'
+                    }];
+                }
+            }
+        }
+
+        // 处理响应数据（保持原逻辑）
+        const directory = Array.isArray(response.data.directory)
+            ? response.data.directory.map((dir: any) => ({
+                id: dir.id,
+                name: dir.name,
+                node_type: 'directory',
+                created_at: dir.created_at,
+            }))
+            : [];
+
+        const files = Array.isArray(response.data.files)
+            ? response.data.files.map((file: any) => ({
+                id: file.id,
+                name: file.name,
+                node_type: 'file',
+                size: file.size,
+                size_display: formatFileSize(file.size),
+                uploaded_at: file.uploaded_at,
+                content_type: file.content_type
+            }))
+            : [];
+
+        items.value = [...directory, ...files];
+    } catch (error) {
+        ElMessage.error('加载文件失败');
+        console.error(error);
+    }
+}
+
+// 导航到指定目录
+function navigateTo(dirId: string | null) {
+    // 找到点击的面包屑索引
+    const index = breadcrumb.value.findIndex(item => item.id === dirId);
+
+    if (index !== -1) {
+        // 截断到点击的面包屑项
+        breadcrumb.value = breadcrumb.value.slice(0, index + 1);
+        currentDirectoryId.value = dirId;
+        loadDirectoryContent();
+    } else if (dirId === rootDirectoryId.value) {
+        // 处理根目录点击
+        breadcrumb.value = breadcrumb.value.slice(0, 1);
+        currentDirectoryId.value = null;
+        loadDirectoryContent();
+    }
+}
+
+
+// 节点点击处理
+function handleNodeClick(node: FileItem) {
+    if (node.node_type === 'directory') {
+        // 重置全局搜索状态
+        isGlobalSearch.value = false;
+        searchQuery.value = '';
+
+        // 更新面包屑：添加当前目录
+        breadcrumb.value.push({
+            id: node.id,
+            name: node.name
+        });
+
+        currentDirectoryId.value = node.id;
+        loadDirectoryContent();
+    }
+}
+
+// 显示创建文件夹对话框
+function showCreateFolderDialog() {
+    createFolderDialog.value = true
+    newFolderName.value = ''
+}
+
+// 创建文件夹
+async function createFolder() {
+    try {
+        // 确定父目录ID：
+        // - 如果在根目录视图：使用根目录ID (6)
+        // - 如果在子目录：使用当前目录ID
+        const parentId = currentDirectoryId.value
+            ? currentDirectoryId.value
+            : rootDirectoryId.value;
+
+        if (!parentId) {
+            ElMessage.error('无法确定父目录');
+            return;
+        }
+
+        await axios.post('/directories/', {
+            name: newFolderName.value,
+            parent: parentId
+        }, { headers: headers.value });
+
+        ElMessage.success('文件夹创建成功');
+        createFolderDialog.value = false;
+        await loadDirectoryContent();
+    } catch (error) {
+        ElMessage.error('文件夹创建失败');
+        console.error(error);
+    }
+}
+
+// 文件下载
+async function downloadFile(fileId: string) {
+    try {
+        const response = await axios.get(`/files/${fileId}/download/`, {
+            headers: headers.value,
+            responseType: 'blob'
+        });
+
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+
+        // 从Content-Disposition头获取文件名
+        const contentDisposition = response.headers['content-disposition'] || '';
+        let fileName = 'file'; // 默认文件名
+
+        // 优先解析 RFC 5987 格式 (filename*=)
+        const rfc5987Match = contentDisposition.match(/filename\*=utf-8''([^;]+)/i);
+        if (rfc5987Match && rfc5987Match[1]) {
+            // URL 解码文件名
+            fileName = decodeURIComponent(rfc5987Match[1]);
+        }
+        // 如果没有 RFC 5987 格式，尝试解析传统格式
+        else {
+            const fileNameMatch = contentDisposition.match(/filename="([^"]+)"/i);
+            if (fileNameMatch && fileNameMatch[1]) {
+                fileName = decodeURIComponent(fileNameMatch[1]);
+            }
+        }
+
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    } catch (error) {
+        ElMessage.error('文件下载失败');
+        console.error(error);
+    }
+}
+
+// 删除项目
+async function deleteItem(item: FileItem) {
+    try {
+        if (item.node_type === 'directory') {
+            await axios.delete(`/directories/${item.id}/`, { headers: headers.value });
+        } else {
+            await axios.delete(`/files/${item.id}/`, { headers: headers.value });
+        }
+
+        ElMessage.success('删除成功');
+        await loadDirectoryContent();
+    } catch (error) {
+        ElMessage.error('删除失败');
+        console.error(error);
+    }
+}
+
+
+// 批量操作
+function handleSelectionChange(selection: FileItem[]) {
+    selectedItems.value = selection
+}
+
+// 执行批量操作
+function executeBatchAction(action: string) {
+    if (action === 'delete') {
+        batchDelete()
+    } else if (action === 'move') {
+        moveDialog.value = true
+        targetDirectoryId.value = null
+    }
+    batchAction.value = ''
+}
+
+// 批量删除
+async function batchDelete() {
+    if (!selectedItems.value.length) return;
+
+    try {
+        const deletePromises = selectedItems.value.map(item => {
+            if (item.node_type === 'directory') {
+                return axios.delete(`/directories/${item.id}/`, { headers: headers.value });
+            } else {
+                return axios.delete(`/files/${item.id}/`, { headers: headers.value });
+            }
+        });
+
+        await Promise.all(deletePromises);
+        ElMessage.success(`成功删除 ${selectedItems.value.length} 个项目`);
+        selectedItems.value = [];
+        await loadDirectoryContent();
+    } catch (error) {
+        ElMessage.error('批量删除失败');
+        console.error(error);
+    }
+}
+
+
+// 分页处理
+function handlePageChange(page: number) {
+    currentPage.value = page
+}
+
+async function performGlobalSearch(query: string) {
+    try {
+        const response = await axios.get('/files/search/', {
+            params: { q: query },
+            headers: headers.value
+        });
+
+        // 处理搜索结果
+        return [
+            ...response.data.directories.map((dir: any) => ({
+                id: dir.id,
+                name: dir.name,
+                node_type: 'directory',
+                created_at: dir.created_at,
+                path: dir.path // 添加路径信息
+            })),
+            ...response.data.files.map((file: any) => ({
+                id: file.id,
+                name: file.name,
+                node_type: 'file',
+                size: file.size,
+                size_display: formatFileSize(file.size),
+                uploaded_at: file.uploaded_at,
+                content_type: file.content_type,
+                path: file.directory_name // 添加路径信息
+            }))
+        ];
+    } catch (error) {
+        ElMessage.error('搜索失败');
+        console.error(error);
+        return [];
+    }
+}
+
+// 添加日期格式化函数
+function formatDateTime(dateString: string): string {
+    if (!dateString) return '';
+
+    const date = new Date(dateString);
+
+    // 确保日期有效
+    if (isNaN(date.getTime())) return '';
+
+    const pad = (num: number) => num.toString().padStart(2, '0');
+
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+        `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
 </script>
 
 <style scoped>
-.file-manager-container {
-    padding: 20px;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
+.upload-progress {
+    margin-top: 10px;
+    width: 200px;
 }
 
-.upload-area {
+.file-management {
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    animation: fadeIn 0.6s ease;
+}
+
+.path-display {
+    margin-bottom: 15px;
+    font-size: 14px;
+    color: #606266;
+    padding: 10px;
+    background: #f5f7fa;
+    border-radius: 4px;
+}
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin-bottom: 20px;
 }
 
-.upload-icon {
-    font-size: 48px;
-    color: var(--el-color-primary);
-    margin-bottom: 16px;
+.batch-select {
+    width: 140px;
 }
 
-.upload-text {
-    font-size: 16px;
-    color: var(--el-text-color-regular);
+.search-input {
+    width: 220px;
+    margin-left: auto;
 }
 
-.upload-tip {
-    margin-top: 10px;
-    font-size: 14px;
-    color: var(--el-text-color-secondary);
-}
-
-.file-list-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.file-name-cell {
+.flex {
     display: flex;
     align-items: center;
 }
 
-.file-icon {
-    margin-right: 8px;
-    font-size: 18px;
-    color: var(--el-color-primary);
+.cursor-pointer {
+    cursor: pointer;
 }
 
-.file-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.file-table {
+    transition: all 0.3s ease;
 }
 
-.pagination-container {
+.file-table:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.pagination {
     margin-top: 20px;
     display: flex;
     justify-content: flex-end;
+}
+
+.directory-tree {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.text-right {
+    text-align: right;
+    margin-top: 20px;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 </style>
