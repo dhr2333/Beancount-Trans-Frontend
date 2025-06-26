@@ -355,9 +355,14 @@ async function loadDirectoryContent() {
             : [];
 
         items.value = [...directory, ...files];
-    } catch (error) {
-        ElMessage.error('加载文件失败');
+    } catch (error: any) {
         console.error(error);
+        if (error.response && error.response.status == 401) {
+            ElMessage.info('未认证，请登录后重试');
+        }
+        else {
+            ElMessage.error('加载文件失败');
+        }
     }
 }
 

@@ -2,6 +2,9 @@
   <el-menu class="el-menu-demo" mode="horizontal" :ellipsis="false" @select="handleSelect">
     <el-sub-menu index="account">
       <template #title>账本管理</template>
+      <el-menu-item index="platform-ledger" @click="openFavaInstance">
+        平台账本
+      </el-menu-item>
       <el-link href="http://localhost:5000/" target="_blank" rel="noopener noreferrer" class="no-underline">
         <el-menu-item index="local-ledger">本地账本</el-menu-item>
       </el-link><br></br>
@@ -111,8 +114,9 @@
 
 <script lang="ts" setup>
 import { ref, onMounted, watchEffect } from "vue";
-import axios from 'axios'; // 导入 axios
+import axios from '../../utils/request'
 import router from "~/routers";
+import { ElMessage, ElLoading } from 'element-plus';
 
 // 定义响应式的用户名
 const username = ref(localStorage.getItem("username") || "未登录");
@@ -207,6 +211,41 @@ announcements.value = [{
   content: "<ul><li>建议所有交易有优惠时尽量使用优惠</li><li>线下交易建议使用 \"微信+备注\" 的形式，如\"食物\"、\"停车\"、\"装修尾款 #DECORATION\"等</li><li>线上交易建议使用 \"支付宝\" (支付宝商业信息较全，但是转账备注信息在账单中无法体现)</li></li></ul>",
   createTime: "2025-03-18T16:12:11"
 }]
+
+
+const openFavaInstance = async () => {
+  const loading = ElLoading.service({
+    lock: true,
+    text: '正在启动您的专属账本...',
+  });
+
+  try {
+    const response = await axios.get('fava/', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      withCredentials: true,
+      maxRedirects: 0
+    });
+
+    console.log('Response:', response);
+
+    if (response.status === 200 && response.request.responseURL) {
+      // 确保使用完整的重定向URL
+      const redirectPath = response.request.responseURL;
+      const newUrl = new URL(redirectPath, window.location.origin);
+      window.location.href = newUrl.toString();
+
+    } else {
+      throw new Error('未收到重定向响应');
+    }
+  } catch (error: any) {
+    if (error.response && error.response.status === 401) {
+      ElMessage.info('未认证，请登录后重试');
+    }
+  } finally {
+    loading.close();
+  }
+};
+
 </script>
 
 <style>
