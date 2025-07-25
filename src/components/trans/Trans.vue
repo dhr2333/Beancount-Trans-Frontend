@@ -109,7 +109,7 @@ const input = ref()
 const filename = ref()
 const wechatUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E5%BE%AE%E4%BF%A1.csv');
 const alipayUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E6%94%AF%E4%BB%98%E5%AE%9D.csv');
-const value4 = ref([])
+const value4 = ref<string[]>([]);
 const options = [
   {
     value: '写入Beancount-Trans-Assets',
@@ -145,6 +145,18 @@ const bocDebitIgnore = ref(false)
 const showPassword = ref(false)
 const isbalance = ref(false)
 const isCSVOnly = ref(false)
+interface BillEntry {
+  id: string;
+  formatted: string;
+  ai_choose: string;
+  ai_candidates: Array<{
+    key: string;
+    score?: number;
+  }>;
+}
+const responseData = ref('')
+const responseList = ref<BillEntry[]>([]);
+
 
 const getUploadData = () => {
   return {
@@ -198,9 +210,6 @@ const headers = computed(() => ({
   "X-CSRFToken": csrfToken.value,
   "Authorization": `Bearer ${token}`,
 }))
-
-const responseData = ref('')
-const responseList = ref([]); // 存储所有账单条目
 
 const handleUploadSuccess = (response: any, file: any) => {
   if (file.status === 'error') return;
@@ -263,7 +272,7 @@ const copyResponseData = async () => {
 };
 
 // 复制单条账单内容
-const copySingleFormatted = async (text) => {
+const copySingleFormatted = async (text: string) => {
   try {
     await navigator.clipboard.writeText(text.trim())
     ElMessage.success('已复制该条账单内容')
@@ -273,10 +282,35 @@ const copySingleFormatted = async (text) => {
 }
 
 // 反馈AI选择
-const handleAiChoose = (rowIndex, key) => {
-  // 只更新前端显示，后端逻辑可后续实现
-  responseList.value[rowIndex].ai_choose = key
-  ElMessage.success('已反馈AI选择')
+const handleAiChoose = async (rowIndex: number, key: string) => {
+  const entryId = responseList.value[rowIndex].id;
+
+  try {
+    // 发送重新解析请求
+    const response = await axios.post('/translate/reparse', {
+      entry_id: entryId,
+      selected_key: key
+    });
+
+    if (response && response.data) {
+      // 更新当前行的格式化内容和AI选择
+      const updatedData = response.data;
+      responseList.value[rowIndex] = {
+        ...responseList.value[rowIndex], // 保留原有属性
+        formatted: updatedData.formatted, // 更新格式化内容
+        ai_choose: updatedData.ai_choose // 更新AI选择
+      };
+
+      // 更新整个结果文本框
+      responseData.value = responseList.value.map(item => item.formatted).join('');
+
+      ElMessage.success('已反馈AI选择');
+    } else {
+      ElMessage.error('反馈AI选择失败，请稍后重试');
+    }
+  } catch (error) {
+    ElMessage.error('重新解析失败，请稍后重试');
+  }
 }
 </script>
 <style>

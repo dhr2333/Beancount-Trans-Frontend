@@ -312,10 +312,6 @@ const submitForm = async (formEl: FormInstance | undefined) => {
       console.log('error submit!', fields)
     }
   })
-  // async function updateExpenseData() {
-  //   const response = await axios.get('expense/');
-  //   expenseData.value = response.data;
-  // }
 }
 
 // 导出
