@@ -57,11 +57,35 @@
 
             <el-select v-model="batchAction" placeholder="批量操作" class="batch-select"
                 :disabled="selectedItems.length === 0" @change="executeBatchAction">
-                <el-option label="解析" value="trans"></el-option>
+                <el-option label="解析" value="parse"></el-option>
                 <el-option label="下载" value="download"></el-option>
                 <el-option label="删除" value="delete"></el-option>
             </el-select>
         </div>
+
+        <!-- 任务状态对话框  -->
+        <el-dialog v-model="parseDialogVisible" title="解析任务进度" width="600px">
+            <el-progress :percentage="parseProgressPercentage" :status="parseStatus" />
+            <div class="task-info">
+                <p>任务组ID: {{ currentTaskGroupId }}</p>
+                <p>状态: {{ parseStatusText }}</p>
+                <p>进度: {{ completedTasks }}/{{ totalTasks }}</p>
+            </div>
+            <el-table :data="taskDetails" height="200px" border>
+                <el-table-column prop="file_id" label="文件ID" width="120" />
+                <el-table-column prop="file_name" label="文件名" />
+                <el-table-column prop="status" label="状态" width="100">
+                    <template #default="{ row }">
+                        <el-tag :type="statusTagType(row.status)">
+                            {{ row.status }}
+                        </el-tag>
+                    </template>
+                </el-table-column>
+            </el-table>
+            <template #footer>
+                <el-button @click="parseDialogVisible = false" :disabled="isProcessing">关闭</el-button>
+            </template>
+        </el-dialog>
 
         <!-- 文件列表 -->
         <el-table :data="filteredItems" style="width: 100%" @selection-change="handleSelectionChange"
@@ -99,21 +123,20 @@
 
             <el-table-column label="操作" width="120">
                 <template #default="{ row }">
-                    <el-tooltip content="解析" placement="top">
-                        <el-button icon="Tickets" circle size="small" @click="downloadFile(row.id)" />
-                    </el-tooltip>
 
-                    <el-tooltip v-if="row.node_type === 'file'" content="下载" placement="top">
-                        <el-button icon="Download" circle size="small" @click="downloadFile(row.id)" />
-                    </el-tooltip>
+                    <el-button icon="Tickets" circle size="small" @click="parseSingleFile(row)" />
+
+                    <el-button v-if="row.node_type === 'file'" icon="Download" circle size="small"
+                        @click="downloadFile(row.id)" />
 
                     <el-tooltip content="删除" placement="top">
-                        <el-popconfirm title="确认删除？" @confirm="deleteItem(row)">
+                        <el-popconfirm title="将同时清除此文件的解析结果，是否继续？" @confirm="deleteItem(row)">
                             <template #reference>
                                 <el-button icon="Delete" circle size="small" />
                             </template>
                         </el-popconfirm>
                     </el-tooltip>
+
                 </template>
             </el-table-column>
         </el-table>
@@ -303,6 +326,7 @@ const filteredItems = computed(() => {
 // 初始化加载
 onMounted(async () => {
     await loadDirectoryContent()
+    stopPolling();
 })
 
 // 加载当前目录内容
@@ -503,7 +527,9 @@ function handleSelectionChange(selection: FileItem[]) {
 
 // 执行批量操作
 function executeBatchAction(action: string) {
-    if (action === 'delete') {
+    if (action === 'parse') {
+        batchParse();
+    } else if (action === 'delete') {
         batchDelete()
     } else if (action === 'move') {
         moveDialog.value = true
@@ -589,6 +615,165 @@ function formatDateTime(dateString: string): string {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
         `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
+
+
+const parseDialogVisible = ref(false);
+const currentTaskGroupId = ref('');
+const completedTasks = ref(0);
+const totalTasks = ref(0);
+const taskDetails = ref<any[]>([]);
+const pollingInterval = ref<NodeJS.Timeout | null>(null);
+const isProcessing = ref(false);
+
+// 计算属性
+const parseProgressPercentage = computed(() => {
+    return totalTasks.value > 0 ? Math.round((completedTasks.value / totalTasks.value) * 100) : 0;
+});
+
+const parseStatus = computed(() => {
+    if (parseProgressPercentage.value === 100) return 'success';
+    return isProcessing.value ? 'primary' : 'exception';
+});
+
+const parseStatusText = computed(() => {
+    if (parseProgressPercentage.value === 100) return '解析完成';
+    return isProcessing.value ? '处理中...' : '等待开始';
+});
+
+async function parseSingleFile(fileItem: FileItem) {
+    // 确保是文件类型
+    if (fileItem.node_type !== 'file') {
+        ElMessage.warning('请选择文件进行解析');
+        return;
+    }
+
+    // 调用解析方法，传入单个文件ID
+    await submitParseTask([fileItem.id]);
+}
+
+async function submitParseTask(fileIds: string[]) {
+    try {
+        const response = await axios.post('/translate/multi', {
+            file_ids: fileIds
+        }, { headers: headers.value });
+
+        // 处理任务状态（保持原有逻辑）
+        if (response.status === 202) {
+            currentTaskGroupId.value = response.data.task_group_id;
+            totalTasks.value = fileIds.length;
+            completedTasks.value = 0;
+
+            // 构建任务详情（兼容全局搜索模式）
+            taskDetails.value = fileIds.map(id => {
+                // 在文件列表中查找对应文件
+                const file = items.value.find(item => item.id === id) ||
+                    globalSearchResults.value.find(item => item.id === id);
+                return {
+                    file_id: id,
+                    file_name: file ? file.name : id,
+                    status: 'pending'
+                };
+            });
+
+            parseDialogVisible.value = true;
+            startPollingTaskStatus();
+        }
+    } catch (error: any) {
+        // 错误处理（保持原有逻辑）
+        if (error.response?.status === 400) {
+            const pendingFiles = error.response.data.pending_files || [];
+            const pendingFileNames = pendingFiles.map((id: string) => {
+                const file = items.value.find(f => f.id === id) ||
+                    globalSearchResults.value.find(f => f.id === id);
+                return file ? file.name : id;
+            });
+            ElMessage.error(`部分文件已在处理中：${pendingFileNames.join(', ')}`);
+        } else {
+            ElMessage.error('提交解析任务失败');
+        }
+        console.error(error);
+    }
+}
+
+// 批量解析方法
+async function batchParse() {
+    // 只筛选文件类型
+    const selectedFiles = selectedItems.value.filter(item => item.node_type === 'file');
+
+    if (selectedFiles.length === 0) {
+        ElMessage.warning('请选择至少一个文件进行解析');
+        return;
+    }
+
+    // 调用共用的解析方法
+    await submitParseTask(selectedFiles.map(file => file.id));
+}
+
+// 开始轮询任务状态
+function startPollingTaskStatus() {
+    isProcessing.value = true;
+
+    if (pollingInterval.value) {
+        clearInterval(pollingInterval.value);
+    }
+
+    pollingInterval.value = setInterval(async () => {
+        try {
+            const response = await axios.get('/translate/task_group_status', {
+                params: { task_group_id: currentTaskGroupId.value },
+                headers: headers.value
+            });
+
+            const statusData = response.data;
+            completedTasks.value = 0;
+
+            // 更新任务状态
+            taskDetails.value = taskDetails.value.map(task => {
+                const taskStatus = statusData.tasks.find((t: any) => t.file_id === task.file_id);
+                if (taskStatus) {
+                    if (taskStatus.status === 'success' || taskStatus.status === 'failed') {
+                        completedTasks.value++;
+                    }
+                    return { ...task, status: taskStatus.status };
+                }
+                return task;
+            });
+
+            // 检查任务组是否完成
+            if (statusData.status === 'completed') {
+                stopPolling();
+                ElMessage.success('所有文件解析完成');
+                setTimeout(() => {
+                    parseDialogVisible.value = false;
+                    // 刷新文件列表
+                    loadDirectoryContent();
+                }, 2000);
+            }
+        } catch (error) {
+            console.error('获取任务状态失败', error);
+        }
+    }, 2000); // 每2秒轮询一次
+}
+
+// 停止轮询
+function stopPolling() {
+    if (pollingInterval.value) {
+        clearInterval(pollingInterval.value);
+        pollingInterval.value = null;
+    }
+    isProcessing.value = false;
+}
+
+// 状态标签类型
+function statusTagType(status: string) {
+    switch (status) {
+        case 'success': return 'success';
+        case 'failed': return 'danger';
+        case 'processing': return 'primary';
+        default: return 'info';
+    }
+}
+
 </script>
 
 <style scoped>
@@ -673,5 +858,10 @@ function formatDateTime(dateString: string): string {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.task-info {
+    margin: 15px 0;
+    line-height: 1.8;
 }
 </style>

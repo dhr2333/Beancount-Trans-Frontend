@@ -111,10 +111,10 @@ const wechatUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%9
 const alipayUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E6%94%AF%E4%BB%98%E5%AE%9D.csv');
 const value4 = ref<string[]>([]);
 const options = [
-  {
-    value: '写入Beancount-Trans-Assets',
-    label: '写入Beancount-Trans-Assets',
-  },
+  // {
+  //   value: '写入Beancount-Trans-Assets',
+  //   label: '写入Beancount-Trans-Assets',
+  // },
   {
     value: '文件若加密请选择',
     label: '文件若加密请选择',

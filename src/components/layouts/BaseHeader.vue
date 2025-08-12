@@ -5,16 +5,20 @@
       <el-menu-item index="platform-ledger" @click="openFavaInstance">
         平台账本
       </el-menu-item>
-      <el-link href="http://localhost:5000/" target="_blank" rel="noopener noreferrer" class="no-underline">
+      <el-menu-item index="official-ledger"
+        @click="openExternal('https://fava.pythonanywhere.com/example-beancount-file/income_statement/')">
+        官方账本
+      </el-menu-item>
+      <!-- <el-link href="http://localhost:5000/" target="_blank" rel="noopener noreferrer" class="no-underline">
         <el-menu-item index="local-ledger">本地账本</el-menu-item>
-      </el-link><br></br>
-      <el-link href="https://beancount.dhr2333.cn/" target="_blank" rel="noopener noreferrer" class="no-underline">
+      </el-link><br></br> -->
+      <!-- <el-link href="https://beancount.dhr2333.cn/" target="_blank" rel="noopener noreferrer" class="no-underline">
         <el-menu-item index="system-ledger">系统账本</el-menu-item>
-      </el-link><br></br>
-      <el-link href="https://fava.pythonanywhere.com/example-beancount-file/income_statement/" target="_blank"
+      </el-link><br></br> -->
+      <!-- <el-link href="https://fava.pythonanywhere.com/example-beancount-file/income_statement/" target="_blank"
         rel="noopener noreferrer" class="no-underline">
         <el-menu-item index="official-ledger">官方账本</el-menu-item>
-      </el-link>
+      </el-link> -->
     </el-sub-menu>
 
     <router-link to="/trans" class="no-underline">
@@ -60,7 +64,7 @@
     <div class="flex-grow" />
 
     <!-- 公告弹窗 -->
-    <el-dialog v-model="announceVisible" title="最新公告 & 经验分享" close-on-click-modal="true" width="70%" top="5vh"
+    <!-- <el-dialog v-model="announceVisible" title="最新公告 & 经验分享" close-on-click-modal="true" width="70%" top="5vh"
       :close-on-click-modal="false">
       <div v-loading="loading" element-loading-text="正在加载公告...">
         <template v-if="announcements.length > 0">
@@ -76,15 +80,15 @@
           <el-empty description="暂无最新公告" />
         </div>
       </div>
-    </el-dialog>
-    <el-menu-item index="announcement" @click="showAnnouncements"> <el-icon :size="26">
+    </el-dialog> -->
+    <!-- <el-menu-item index="announcement" @click="showAnnouncements"> <el-icon :size="26">
         <svg viewBox="0 0 1024 1024">
           <path
             d="M512 128c-212.8 0-384 171.2-384 384 0 132.8 67.2 249.6 170.4 318.4l-46.4 132.8 150.4-80c32 8 64 12.8 96 12.8 212.8 0 384-171.2 384-384S724.8 128 512 128z m0 704c-32 0-64-4.8-96-12.8l-88 46.4 33.6-96C280 763.2 224 649.6 224 512 224 299.2 356.8 160 512 160s288 139.2 288 352-128.8 352-288 352z">
           </path>
         </svg>
-      </el-icon></el-menu-item>
-    <el-menu-item>
+      </el-icon></el-menu-item> -->
+    <!-- <el-menu-item>
       <el-popover placement="top-start" :width="200" trigger="hover">
         <template #reference>
           <img src="/images/openai-icon-2021x2048-4rpe5x7n.png" alt="Openai Logo" style="width: 30px" />
@@ -92,7 +96,7 @@
         <p>基于gpt-3.5-turbo</p>
         <img src="/images/wechat-channel.jpg" alt="Wechat-Channel" style="max-width: 100%" slot="content" />
       </el-popover>
-    </el-menu-item>
+    </el-menu-item> -->
     <el-menu-item>
       <el-link href="https://github.com/dhr2333/Beancount-Trans" target="_blank">
         <img src="/images/github-logo.png" alt="GitHub Logo" style="width: 30px" />
@@ -171,6 +175,11 @@ const formatTime = (timestamp: string) => {
   return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
 }
 
+// 定义打开外部链接的函数
+const openExternal = (url: string) => {
+  window.open(url, '_blank', 'noopener,noreferrer');
+};
+
 // 在组件挂载时验证令牌
 onMounted(async () => {
   const accessToken = localStorage.getItem("access");
@@ -223,7 +232,7 @@ const openFavaInstance = async () => {
     const response = await axios.get('fava/', {
       headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
       withCredentials: true,
-      maxRedirects: 0
+      // maxRedirects: 5,
     });
 
     console.log('Response:', response);
