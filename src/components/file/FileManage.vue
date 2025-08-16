@@ -121,6 +121,14 @@
                 </template>
             </el-table-column>
 
+            <el-table-column prop="status" label="状态">
+                <template #default="{ row }">
+                    <el-tag :type="getStatusColor(row.parse_status || row.status)">
+                        {{ translateStatus(row.parse_status || row.status) }}
+                    </el-tag>
+                </template>
+            </el-table-column>
+
             <el-table-column label="操作" width="120">
                 <template #default="{ row }">
 
@@ -170,12 +178,14 @@ import { Folder, Document, Plus } from '@element-plus/icons-vue'
 import { ref, computed, onMounted, watch } from 'vue'
 import axios from '../../utils/request'
 import { ElMessage } from 'element-plus'
+import { parse } from 'path'
 
 
 interface FileItem {
     id: string
     name: string
     node_type: 'file' | 'directory'
+    parse_status?: string
     size_display?: string
     uploaded_at?: string
     updated_at?: string
@@ -372,6 +382,7 @@ async function loadDirectoryContent() {
                 name: file.name,
                 node_type: 'file',
                 size: file.size,
+                parse_status: file.parse_status,
                 size_display: formatFileSize(file.size),
                 uploaded_at: file.uploaded_at,
                 content_type: file.content_type
@@ -770,8 +781,36 @@ function statusTagType(status: string) {
         case 'success': return 'success';
         case 'failed': return 'danger';
         case 'processing': return 'primary';
-        default: return 'info';
+        default: return 'info'; // 其他状态
     }
+}
+
+
+// 状态翻译函数
+function translateStatus(status: string | undefined): string {
+    if (!status) return '-';
+    const statusMap: Record<string, string> = {
+        'unprocessed': '未解析',
+        'pending': '待解析',
+        'processing': '解析中',
+        'success': '解析成功',
+        'failed': '解析失败'
+    };
+    return statusMap[status] || status;
+}
+
+function getStatusColor(status: string | undefined): string {
+    if (!status) return 'info';
+    
+    const statusMap: Record<string, string> = {
+        'unprocessed': 'info',
+        'pending': 'primary',
+        'processing': 'warning',
+        'success': 'success',
+        'failed': 'danger'
+    };
+    
+    return statusMap[status] || 'info';
 }
 
 </script>

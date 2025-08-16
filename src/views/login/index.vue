@@ -141,7 +141,7 @@ const login = async () => {
     if (!isRegisteredLogin) {
       ElMessage.success("登录成功");
     }
-    router.push('/map/expenses/')
+    router.push('file/')
 
   } catch (error) {
     console.log(error);
