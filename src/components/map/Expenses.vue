@@ -1,6 +1,6 @@
 <template>
-  <el-table :data="filterExpenseData" style="width: 99%;margin-left: 10px;">
-    <el-table-column label="关键字" prop="key" />
+  <el-table :data="filterExpenseData" style="width: 99%; margin-left: 10px;">
+    <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" />
     <el-table-column label="商家" prop="payee">
       <template #header="{ column }">
         <span>
@@ -16,7 +16,7 @@
         </span>
       </template>
     </el-table-column>
-    <el-table-column label="映射账户" prop="expend">
+    <el-table-column label="映射账户" prop="expend" sortable>
       <template #header="{ column }">
         <span>
           {{ column.label }}
@@ -141,6 +141,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import axios from '../../utils/request'
 import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
+import { pinyin } from 'pinyin-pro';
 
 // const apiUrl = import.meta.env.VITE_API_URL;
 const dialogError = ref(false)
@@ -165,13 +166,14 @@ const expendtipContent = ref("优先级越高则映射账户越精准。例如�
 const currencyContent = ref("若该货币与格式化输出中的基础货币模板不同，则会使用\"@@\"来指定总成本，建议储值类使用非CNY货币，留空默认为\"CNY\"")
 
 // 页面获取数据
-const expenseData = ref<Expense[]>([])
+const ExpenseData = ref<Expense[]>([])
 // console.log(expenseData.value);
 
 const fetchData = async () => {
   try {
     const response = await axios.get('expense/')
-    expenseData.value = response.data
+    // expenseData.value = response.data
+    ExpenseData.value = response.data.sort((a: any, b: any) => a.id - b.id)
     // console.log(expenseData.value);
   } catch (error: any) {
     console.error(error)
@@ -193,7 +195,7 @@ onMounted(() => {
 const search = ref('')
 
 const filterExpenseData = computed(() =>
-  expenseData.value.filter((data) => {
+  ExpenseData.value.filter((data) => {
     const searchTerm = search.value?.toLowerCase() || ''
     if (!searchTerm) return true
 
@@ -316,7 +318,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
 
 // 导出
 const handleExport = () => {
-  const data = expenseData.value
+  const data = ExpenseData.value
   data.forEach((item: any) => {
     delete item.id
     delete item.url
@@ -502,7 +504,7 @@ const confirmDelete = async () => {
     const response = await axios.delete(`expense/${selectedId.value}/`);
     // console.log(response.data);
     const get = await axios.get('expense')
-    expenseData.value = get.data
+    ExpenseData.value = get.data
   } catch (error: any) {
     console.error(error);
     // 从错误响应中提取后端信息
@@ -516,6 +518,35 @@ const confirmDelete = async () => {
   }
   dialogDel.value = false
 }
+
+// 高级排序方法：处理数字、英文和中文混合内容
+const advancedSort = (a: Expense, b: Expense): number => {
+  // 提取数字部分（如果有）
+  const numA = parseInt(a.key.match(/\d+/)?.[0] || '0');
+  const numB = parseInt(b.key.match(/\d+/)?.[0] || '0');
+
+  // 如果都有数字且数字不同，按数字排序
+  if (numA !== numB) {
+    return numA - numB;
+  }
+
+  // 否则按拼音排序
+  const pinyinA = pinyin(a.key, {
+    toneType: 'none',
+    pattern: 'first',
+    type: 'string'
+  }).toLowerCase();
+
+  const pinyinB = pinyin(b.key, {
+    toneType: 'none',
+    pattern: 'first',
+    type: 'string'
+  }).toLowerCase();
+
+  if (pinyinA < pinyinB) return -1;
+  if (pinyinA > pinyinB) return 1;
+  return 0;
+};
 
 </script>
 

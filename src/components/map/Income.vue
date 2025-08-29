@@ -1,6 +1,6 @@
 <template>
     <el-table v-loading="loading" :data="filterExpenseData" style="width: 99%;margin-left: 10px;">
-        <el-table-column label="关键字" prop="key" />
+        <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" />
         <!-- <el-table-column label="账户" prop="full">
             <template #header="{ column }">
                 <span>
@@ -17,7 +17,7 @@
                 </span>
             </template>
 </el-table-column> -->
-        <el-table-column label="映射账户" prop="income" />
+        <el-table-column label="映射账户" prop="income" sortable />
         <el-table-column align="right">
             <template #header>
                 <div style="display: flex">
@@ -48,7 +48,7 @@
                 <el-input v-model="ruleForm.full" placeholder="中国建设银行储蓄卡(0000)" />
             </el-form-item> -->
             <el-form-item label="映射账户" prop="income">
-                <el-input v-model="ruleForm.income" placeholder="Assets:Savings:Bank:CCB:C0000" />
+                <el-input v-model="ruleForm.income" placeholder="Income:RedPacket:Personal" />
             </el-form-item>
             <el-form-item>
                 <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
@@ -98,8 +98,9 @@ import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import axios from '../../utils/request'
 import handleRefresh from '../../utils/commonFunctions'
-import router from '~/routers'
 import * as XLSX from 'xlsx'
+import { pinyin } from 'pinyin-pro';
+
 
 const dialogError = ref(false)
 const loading = ref(false)
@@ -118,13 +119,12 @@ const showTooltip = ref(true)
 const incometipContent = ref("固定格式： [银行]+[储蓄卡/信用卡]+([卡号])。用于支付宝还款功能映射 and 支付宝提现至储蓄卡");
 
 // 页面获取数据
-const AssetsData = ref<Income[]>([])
+const IncomeData = ref<Income[]>([])
 const fetchData = async () => {
     loading.value = true
     try {
         const response = await axios.get('income/')
-        AssetsData.value = response.data
-        // console.log(AssetsData.value);
+        IncomeData.value = response.data.sort((a: any, b: any) => a.id - b.id)
     } catch (error: any) {
         console.error(error)
         if (error.response.data.code == "token_not_valid") {
@@ -147,7 +147,7 @@ onMounted(() => {
 const search = ref('')
 
 const filterExpenseData = computed(() =>
-    AssetsData.value.filter(
+    IncomeData.value.filter(
         (data) =>
             !search.value ||
             data.key.toLowerCase().includes(search.value.toLowerCase())
@@ -246,7 +246,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
 
 // 导出
 const handleExport = () => {
-    const data = AssetsData.value
+    const data = IncomeData.value
     data.forEach((item: any) => {
         delete item.id
         delete item.url
@@ -426,6 +426,36 @@ const confirmDelete = async () => {
         }
     }
 }
+
+// 高级排序方法：处理数字、英文和中文混合内容
+const advancedSort = (a: Income, b: Income): number => {
+    // 提取数字部分（如果有）
+    const numA = parseInt(a.key.match(/\d+/)?.[0] || '0');
+    const numB = parseInt(b.key.match(/\d+/)?.[0] || '0');
+
+    // 如果都有数字且数字不同，按数字排序
+    if (numA !== numB) {
+        return numA - numB;
+    }
+
+    // 否则按拼音排序
+    const pinyinA = pinyin(a.key, {
+        toneType: 'none',
+        pattern: 'first',
+        type: 'string'
+    }).toLowerCase();
+
+    const pinyinB = pinyin(b.key, {
+        toneType: 'none',
+        pattern: 'first',
+        type: 'string'
+    }).toLowerCase();
+
+    if (pinyinA < pinyinB) return -1;
+    if (pinyinA > pinyinB) return 1;
+    return 0;
+};
+
 </script>
 
 <style scoped>

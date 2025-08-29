@@ -1,7 +1,7 @@
 <template>
     <el-table v-loading="loading" :data="filterExpenseData" style="width: 99%;margin-left: 10px;">
         <!-- <el-table-column label="编号" prop="id" /> -->
-        <el-table-column label="关键字" prop="key">
+        <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort">
             <template #header="{ column }">
                 <span>
                     {{ column.label }}
@@ -35,7 +35,7 @@
                 </span>
             </template>
         </el-table-column>
-        <el-table-column label="映射账户" prop="assets" />
+        <el-table-column label="映射账户" prop="assets" sortable/>
         <el-table-column align="right">
             <template #header>
                 <div style="display: flex">
@@ -117,6 +117,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import axios from '../../utils/request'
 import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
+import { pinyin } from 'pinyin-pro';
 
 const dialogError = ref(false)
 const lastEditedData = ref<Partial<Assets> | null>(null)
@@ -144,7 +145,8 @@ const fetchData = async () => {
     loading.value = true
     try {
         const response = await axios.get('aassets/')
-        AssetsData.value = response.data
+        // AssetsData.value = response.data
+        AssetsData.value = response.data.sort((a: any, b: any) => a.id - b.id)
         // console.log(AssetsData.value);
     } catch (error: any) {
         console.error(error)
@@ -460,6 +462,36 @@ const confirmDelete = async () => {
         }
     }
 }
+
+// 高级排序方法：处理数字、英文和中文混合内容
+const advancedSort = (a: Assets, b: Assets): number => {
+  // 提取数字部分（如果有）
+  const numA = parseInt(a.key.match(/\d+/)?.[0] || '0');
+  const numB = parseInt(b.key.match(/\d+/)?.[0] || '0');
+
+  // 如果都有数字且数字不同，按数字排序
+  if (numA !== numB) {
+    return numA - numB;
+  }
+
+  // 否则按拼音排序
+  const pinyinA = pinyin(a.key, {
+    toneType: 'none',
+    pattern: 'first',
+    type: 'string'
+  }).toLowerCase();
+
+  const pinyinB = pinyin(b.key, {
+    toneType: 'none',
+    pattern: 'first',
+    type: 'string'
+  }).toLowerCase();
+
+  if (pinyinA < pinyinB) return -1;
+  if (pinyinA > pinyinB) return 1;
+  return 0;
+};
+
 </script>
 
 <style scoped>
