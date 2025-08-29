@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 // 引入组件
 import Trans from "./components/trans/Trans.vue"
 import Format from "./components/map/Format.vue"
+import Templates from "./components/map/Templates.vue"
 import Assets from "./components/map/Assets.vue"
 import Expenses from "./components/map/Expenses.vue"
 import Income from "./components/map/Income.vue"
@@ -24,6 +25,7 @@ const router = createRouter({
     { path: '/auth/github/token', component: AuthenticateByGithubToken },
     { path: '/trans',name:"trans", component: Trans },
     { path: '/format',name:"format", component: Format },
+    { path: '/map/templates',name:"templates", component: Templates },
     { path: '/map/assets',name:"assets", component: Assets },
     { path: '/map/expenses',name:"expenses", component: Expenses },
     { path: '/map/income',name:"income", component: Income },

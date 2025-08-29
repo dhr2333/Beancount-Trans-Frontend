@@ -31,8 +31,11 @@
 
     <el-sub-menu index="map">
       <template #title>映射管理</template>
-      <router-link to="/format" class="no-underline">
+      <!-- <router-link to="/format" class="no-underline">
         <el-menu-item index="/format">格式化输出</el-menu-item>
+      </router-link> -->
+      <router-link to="/map/templates" class="no-underline">
+        <el-menu-item index="/map/templates">模板管理</el-menu-item>
       </router-link>
       <router-link to="/map/expenses" class="no-underline">
         <el-menu-item index="/map/expense">支出映射</el-menu-item>
@@ -44,6 +47,14 @@
         <el-menu-item index="/map/assets">资产映射</el-menu-item>
       </router-link>
     </el-sub-menu>
+
+    <el-sub-menu index="config">
+      <template #title>配置管理</template>
+      <router-link to="/format" class="no-underline">
+        <el-menu-item index="/format">格式化输出</el-menu-item>
+      </router-link>
+    </el-sub-menu>
+
 
     <!-- <el-sub-menu index="bill">
       <template #title>账单管理</template>
