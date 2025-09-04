@@ -59,10 +59,10 @@
                     {{ template.description || '暂无描述' }}
                 </div>
 
-                <el-collapse v-if="template.items && template.items.length > 0">
-                    <el-collapse-item title="查看映射条目">
+                <el-collapse v-if="template.items && template.items.length > 0" v-model="activeNames">
+                    <el-collapse-item title="查看映射条目" name="1">
                         <el-table :data="template.items" class="items-table" stripe>
-                            <el-table-column label="关键字" prop="key" width="120"></el-table-column>
+                            <el-table-column label="关键字" prop="key"></el-table-column>
 
                             <!-- 支出模板特有字段 -->
                             <el-table-column v-if="template.type === 'expense'" label="商家"
@@ -95,15 +95,29 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, watch } from 'vue'
-import { ElMessage, ElLoading } from 'element-plus'
+import { ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { User, Clock, DocumentDelete, Loading } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 
+interface TemplateItem {
+    id: number;
+    name: string;
+    is_official: boolean;
+    type: string;
+    version: string;
+    owner_name?: string;
+    modified: string;
+    description?: string;
+    update_notes?: string;
+    items?: any[]; // 可以根据实际结构进一步定义
+}
+
 // 响应式数据
 const activeType = ref('expense')
-const templates = ref([])
+const templates = ref<TemplateItem[]>([])
 const loading = ref(false)
+const activeNames = ref(['1'])
 
 // 获取模板类型文本
 const getTypeText = (type: string) => {
@@ -161,11 +175,6 @@ const fetchTemplates = async () => {
         loading.value = false
     }
 }
-
-// 初始化时获取数据
-// onMounted(() => {
-//     fetchTemplates()
-// })
 
 // 监听标签页变化
 watch(activeType, () => {
