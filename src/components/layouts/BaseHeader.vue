@@ -325,11 +325,11 @@ const openFavaInstance = async () => {
     color: #34495e;
 
     /* 处理富文本内容样式 */
-    p {
+    & p {
       margin: 8px 0;
     }
 
-    ul {
+    & ul {
       padding-left: 20px;
     }
   }

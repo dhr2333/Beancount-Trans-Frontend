@@ -67,4 +67,7 @@ export default defineConfig({
       ]
     }),
   ],
+  build: {
+    chunkSizeWarningLimit: 2048, // 单位是 kB，设置为 2048 即 2MB
+  },
 })
