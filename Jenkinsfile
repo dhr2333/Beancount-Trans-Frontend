@@ -32,8 +32,8 @@ pipeline {
                     branches: [[name: "*/${params.BRANCH}"]],
                     extensions: [],
                     userRemoteConfigs: [[
-                        url: 'git@github.com:dhr2333/Beancount-Trans-Frontend.git',
-                        credentialsId: 'github-ssh-key'
+                        url: 'https://github.com/dhr2333/Beancount-Trans-Frontend.git',
+                        credentialsId: '8a235621-ec9f-4f59-97c5-225b1c22764e'
                     ]]
                 ])
                 script {
@@ -46,6 +46,20 @@ pipeline {
                     
                     echo "Git Commit短哈希: ${env.GIT_COMMIT_SHORT}"
                     echo "最终镜像标签: ${env.IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('配置环境变量') {
+            steps {
+                script {
+                    // 替换 .env 文件内容为生产环境配置
+                    sh '''
+                        cat > .env << 'EOF'
+VITE_API_URL = "https://trans.dhr2333.cn/api"
+EOF
+                    '''
+                    echo "已更新 .env 文件内容为生产环境配置"
                 }
             }
         }
