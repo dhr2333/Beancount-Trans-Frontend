@@ -119,8 +119,8 @@
         <el-menu-item index="" @click="user()">个人中心</el-menu-item>
       </router-link>
       <el-menu-item>
-        <a href="https://www.dhr2333.cn/category/beancountfu-shi-ji-zhang.html" class="help-link"
-          target="_blank">帮助手册</a>
+        <a href="https://trans.dhr2333.cn/docs/beancount-trans-%E5%BF%AB%E9%80%9F%E5%85%A5%E9%97%A8" class="help-link"
+          target="_blank">用户手册</a>
       </el-menu-item>
       <el-menu-item index="logout" @click="cleanToken">退出登录</el-menu-item>
     </el-sub-menu>
