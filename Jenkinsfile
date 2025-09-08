@@ -1,81 +1,114 @@
 pipeline {
     agent any
+    triggers {
+        pollSCM('')
+    }
+    parameters {
+        string(name: 'BRANCH', defaultValue: 'main', description: '要构建的Git分支')
+        string(name: 'VERSION', defaultValue: '', description: '镜像版本标签 (留空则使用Git Commit短哈希)')
+        booleanParam(name: 'SKIP_TESTS', defaultValue: false, description: '跳过测试步骤')
+        booleanParam(name: 'PUSH_TO_REGISTRY', defaultValue: false, description: '是否推送到镜像仓库')
+    }
     environment {
-        DOCKER_TAG = new Date().format("yyyyMMdd")
-        DOCKER_IMAGE = 'registry.cn-hangzhou.aliyuncs.com/dhr2333/beancount-trans-frontend'
-        YAML = "image: ${DOCKER_IMAGE}:${DOCKER_TAG}"
+        REGISTRY = "harbor.dhr2333.cn/beancount-trans"
+        IMAGE_NAME = "beancount-trans-frontend"
     }
     stages {
-        stage('Clone') {
-            steps {
-                git branch: 'main', credentialsId: '0bd011d1-722c-4a1a-a870-31eaff32761d', url: 'https://github.com/dhr2333/Beancount-Trans-Frontend.git'
-            }
-        }
-        stage('Modify Configuration'){
-            steps {
-                sh '''sed -i \'s/^# VITE_API_URL = "https:\\/\\/trans.dhr2333.cn\\"/VITE_API_URL = "https:\\/\\/trans.dhr2333.cn\\"/\' .env\nsed -i \'s/^VITE_API_URL = "http:\\/\\/localhost:38001\\/api"/# VITE_API_URL = "http:\\/\\/localhost:38001\\/api"/\' .env\nsed -i \'s/^VITE_API_URL = "http:\\/\\/localhost:38001\\"/# VITE_API_URL = "http:\\/\\/localhost:38001\\"/\' .env\ncat .env'''
-            }
-        }
-//         stage('Src Build'){
-//             steps {
-//                 nodejs('NodeJs 20.3.0') {
-//                     // some block
-//                 }
-//                 sh '''PACKAGE=\'beancount-trans-vue.tar.gz\'
-// node -v
-// npm -v
-// npm install
-// npm run build
-// cd dist
-// rm -rf $PACKAGE
-// tar zcvf $PACKAGE	*
-// cd ..'''
-//             }
-//         }
-//         stage('Build Image and Push') {
-//             steps {
-//                 sshPublisher(publishers: [sshPublisherDesc(configName: 'dhr2333', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: '''PACKAGE=\'beancount-trans-vue.tar.gz\'
-// IMAGE_NAME=\'harbor.dhr2333.cn:8080/library/beancount-trans:20230614\'
-
-// rm /usr/local/daihaorui/jenkins/Beancount-Trans-Frontend/dist/*
-// mv /usr/local/daihaorui/jenkins/Beancount-Trans-Fronten/beancount-trans-vue.tar.gz /usr/local/daihaorui/jenkins/Beancount-Trans-Frontend/dist/
-// cd /usr/local/daihaorui/jenkins/Beancount-Trans-Frontend/dist/
-// tar zxvf $PACKAGE
-// rm -rf $PACKAGE
-// cd ..
-// docker build -t $IMAGE_NAME .
-// # docker push $IMAGE_NAME''', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '/Beancount-Trans-Fronten', remoteDirectorySDF: false, removePrefix: 'dist/', sourceFiles: 'dist/beancount-trans-vue.tar.gz')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: true)])
-//                 // script {
-//                 //     docker.withRegistry('http://127.0.0.1:8080', 'a4a1bb2f-ee2a-4476-bc0f-f0b8df584cd1') {
-//                 //         def customImage = docker.build("127.0.0.1:8080/library/beancount-trans-frontend:latest")
-//                 //         customImage.push()
-//                 //     }
-//                 // }
-//             }
-//         }
-         stage('Build Image and Push') {
+        stage('初始化') {
             steps {
                 script {
-                    docker.withRegistry('https://registry.cn-hangzhou.aliyuncs.com/dhr2333', '8972f1d0-8506-4197-9ffa-88f6f988650a') {
-                        def customImage = docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
-                        customImage.push()
+                    echo "开始构建 Beancount-Trans-Frontend 项目"
+                    echo "分支: ${params.BRANCH}"
+                    echo "镜像标签参数: ${params.VERSION}"
+                    echo "工作目录: ${env.WORKSPACE}"
+                }
+            }
+        }
+
+        stage('代码检出') {
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${params.BRANCH}"]],
+                    extensions: [],
+                    userRemoteConfigs: [[
+                        url: 'git@github.com:dhr2333/Beancount-Trans-Frontend.git',
+                        credentialsId: 'github-ssh-key'
+                    ]]
+                ])
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+                    
+                    env.IMAGE_TAG = params.VERSION ?: "git-${env.GIT_COMMIT_SHORT}"
+                    
+                    echo "Git Commit短哈希: ${env.GIT_COMMIT_SHORT}"
+                    echo "最终镜像标签: ${env.IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('构建Docker镜像') {
+            steps {
+                script {
+                    docker.build("${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}")
+                }
+            }
+        }
+
+        stage('推送镜像') {
+            when {
+                expression { return params.PUSH_TO_REGISTRY }
+            }
+            steps {
+                script {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'docker-registry-cred',
+                        usernameVariable: 'REGISTRY_USER',
+                        passwordVariable: 'REGISTRY_PASSWORD'
+                    )]) {
+                        sh "echo ${REGISTRY_PASSWORD} | docker login -u ${REGISTRY_USER} --password-stdin ${env.REGISTRY}"
+                    }
+                    
+                    sh "docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                    sh "docker push ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                    
+                    if (params.BRANCH == 'main' || params.BRANCH == 'master') {
+                        sh "docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.REGISTRY}/${env.IMAGE_NAME}:latest"
+                        sh "docker push ${env.REGISTRY}/${env.IMAGE_NAME}:latest"
                     }
                 }
             }
         }
-        stage('Start Service'){
-            steps{
-                sshPublisher(publishers: [sshPublisherDesc(configName: 'dhr2333', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: "echo ${DOCKER_TAG} \n echo \"${DOCKER_TAG}\" \n sed -i \"/registry.cn-hangzhou.aliyuncs.com\\/dhr2333\\/beancount-trans-frontend/c\\\\    image: registry.cn-hangzhou.aliyuncs.com/dhr2333/beancount-trans-frontend:${DOCKER_TAG}\" /root/Manage/docker-compose-beancount-trans.yaml \n docker compose -f /root/Manage/docker-compose-beancount-trans.yaml down \n docker compose -f /root/Manage/docker-compose-beancount-trans.yaml up -d", execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '', remoteDirectorySDF: false, removePrefix: '', sourceFiles: '')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: false)])
+
+		stage('部署到服务器') {
+		    steps {
+		        script {
+		            sshagent([env.SSH_CREDENTIALS_ID]) {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no -p ${env.DEPLOY_PORT} root@${env.DEPLOY_SERVER} "cd /root/Manage && docker compose -f docker-compose-beancount-trans-frontend.yaml down && sed -i 's|image:.*|image: ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}|' docker-compose-beancount-trans-frontend.yaml && docker compose -f docker-compose-beancount-trans-frontend.yaml up -d"
+                        """
+		            }
+		        }
+		    }
+		}
+    }
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            script {
+                echo "Beancount-Trans-Frontend 项目构建成功!"
+                if (params.PUSH_TO_REGISTRY) {
+                    echo "镜像已推送到: ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                }
             }
         }
-    }
-    post {  // 不管构建结果，都执行以下步骤
-        success{  // 构建成功时
-            echo 'hello'
-
-        }
-        failure{
-            echo 'hello'
+        failure {
+            echo "Beancount-Trans-Frontend 项目构建失败!"
         }
     }
 }
