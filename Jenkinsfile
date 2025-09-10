@@ -3,6 +3,9 @@ pipeline {
     triggers {
         pollSCM('')
     }
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+    }
     parameters {
         string(name: 'BRANCH', defaultValue: 'main', description: '要构建的Git分支')
         string(name: 'VERSION', defaultValue: '', description: '镜像版本标签 (留空则使用Git Commit短哈希)')
@@ -52,22 +55,18 @@ pipeline {
 
         stage('配置环境变量') {
             steps {
-                script {
-                    // 替换 .env 文件内容为生产环境配置
-                    sh '''
-                        cat > .env << 'EOF'
-VITE_API_URL = "https://trans.dhr2333.cn/api"
-EOF
-                    '''
-                    echo "已更新 .env 文件内容为生产环境配置"
-                }
+                writeFile(
+                    file: '.env',
+                    text: 'VITE_API_URL = "https://trans.dhr2333.cn/api"'
+                )
+                echo "已更新 .env 文件内容为生产环境配置"
             }
         }
 
         stage('构建Docker镜像') {
             steps {
                 script {
-                    docker.build("${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}")
+                    docker.build("${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}", "--rm .")
                 }
             }
         }

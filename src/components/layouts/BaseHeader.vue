@@ -35,7 +35,7 @@
         <el-menu-item index="/format">格式化输出</el-menu-item>
       </router-link> -->
       <router-link to="/map/templates" class="no-underline">
-        <el-menu-item index="/map/templates">模板管理</el-menu-item>
+        <el-menu-item index="/map/templates">映射模板</el-menu-item>
       </router-link>
       <router-link to="/map/expenses" class="no-underline">
         <el-menu-item index="/map/expense">支出映射</el-menu-item>
@@ -109,15 +109,17 @@
       </el-popover>
     </el-menu-item> -->
     <el-menu-item>
-      <el-link href="https://github.com/dhr2333/Beancount-Trans" target="_blank">
-        <img src="/images/github-logo.png" alt="GitHub Logo" style="width: 30px" />
+      <el-link href="https://github.com/dhr2333/Beancount-Trans" target="_blank"
+        style="display: inline-flex; align-items: center;"> <img
+          src="https://img.shields.io/github/stars/dhr2333/Beancount-Trans?style=social" alt="GitHub stars"
+          style="height: 30px; margin-left: 6px; vertical-align: middle;" />
       </el-link>
     </el-menu-item>
     <el-sub-menu index="manager">
       <template #title>{{ username }}</template>
-      <router-link to="" class="no-underline">
+      <!-- <router-link to="" class="no-underline">
         <el-menu-item index="" @click="user()">个人中心</el-menu-item>
-      </router-link>
+      </router-link> -->
       <el-menu-item>
         <a href="https://trans.dhr2333.cn/docs/quick-start" class="help-link" target="_blank">用户手册</a>
       </el-menu-item>

@@ -2,10 +2,13 @@
   <el-upload class="upload-demo" :drag="true" :action=action method="POST" :data="getUploadData" :multiple="false"
     :headers=headers accept=".csv,.pdf,.xls,.xlsx" show-file-list name="trans" @success="handleUploadSuccess"
     @error="handleUploadError" @change="handleChange">
-    <el-icon class="el-icon--upload"><upload-filled /></el-icon>
     <div class="el-upload__text">
+      <el-icon class="el-icon--upload"><upload-filled /></el-icon>
       拖拽文件至此处 或 <em>单击上传</em>
     </div>
+    <p class="upload-privacy-hint" style="color: #666; font-size: 0.9em;">
+      该操作不会保存您的任何文件，所有上传的文件均在处理完成后立即删除
+    </p>
     <template #tip>
       <div class="el-upload__tip">
         当前支持<a :href="wechatUrl" download>微信</a>、<a :href="alipayUrl" download>支付宝</a>、

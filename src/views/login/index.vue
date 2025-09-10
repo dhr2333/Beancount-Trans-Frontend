@@ -17,6 +17,7 @@
         </div>
 
         <div class="big-contain" key="bigContainRegister" v-else>
+          
           <div class="btitle">创建账户</div>
           <form class="bform" @submit.prevent="register"> <!-- 关键修改：添加表单和 submit 事件 -->
             <input type="text" placeholder="用户名（必填）" v-model="username">
@@ -29,13 +30,14 @@
       </div>
       <div class="small-box" :class="{ active: isLogin }">
         <div class="small-contain" key="smallContainRegister" v-if="isLogin">
-          <div class="stitle">你好，朋友!</div>
-          <p class="scontent">开始注册，和我们一起旅行</p>
+          <div class="stitle">还没有账户?</div>
+          <p class="scontent">立即注册，AI 帮您实现 3 分钟生成专业财务报表
+          </p>
           <button class="sbutton" @click="changeType">注册</button>
         </div>
         <div class="small-contain" key="smallContainLogin" v-else>
-          <div class="stitle">欢迎回来!</div>
-          <p class="scontent">与我们保持联系，请登录你的账户</p>
+          <div class="stitle">已有账户?</div>
+          <p class="scontent">欢迎回来！请登录继续管理您的财务报告</p>
           <button class="sbutton" @click="changeType">登录</button>
         </div>
       </div>
