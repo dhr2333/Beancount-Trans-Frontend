@@ -67,21 +67,36 @@
                             <!-- 支出模板特有字段 -->
                             <el-table-column v-if="template.type === 'expense'" label="商家"
                                 prop="payee"></el-table-column>
-                            <el-table-column v-if="template.type === 'expense'" label="支出账户"
-                                prop="account"></el-table-column>
-                            <el-table-column v-if="template.type === 'expense'" label="货币" prop="currency"
-                                width="80"></el-table-column>
+                            <el-table-column v-if="template.type === 'expense'" label="支出账户">
+                                <template #default="{ row }">
+                                    {{ row.expend?.account || row.account.account }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column v-if="template.type === 'expense'" label="货币" width="80">
+                                <template #default="{ row }">
+                                    <span v-if="row.currencies && row.currencies.length > 0">
+                                        {{row.currencies.map(c => c.code).join(', ')}}
+                                    </span>
+                                    <span v-else>{{ row.currency || 'CNY' }}</span>
+                                </template>
+                            </el-table-column>
 
                             <!-- 收入模板特有字段 -->
                             <!-- <el-table-column v-if="template.type === 'income'" label="付款方" prop="payer"></el-table-column> -->
-                            <el-table-column v-if="template.type === 'income'" label="收入账户"
-                                prop="account"></el-table-column>
+                            <el-table-column v-if="template.type === 'income'" label="收入账户">
+                                <template #default="{ row }">
+                                    {{ row.income?.account || row.account.account }}
+                                </template>
+                            </el-table-column>
 
                             <!-- 资产模板特有字段 -->
                             <el-table-column v-if="template.type === 'assets'" label="账户全称"
                                 prop="full"></el-table-column>
-                            <el-table-column v-if="template.type === 'assets'" label="资产账户"
-                                prop="account"></el-table-column>
+                            <el-table-column v-if="template.type === 'assets'" label="资产账户">
+                                <template #default="{ row }">
+                                    {{ row.assets?.account || row.account.account }}
+                                </template>
+                            </el-table-column>
                         </el-table>
                     </el-collapse-item>
                 </el-collapse>

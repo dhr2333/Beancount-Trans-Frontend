@@ -159,19 +159,65 @@
         </el-dialog>
 
         <!-- 货币管理对话框 -->
-        <el-dialog v-model="currencyDialog" title="管理货币" width="600px">
-            <div class="currency-management">
-                <div class="available-currencies">
-                    <h4>可用货币</h4>
-                    <el-select v-model="selectedCurrencies" multiple placeholder="选择货币">
-                        <el-option v-for="currency in availableCurrencies" :key="currency.id"
-                            :label="`${currency.code} - ${currency.name}`" :value="currency.id" />
-                    </el-select>
-                </div>
-            </div>
+        <el-dialog v-model="currencyDialog" title="货币管理" width="800px">
+            <el-tabs v-model="activeCurrencyTab" type="card">
+                <!-- 货币列表 -->
+                <el-tab-pane label="货币列表" name="list">
+                    <div class="currency-list-section">
+                        <div class="section-header">
+                            <h4>所有货币</h4>
+                            <el-button type="primary" size="small" @click="showAddCurrencyDialog">
+                                <el-icon>
+                                    <Plus />
+                                </el-icon>
+                                新增货币
+                            </el-button>
+                        </div>
+                        <el-table :data="allCurrencies" style="width: 100%" v-loading="currencyLoading">
+                            <el-table-column prop="code" label="货币代码" width="120" />
+                            <el-table-column prop="name" label="货币名称" />
+                            <el-table-column label="操作" width="150">
+                                <template #default="{ row }">
+                                    <el-button size="small" @click="editCurrency(row)">编辑</el-button>
+                                    <el-button size="small" type="danger" @click="deleteCurrency(row)">删除</el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+                </el-tab-pane>
+
+                <!-- 账户货币关联 -->
+                <el-tab-pane label="账户关联" name="association">
+                    <div class="currency-association-section">
+                        <h4>为账户 "{{ selectedAccount?.account }}" 关联货币</h4>
+                        <el-select v-model="selectedCurrencies" multiple placeholder="选择货币" style="width: 100%">
+                            <el-option v-for="currency in allCurrencies" :key="currency.id"
+                                :label="`${currency.code} - ${currency.name}`" :value="currency.id" />
+                        </el-select>
+                    </div>
+                </el-tab-pane>
+            </el-tabs>
+
             <template #footer>
                 <el-button @click="currencyDialog = false">取消</el-button>
-                <el-button type="primary" @click="updateAccountCurrencies">确定</el-button>
+                <el-button v-if="activeCurrencyTab === 'association'" type="primary"
+                    @click="updateAccountCurrencies">确定</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 新增/编辑货币对话框 -->
+        <el-dialog v-model="currencyFormDialog" :title="isEditingCurrency ? '编辑货币' : '新增货币'" width="400px">
+            <el-form :model="currencyForm" :rules="currencyRules" ref="currencyFormRef" label-width="80px">
+                <el-form-item label="货币代码" prop="code">
+                    <el-input v-model="currencyForm.code" placeholder="如：CNY, USD" />
+                </el-form-item>
+                <el-form-item label="货币名称" prop="name">
+                    <el-input v-model="currencyForm.name" placeholder="如：人民币, 美元" />
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="currencyFormDialog = false">取消</el-button>
+                <el-button type="primary" @click="saveCurrency">确定</el-button>
             </template>
         </el-dialog>
     </div>
@@ -219,12 +265,27 @@ const availableCurrencies = ref<Currency[]>([])
 const addAccountDialog = ref(false)
 const editAccountDialog = ref(false)
 const currencyDialog = ref(false)
+const currencyFormDialog = ref(false)
+
+// 货币管理相关
+const activeCurrencyTab = ref('list')
+const allCurrencies = ref<Currency[]>([])
+const currencyLoading = ref(false)
+const isEditingCurrency = ref(false)
+const currentCurrencyId = ref<number | null>(null)
 
 // 表单数据
 const newAccount = ref({
     account: '',
     currency_ids: [] as number[]
 })
+
+const currencyForm = ref({
+    code: '',
+    name: ''
+})
+
+const currencyFormRef = ref<FormInstance>()
 
 const editAccountForm = ref({
     account: '',
@@ -248,6 +309,17 @@ const accountRules: FormRules = {
     account: [
         { required: true, message: '请输入账户路径', trigger: 'blur' },
         { pattern: /^[A-Z][A-Za-z0-9:]*$/, message: '账户路径必须以大写字母开头，只能包含字母、数字和冒号', trigger: 'blur' }
+    ]
+}
+
+const currencyRules: FormRules = {
+    code: [
+        { required: true, message: '请输入货币代码', trigger: 'blur' },
+        { pattern: /^[A-Z]{3}$/, message: '货币代码必须是3位大写字母', trigger: 'blur' }
+    ],
+    name: [
+        { required: true, message: '请输入货币名称', trigger: 'blur' },
+        { max: 20, message: '货币名称不能超过20个字符', trigger: 'blur' }
     ]
 }
 
@@ -421,10 +493,11 @@ const deleteAccount = async () => {
 }
 
 // 显示货币管理对话框
-const showCurrencyDialog = () => {
+const showCurrencyDialog = async () => {
     if (!selectedAccount.value) return
 
     selectedCurrencies.value = selectedAccount.value.currencies.map(c => c.id)
+    await fetchAllCurrencies()
     currencyDialog.value = true
 }
 
@@ -502,6 +575,89 @@ const formatDateTime = (dateString: string): string => {
 
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
         `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+// 获取所有货币
+const fetchAllCurrencies = async () => {
+    try {
+        currencyLoading.value = true
+        const response = await axios.get('/currencies/')
+        allCurrencies.value = response.data
+    } catch (error: any) {
+        console.error('获取货币列表失败:', error)
+        ElMessage.error('获取货币列表失败')
+    } finally {
+        currencyLoading.value = false
+    }
+}
+
+// 显示新增货币对话框
+const showAddCurrencyDialog = () => {
+    isEditingCurrency.value = false
+    currentCurrencyId.value = null
+    currencyForm.value = { code: '', name: '' }
+    currencyFormDialog.value = true
+}
+
+// 编辑货币
+const editCurrency = (currency: Currency) => {
+    isEditingCurrency.value = true
+    currentCurrencyId.value = currency.id
+    currencyForm.value = { code: currency.code, name: currency.name }
+    currencyFormDialog.value = true
+}
+
+// 保存货币
+const saveCurrency = async () => {
+    if (!currencyFormRef.value) return
+
+    try {
+        await currencyFormRef.value.validate()
+
+        if (isEditingCurrency.value && currentCurrencyId.value) {
+            // 编辑货币
+            await axios.put(`/currencies/${currentCurrencyId.value}/`, currencyForm.value)
+            ElMessage.success('货币更新成功')
+        } else {
+            // 新增货币
+            await axios.post('/currencies/', currencyForm.value)
+            ElMessage.success('货币创建成功')
+        }
+
+        currencyFormDialog.value = false
+        await fetchAllCurrencies()
+    } catch (error: any) {
+        console.error('保存货币失败:', error)
+        if (error.response?.status === 400) {
+            ElMessage.error('货币代码已存在或数据格式错误')
+        } else {
+            ElMessage.error('保存货币失败')
+        }
+    }
+}
+
+// 删除货币
+const deleteCurrency = async (currency: Currency) => {
+    try {
+        await ElMessageBox.confirm(
+            `确定要删除货币 "${currency.code} - ${currency.name}" 吗？此操作不可撤销。`,
+            '确认删除',
+            {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'warning',
+            }
+        )
+
+        await axios.delete(`/currencies/${currency.id}/`)
+        ElMessage.success('货币删除成功')
+        await fetchAllCurrencies()
+    } catch (error: any) {
+        if (error !== 'cancel') {
+            console.error('删除货币失败:', error)
+            ElMessage.error('删除货币失败')
+        }
+    }
 }
 
 // 组件挂载时初始化数据

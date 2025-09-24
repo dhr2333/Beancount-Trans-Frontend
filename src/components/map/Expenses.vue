@@ -1,117 +1,178 @@
 <template>
-  <el-table :data="filterExpenseData" style="width: 99%; margin-left: 10px;">
-    <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" />
-    <el-table-column label="商家" prop="payee">
-      <template #header="{ column }">
-        <span>
-          {{ column.label }}
-          <span class="tooltip-icon" @mouseover="showTooltip = true" @mouseleave="showTooltip = false">
-            <i class="el-icon-question"></i>
-          </span>
-          <el-tooltip v-if="showTooltip" class="tooltip" effect="dark" placement="top" :content="payeetipContent">
+  <div class="expense-mapping">
+    <!-- 搜索和操作栏 -->
+    <div class="toolbar">
+      <div class="search-section">
+        <el-input v-model="search" placeholder="搜索关键字、商家、账户" clearable @input="handleSearch">
+          <template #prefix>
             <el-icon>
-              <InfoFilled />
+              <Search />
             </el-icon>
-          </el-tooltip>
-        </span>
-      </template>
-    </el-table-column>
-    <el-table-column label="映射账户" prop="expend" sortable>
-      <template #header="{ column }">
-        <span>
-          {{ column.label }}
-          <span class="tooltip-icon" @mouseover="showTooltip = true" @mouseleave="showTooltip = false">
-            <i class="el-icon-question"></i>
-          </span>
-          <el-tooltip v-if="showTooltip" class="tooltip" effect="dark" placement="top" :content="expendtipContent">
-            <el-icon>
-              <InfoFilled />
-            </el-icon>
-          </el-tooltip>
-        </span>
-      </template>
-    </el-table-column>
-    <el-table-column label="货币" prop="currency" width="120">
-      <template #header="{ column }">
-        <div class="currency-header">
-          {{ column.label }}
-          <el-tooltip v-if="showTooltip" class="tooltip" effect="dark" placement="top" :content="currencyContent">
-            <el-icon>
-              <InfoFilled />
-            </el-icon>
-          </el-tooltip>
-        </div>
-      </template>
-    </el-table-column>
-    <!-- <el-table-column label="标签" prop="tag" />
-    <el-table-column label="类型" prop="classification" /> -->
-    <el-table-column align="right">
-      <template #header>
-        <div style="display: flex">
-          <el-input v-model="search" size="small" placeholder="搜索 关键字" />
-          <el-button size="small" type="info" @click="handleAdd()" style="margin-left: 12px">新增</el-button>
-          <el-button size="small" type="default" @click="handleImport()" style="margin-left: 12px">导入</el-button>
-          <el-button size="small" type="default" @click="handleExport()" style="margin-left: 12px">导出</el-button>
-        </div>
-      </template>
-      <template #default="scope">
-        <el-switch v-model="scope.row.enable" style="margin-right: 12px;" @change="handleSwitchChange(scope.row)"
-          inline-prompt inactive-text="禁用" />
-        <el-button size="small" @click="handleEdit(scope.$index, scope.row)">编辑</el-button>
-        <el-button size="small" type="danger" @click="handleDelete(scope.$index, scope.row)"
-          style="margin-left: 12px">删除</el-button>
-      </template>
-    </el-table-column>
-  </el-table>
-  <el-dialog v-model="dialogAdd" title="新增映射" width="30%">
-    <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="120px" class="demo-ruleForm" status-icon>
-      <el-form-item label="关键字" prop="key">
-        <el-input v-model="ruleForm.key" placeholder="王者荣耀" />
-      </el-form-item>
-      <el-form-item label="商家" prop="payee">
-        <el-input v-model="ruleForm.payee" placeholder="腾讯" />
-      </el-form-item>
-      <el-form-item label="映射账户" prop="expend">
-        <el-input v-model="ruleForm.expend" placeholder="Expenses:Culture:Entertainment" />
-      </el-form-item>
-      <el-form-item label="货币" prop="currency">
-        <el-input v-model="ruleForm.currency" placeholder="CNY" clearable>
+          </template>
         </el-input>
+      </div>
+      <div class="action-section">
+        <el-button type="primary" @click="handleAdd()">
+          <el-icon>
+            <Plus />
+          </el-icon>
+          新增映射
+        </el-button>
+        <el-button @click="handleImport()">
+          <el-icon>
+            <Upload />
+          </el-icon>
+          导入
+        </el-button>
+        <el-button @click="handleExport()">
+          <el-icon>
+            <Download />
+          </el-icon>
+          导出
+        </el-button>
+        <el-button @click="fetchData()">
+          <el-icon>
+            <Refresh />
+          </el-icon>
+          刷新
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 映射列表 -->
+    <el-table :data="filterExpenseData" v-loading="loading" style="width: 100%;"
+      @selection-change="handleSelectionChange">
+      <el-table-column type="selection" width="55" />
+
+      <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" width="120">
+        <template #default="{ row }">
+          <el-tag type="primary" size="small">{{ row.key }}</el-tag>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="商家" prop="payee" width="150">
+        <template #default="{ row }">
+          <span v-if="row.payee">{{ row.payee }}</span>
+          <el-text v-else type="info" size="small">-</el-text>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="映射账户" prop="expend" sortable min-width="200">
+        <template #default="{ row }">
+          <div class="account-cell">
+            <el-text type="primary">{{ row.expend?.account || row.expend }}</el-text>
+            <el-tag v-if="row.expend?.account_type" :type="getAccountTypeColor(row.expend.account_type)" size="small">
+              {{ row.expend.account_type }}
+            </el-tag>
+          </div>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="关联货币" prop="currencies" width="150">
+        <template #default="{ row }">
+          <div v-if="row.currencies && row.currencies.length > 0" class="currency-cell">
+            <el-tag v-for="currency in row.currencies" :key="currency.id" size="small" class="currency-tag">
+              {{ currency.code }}
+            </el-tag>
+          </div>
+          <el-text v-else type="info" size="small">CNY</el-text>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="状态" prop="enable" width="100">
+        <template #default="{ row }">
+          <el-switch v-model="row.enable" @change="handleSwitchChange(row)" inline-prompt active-text="启用"
+            inactive-text="禁用" />
+        </template>
+      </el-table-column>
+
+      <el-table-column label="操作" width="150" fixed="right">
+        <template #default="{ row, $index }">
+          <el-button size="small" @click="handleEdit($index, row)">
+            <el-icon>
+              <Edit />
+            </el-icon>
+          </el-button>
+          <el-button size="small" type="danger" @click="handleDelete($index, row)">
+            <el-icon>
+              <Delete />
+            </el-icon>
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 批量操作栏 -->
+    <div v-if="selectedItems.length > 0" class="batch-actions">
+      <el-alert :title="`已选择 ${selectedItems.length} 项`" type="info" show-icon :closable="false">
+        <template #default>
+          <div class="batch-buttons">
+            <el-button size="small" @click="handleBatchEnable">批量启用</el-button>
+            <el-button size="small" @click="handleBatchDisable">批量禁用</el-button>
+            <el-button size="small" type="danger" @click="handleBatchDelete">批量删除</el-button>
+          </div>
+        </template>
+      </el-alert>
+    </div>
+  </div>
+  <!-- 新增映射对话框 -->
+  <el-dialog v-model="dialogAdd" title="新增支出映射" width="600px">
+    <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="100px" status-icon>
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <el-form-item label="关键字" prop="key">
+            <el-input v-model="ruleForm.key" placeholder="王者荣耀" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="商家" prop="payee">
+            <el-input v-model="ruleForm.payee" placeholder="腾讯（可选）" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+
+      <el-form-item label="映射账户" prop="expend">
+        <AccountSelector v-model="ruleForm.expend" placeholder="选择账户" @change="handleAccountChange" />
       </el-form-item>
-      <!-- <el-form-item label="标签" prop="tag">
-        <el-input v-model="ruleForm.tag" placeholder="影音娱乐" />
+
+      <el-form-item label="关联货币" prop="currency_id">
+        <CurrencySelector v-model="ruleForm.currency_id" :account-id="ruleForm.expend || undefined"
+          placeholder="选择货币" />
       </el-form-item>
-      <el-form-item label="类型" prop="classification">
-        <el-input v-model="ruleForm.classification" placeholder="文化休闲/影音娱乐" />
-      </el-form-item> -->
+
       <el-form-item>
         <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
         <el-button @click="resetForm(ruleFormRef)">重置</el-button>
       </el-form-item>
     </el-form>
   </el-dialog>
-  <el-dialog v-model="dialogEdit" title="修改映射" width="30%">
-    <el-form ref="ruleFormRef" :model="ruleForm" :rules="rules" label-width="120px" class="demo-ruleForm" status-icon>
-      <el-form-item label="关键字" prop="key">
-        <el-input v-model="ruleForm.key" />
-      </el-form-item>
-      <el-form-item label="商家" prop="payee">
-        <el-input v-model="ruleForm.payee" />
-      </el-form-item>
+  <!-- 编辑映射对话框 -->
+  <el-dialog v-model="dialogEdit" title="编辑支出映射" width="600px">
+    <el-form ref="editFormRef" :model="ruleForm" :rules="rules" label-width="100px" status-icon>
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <el-form-item label="关键字" prop="key">
+            <el-input v-model="ruleForm.key" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="商家" prop="payee">
+            <el-input v-model="ruleForm.payee" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+
       <el-form-item label="映射账户" prop="expend">
-        <el-input v-model="ruleForm.expend" />
+        <AccountSelector v-model="ruleForm.expend" placeholder="选择账户" @change="handleAccountChange" />
       </el-form-item>
-      <el-form-item label="货币" prop="currency">
-        <el-input v-model="ruleForm.currency" />
+
+      <el-form-item label="关联货币" prop="currency_id">
+        <CurrencySelector v-model="ruleForm.currency_id" :account-id="ruleForm.expend || undefined"
+          placeholder="选择货币" />
       </el-form-item>
-      <!-- <el-form-item label="标签" prop="tag">
-        <el-input v-model="ruleForm.tag" />
-      </el-form-item>
-      <el-form-item label="类型" prop="classification">
-        <el-input v-model="ruleForm.classification" />
-      </el-form-item> -->
+
       <el-form-item>
-        <el-button type="primary" @click="editForm(ruleFormRef)">保存</el-button>
+        <el-button type="primary" @click="editForm(editFormRef)">保存</el-button>
         <el-button @click="dialogEdit = false">取消</el-button>
       </el-form-item>
     </el-form>
@@ -135,28 +196,41 @@
 </template>
 
 <script lang="ts" setup>
-import { ElMessage } from 'element-plus';
 import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Plus, Upload, Download, Refresh, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
 import { pinyin } from 'pinyin-pro';
+import AccountSelector from '../common/AccountSelector.vue'
+import CurrencySelector from '../common/CurrencySelector.vue'
 
 // const apiUrl = import.meta.env.VITE_API_URL;
 const dialogError = ref(false)
 const lastEditedData = ref<Partial<Expense> | null>(null)
 // console.log(import.meta.env);
 
+interface Currency {
+  id: number
+  code: string
+  name: string
+}
+
 interface Expense {
   id: number
   key: string
   payee: string | null | undefined
-  expend: string
-  currency: string | null | undefined
+  expend: {
+    id: number
+    account: string
+    enable: boolean
+    account_type?: string
+  } | string
+  currencies: Currency[]
+  currency_ids?: number[]
   enable: boolean
-  // tag: string
-  // classification: string
 }
 
 // 页面增加优先级提示
@@ -167,22 +241,25 @@ const currencyContent = ref("若该货币与格式化输出中的基础货币模
 
 // 页面获取数据
 const ExpenseData = ref<Expense[]>([])
-// console.log(expenseData.value);
+const selectedItems = ref<Expense[]>([])
+const loading = ref(false)
 
 const fetchData = async () => {
   try {
+    loading.value = true
     const response = await axios.get('expense/')
-    // expenseData.value = response.data
     ExpenseData.value = response.data.sort((a: any, b: any) => a.id - b.id)
-    // console.log(expenseData.value);
   } catch (error: any) {
     console.error(error)
-    // console.log(error.response.data.code);
-    if (error.response.data.code == "token_not_valid") {
+    if (error.response?.data?.code == "token_not_valid") {
       handleRefresh();
-      // ElMessage("token_not_valid, please log in again.")
-      // console.log("token_not_valid");
+    } else if (error.response?.status === 401) {
+      ElMessage.info('未认证，请登录后重试')
+    } else {
+      ElMessage.error('获取支出映射数据失败')
     }
+  } finally {
+    loading.value = false
   }
 }
 
@@ -199,14 +276,21 @@ const filterExpenseData = computed(() =>
     const searchTerm = search.value?.toLowerCase() || ''
     if (!searchTerm) return true
 
+    const expendAccount = typeof data.expend === 'string' ? data.expend : data.expend?.account || ''
+
     return [
       data.key.toLowerCase(),
       data.payee?.toLowerCase() ?? '',
-      data.expend.toLowerCase(),
-      data.currency?.toLowerCase() ?? ''
+      expendAccount.toLowerCase(),
+      ...(data.currencies?.map(c => c.code.toLowerCase()) ?? [])
     ].some(field => field.includes(searchTerm))
   })
 )
+
+// 搜索处理
+const handleSearch = () => {
+  // 搜索逻辑已在计算属性中处理
+}
 
 // 新增
 const dialogAdd = ref(false)
@@ -214,14 +298,24 @@ const dialogAdd = ref(false)
 const handleAdd = () => {
   if (lastEditedData.value) {
     // 使用上一次编辑的值
+    const expendId = typeof lastEditedData.value.expend === 'object'
+      ? lastEditedData.value.expend?.id
+      : lastEditedData.value.expend
+
     ruleForm.value = {
       key: lastEditedData.value.key || '',
       payee: lastEditedData.value.payee ?? null,
-      expend: lastEditedData.value.expend || '',
-      currency: lastEditedData.value.currency ?? null
+      expend: typeof expendId === 'number' ? expendId : null,
+      currency_id: lastEditedData.value.currency_ids?.[0] || null
     };
   } else {
     // 没有编辑记录则重置
+    ruleForm.value = {
+      key: '',
+      payee: null,
+      expend: null,
+      currency_id: null
+    };
     if (ruleFormRef.value) {
       ruleFormRef.value.resetFields();
     }
@@ -230,15 +324,12 @@ const handleAdd = () => {
 }
 
 const ruleFormRef = ref<FormInstance>()
+const editFormRef = ref<FormInstance>()
 const ruleForm = ref({
   key: '',
-  // payee: null,
   payee: null as string | null | undefined,
-  expend: '',
-  currency: null as string | null | undefined,
-  // enable: '',
-  // tag: '',
-  // classification: '',
+  expend: null as number | null | undefined,
+  currency_id: null as number | null,
 })
 
 const rules = ref<FormRules>({
@@ -247,25 +338,15 @@ const rules = ref<FormRules>({
     { max: 16, message: '长度应控制在16个字符以内', trigger: 'blur' },
   ],
   payee: [
-    { required: false, message: '', trigger: 'change', },
+    { required: false, message: '', trigger: 'change' },
     { max: 32, message: '长度应控制在32个字符以内', trigger: 'blur' },
   ],
   expend: [
-    { required: true, message: '请输入映射账户', trigger: 'blur' },
-    { max: 64, message: '长度应控制在64个字符以内', trigger: 'blur' },
+    { required: true, message: '请选择映射账户', trigger: 'change' },
   ],
-  currency: [
-    { required: false, message: '请输入货币', trigger: 'blur' },
-    { pattern: /^[A-Z][A-Z0-9'._-]{0,22}([A-Z0-9])?$/, message: '必须以大写字母开头，以大写字母/数字结尾，允许字符 [A-Z0-9\'._-]', trigger: 'blur' }
+  currency_id: [
+    { required: false, message: '请选择货币', trigger: 'change' },
   ],
-  // tag: [
-  //   { required: true, message: '请输入标签', trigger: 'blur' },
-  //   { max: 16, message: '长度应控制在16个字符以内', trigger: 'blur' },
-  // ],
-  // classification: [
-  //   { required: true, message: '请输入类型', trigger: 'blur' },
-  //   { max: 16, message: '长度应控制在16个字符以内', trigger: 'blur' },
-  // ],
 })
 
 // 弹窗重置
@@ -280,9 +361,19 @@ const submitForm = async (formEl: FormInstance | undefined) => {
   await formEl.validate((valid, fields) => {
     if (valid) {
       try {
+        // 转换字段名以匹配后端API
+        const submitData = {
+          key: ruleForm.value.key,
+          payee: ruleForm.value.payee,
+          expend_id: ruleForm.value.expend, // 将 expend 转换为 expend_id
+          currency_ids: ruleForm.value.currency_id ? [ruleForm.value.currency_id] : []
+        }
+
+        console.log('提交数据:', submitData)
+
         axios({
           url: 'expense/',
-          data: JSON.parse(JSON.stringify(ruleForm.value)),
+          data: submitData,
           method: "POST",
           headers: { 'Content-Type': 'application/json' }
         })
@@ -410,8 +501,8 @@ const handleEdit = (index: number, row: Expense) => {
 
   ruleForm.value.key = row.key
   ruleForm.value.payee = row.payee !== null ? row.payee : null // 为了解决编辑时payee为null时的问题;
-  ruleForm.value.expend = row.expend
-  ruleForm.value.currency = row.currency
+  ruleForm.value.expend = typeof row.expend === 'object' ? row.expend?.id : (typeof row.expend === 'number' ? row.expend : null)
+  ruleForm.value.currency_id = row.currencies?.[0]?.id || null
   // ruleForm.value.enable = row.enable
   // ruleForm.value.tag = row.tag
   // ruleForm.value.classification = row.classification
@@ -449,9 +540,19 @@ const editForm = async (formEl: FormInstance | undefined) => {
   await formEl.validate((valid, fields) => {
     if (valid) {
       try {
+        // 转换字段名以匹配后端API
+        const submitData = {
+          key: ruleForm.value.key,
+          payee: ruleForm.value.payee,
+          expend_id: ruleForm.value.expend, // 将 expend 转换为 expend_id
+          currency_ids: ruleForm.value.currency_id ? [ruleForm.value.currency_id] : []
+        }
+
+        console.log('编辑提交数据:', submitData)
+
         axios({
           url: `expense/${selectedId.value}/`,
-          data: JSON.parse(JSON.stringify(ruleForm.value)),
+          data: submitData,
           method: "PUT",
           headers: {
             'Content-Type': 'application/json'
@@ -519,6 +620,100 @@ const confirmDelete = async () => {
   dialogDel.value = false
 }
 
+// 获取账户类型颜色
+const getAccountTypeColor = (type: string) => {
+  const colorMap: Record<string, string> = {
+    'Assets': 'success',
+    'Expenses': 'warning',
+    'Income': 'primary',
+    'Liabilities': 'danger',
+    'Equity': 'info',
+    // 中文类型映射
+    '资产账户': 'success',
+    '支出账户': 'warning',
+    '收入账户': 'primary',
+    '负债账户': 'danger',
+    '权益账户': 'info'
+  }
+  return colorMap[type] || 'info'
+}
+
+// 处理账户选择变化
+const handleAccountChange = (account: any) => {
+  // 账户变化时可以做一些额外处理
+  console.log('账户选择变化:', account)
+}
+
+// 处理选择变化
+const handleSelectionChange = (selection: Expense[]) => {
+  selectedItems.value = selection
+}
+
+// 批量启用
+const handleBatchEnable = async () => {
+  if (selectedItems.value.length === 0) return
+
+  try {
+    const promises = selectedItems.value.map(item =>
+      axios.patch(`expense/${item.id}/`, { enable: true })
+    )
+    await Promise.all(promises)
+    ElMessage.success(`成功启用 ${selectedItems.value.length} 个映射`)
+    await fetchData()
+    selectedItems.value = []
+  } catch (error: any) {
+    console.error('批量启用失败:', error)
+    ElMessage.error('批量启用失败')
+  }
+}
+
+// 批量禁用
+const handleBatchDisable = async () => {
+  if (selectedItems.value.length === 0) return
+
+  try {
+    const promises = selectedItems.value.map(item =>
+      axios.patch(`expense/${item.id}/`, { enable: false })
+    )
+    await Promise.all(promises)
+    ElMessage.success(`成功禁用 ${selectedItems.value.length} 个映射`)
+    await fetchData()
+    selectedItems.value = []
+  } catch (error: any) {
+    console.error('批量禁用失败:', error)
+    ElMessage.error('批量禁用失败')
+  }
+}
+
+// 批量删除
+const handleBatchDelete = async () => {
+  if (selectedItems.value.length === 0) return
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedItems.value.length} 个映射吗？此操作不可撤销。`,
+      '确认批量删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    const promises = selectedItems.value.map(item =>
+      axios.delete(`expense/${item.id}/`)
+    )
+    await Promise.all(promises)
+    ElMessage.success(`成功删除 ${selectedItems.value.length} 个映射`)
+    await fetchData()
+    selectedItems.value = []
+  } catch (error: any) {
+    if (error === 'cancel') return
+    console.error('批量删除失败:', error)
+    ElMessage.error('批量删除失败')
+  }
+}
+
 // 高级排序方法：处理数字、英文和中文混合内容
 const advancedSort = (a: Expense, b: Expense): number => {
   // 提取数字部分（如果有）
@@ -551,7 +746,79 @@ const advancedSort = (a: Expense, b: Expense): number => {
 </script>
 
 <style scoped>
+.expense-mapping {
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.search-section {
+  flex: 1;
+  max-width: 400px;
+}
+
+.action-section {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.account-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.currency-cell {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.currency-tag {
+  margin: 0;
+}
+
+.batch-actions {
+  margin-top: 16px;
+}
+
+.batch-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .dialog-footer button:first-child {
   margin-right: 10px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .expense-mapping {
+    padding: 12px;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-section {
+    max-width: none;
+  }
+
+  .action-section {
+    justify-content: center;
+  }
 }
 </style>
