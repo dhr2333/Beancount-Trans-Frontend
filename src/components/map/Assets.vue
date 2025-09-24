@@ -242,7 +242,7 @@ const selectedItems = ref<Assets[]>([])
 const fetchData = async () => {
     try {
         loading.value = true
-        const response = await axios.get('aassets/')
+        const response = await axios.get('assets/')
         AssetsData.value = response.data.sort((a: any, b: any) => a.id - b.id)
     } catch (error: any) {
         console.error(error)
@@ -363,7 +363,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                 console.log('资产映射提交数据:', submitData)
 
                 axios({
-                    url: 'aassets/',
+                    url: 'assets/',
                     data: submitData,
                     method: "POST",
                     headers: { 'Content-Type': 'application/json' }
@@ -453,7 +453,7 @@ const handleImport = () => {
                     console.log(JSON.stringify(json));
 
                     axios({
-                        url: 'aassets/',
+                        url: 'assets/',
                         data: JSON.parse(JSON.stringify(json)),
                         method: "POST",
                         headers: { 'Content-Type': 'application/json' }
@@ -507,7 +507,7 @@ const handleSwitchChange = async (row: Assets) => {
         row.enable = row.enable
 
         // 发送 API 请求
-        await axios.patch(`aassets/${row.id}/`, {
+        await axios.patch(`assets/${row.id}/`, {
             enable: row.enable
         })
         ElMessage.success('状态更新成功')
@@ -538,7 +538,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
                 console.log('资产映射编辑提交数据:', submitData)
 
                 axios({
-                    url: `aassets/${selectedId.value}/`,
+                    url: `assets/${selectedId.value}/`,
                     data: submitData,
                     method: "PUT",
                     headers: { 'Content-Type': 'application/json' }
@@ -585,7 +585,7 @@ const handleDelete = (index: number, row: Assets) => {
 // 删除确认
 const confirmDelete = async () => {
     try {
-        const response = await axios.delete(`aassets/${selectedId.value}/`);
+        const response = await axios.delete(`assets/${selectedId.value}/`);
         // console.log(response.data);
         dialogDel.value = false
         fetchData()
@@ -636,7 +636,7 @@ const handleBatchEnable = async () => {
 
     try {
         const promises = selectedItems.value.map(item =>
-            axios.patch(`aassets/${item.id}/`, { enable: true })
+            axios.patch(`assets/${item.id}/`, { enable: true })
         )
         await Promise.all(promises)
         ElMessage.success(`成功启用 ${selectedItems.value.length} 个映射`)
@@ -654,7 +654,7 @@ const handleBatchDisable = async () => {
 
     try {
         const promises = selectedItems.value.map(item =>
-            axios.patch(`aassets/${item.id}/`, { enable: false })
+            axios.patch(`assets/${item.id}/`, { enable: false })
         )
         await Promise.all(promises)
         ElMessage.success(`成功禁用 ${selectedItems.value.length} 个映射`)
@@ -682,7 +682,7 @@ const handleBatchDelete = async () => {
         )
 
         const promises = selectedItems.value.map(item =>
-            axios.delete(`aassets/${item.id}/`)
+            axios.delete(`assets/${item.id}/`)
         )
         await Promise.all(promises)
         ElMessage.success(`成功删除 ${selectedItems.value.length} 个映射`)

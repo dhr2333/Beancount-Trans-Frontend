@@ -248,7 +248,7 @@ const fetchStatistics = async () => {
         const [expenseRes, incomeRes, assetsRes] = await Promise.all([
             axios.get('/expense/'),
             axios.get('/income/'),
-            axios.get('/aassets/')
+            axios.get('/assets/')
         ])
 
         const expenseData = expenseRes.data
@@ -338,7 +338,7 @@ const handleQuickCreate = async () => {
                 formData.income_id = quickCreateForm.value.accountId // 转换为 income_id
                 break
             case 'assets':
-                apiUrl = '/aassets/'
+                apiUrl = '/assets/'
                 formData.full = quickCreateForm.value.full
                 formData.assets_id = quickCreateForm.value.accountId // 转换为 assets_id
                 break
