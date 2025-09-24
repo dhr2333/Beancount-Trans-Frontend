@@ -7,10 +7,6 @@ import Templates from "./components/map/Templates.vue"
 import Assets from "./components/map/Assets.vue"
 import Expenses from "./components/map/Expenses.vue"
 import Income from "./components/map/Income.vue"
-import Event from "./components/bill/Event.vue"
-import Commodity from "./components/bill/Commodity.vue"
-import BillAccount from "./components/bill/BillAccount.vue"
-import Account from "./components/assets/Account.vue"
 import FileManage from "./components/file/FileManage.vue"
 import Login from "./views/login/index.vue"
 import ShowDates from "./components/owntracks/show_log_dates.vue"
@@ -29,11 +25,7 @@ const router = createRouter({
     { path: '/map/assets',name:"assets", component: Assets },
     { path: '/map/expenses',name:"expenses", component: Expenses },
     { path: '/map/income',name:"income", component: Income },
-    { path: '/bill/account',name:"billaccount", component: BillAccount },
-    { path: '/bill/event',name:"event", component: Event },
-    { path: '/bill/commodity',name:"commodity", component: Commodity },
     { path: '/file',name:"filemanage", component: FileManage },
-    { path: '/assets/account', name: "account", component: Account },
     { path: '/login', name: "login", component: Login },
     { path: '/owntracks/show_dates', name: "showdates", component: ShowDates },
   ]

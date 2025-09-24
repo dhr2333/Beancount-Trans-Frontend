@@ -31,7 +31,7 @@
       <div class="small-box" :class="{ active: isLogin }">
         <div class="small-contain" key="smallContainRegister" v-if="isLogin">
           <div class="stitle">还没有账户?</div>
-          <p class="scontent">立即注册，AI 帮您实现 3 分钟生成专业财务报表
+          <p class="scontent">立即注册，AI 帮您 3 分钟生成专业财务报表
           </p>
           <button class="sbutton" @click="changeType">注册</button>
         </div>
