@@ -22,7 +22,8 @@
             <!-- 左侧：账户树形结构 -->
             <div class="account-tree-panel">
                 <el-tree :data="accountTree" :props="treeProps" node-key="id" :expand-on-click-node="false"
-                    :default-expand-all="true" @node-click="handleNodeClick" class="account-tree" v-loading="loading">
+                    :default-expand-all="false" :default-expanded-keys="defaultExpandedKeys"
+                    @node-click="handleNodeClick" class="account-tree" v-loading="loading">
                     <template #default="{ node, data }">
                         <div class="tree-node">
                             <span class="node-label">{{ data.account }}</span>
@@ -334,6 +335,7 @@ interface Account {
     enable: boolean
     created: string
     modified: string
+    children?: Account[]
     mapping_count?: {
         expense: number
         assets: number
@@ -347,6 +349,7 @@ const loading = ref(false)
 const accountTree = ref<Account[]>([])
 const selectedAccount = ref<Account | null>(null)
 const availableCurrencies = ref<Currency[]>([])
+const defaultExpandedKeys = ref<number[]>([])
 
 // 对话框状态
 const addAccountDialog = ref(false)
@@ -420,12 +423,37 @@ const currencyRules: FormRules = {
     ]
 }
 
+// 计算默认展开的节点
+const calculateDefaultExpandedKeys = (accounts: Account[], level: number = 1): number[] => {
+    const expandedKeys: number[] = []
+
+    accounts.forEach(account => {
+        const accountType = account.account.split(':')[0]
+
+        // 只展开Expenses类型的账户
+        if (accountType === 'Expenses' && level <= 2) {
+            expandedKeys.push(account.id)
+
+            // 递归处理子账户
+            if (account.children && account.children.length > 0) {
+                const childKeys = calculateDefaultExpandedKeys(account.children, level + 1)
+                expandedKeys.push(...childKeys)
+            }
+        }
+    })
+
+    return expandedKeys
+}
+
 // 获取账户树形数据
 const fetchAccountTree = async () => {
     try {
         loading.value = true
         const response = await axios.get('/account/tree/')
         accountTree.value = response.data
+
+        // 计算默认展开的节点
+        defaultExpandedKeys.value = calculateDefaultExpandedKeys(response.data)
     } catch (error: any) {
         console.error('获取账户树失败:', error)
         if (error.response?.status === 401) {
