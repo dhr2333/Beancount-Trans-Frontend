@@ -68,9 +68,9 @@
                                 <el-tag type="primary">{{ selectedAccount.mapping_count.income }}收入</el-tag>
                                 <el-tag type="info">{{ selectedAccount.mapping_count.total }}总计</el-tag>
                             </el-descriptions-item>
-                            <el-descriptions-item label="父账户" v-if="selectedAccount.parent_account">
+                            <!-- <el-descriptions-item label="父账户" v-if="selectedAccount.parent_account">
                                 {{ selectedAccount.parent_account }}
-                            </el-descriptions-item>
+                            </el-descriptions-item> -->
                             <el-descriptions-item label="创建时间">
                                 {{ formatDateTime(selectedAccount.created) }}
                             </el-descriptions-item>
@@ -614,13 +614,18 @@ const saveCurrency = async () => {
     try {
         await currencyFormRef.value.validate()
 
+        console.log('保存货币数据:', currencyForm.value)
+
         if (isEditingCurrency.value && currentCurrencyId.value) {
             // 编辑货币
+            console.log('编辑货币，ID:', currentCurrencyId.value)
             await axios.put(`/currencies/${currentCurrencyId.value}/`, currencyForm.value)
             ElMessage.success('货币更新成功')
         } else {
             // 新增货币
-            await axios.post('/currencies/', currencyForm.value)
+            console.log('新增货币')
+            const response = await axios.post('/currencies/', currencyForm.value)
+            console.log('新增货币响应:', response.data)
             ElMessage.success('货币创建成功')
         }
 
@@ -628,8 +633,13 @@ const saveCurrency = async () => {
         await fetchAllCurrencies()
     } catch (error: any) {
         console.error('保存货币失败:', error)
+        console.error('错误详情:', error.response?.data)
         if (error.response?.status === 400) {
             ElMessage.error('货币代码已存在或数据格式错误')
+        } else if (error.response?.status === 401) {
+            ElMessage.error('未认证，请登录后重试')
+        } else if (error.response?.status === 403) {
+            ElMessage.error('权限不足，请登录后重试')
         } else {
             ElMessage.error('保存货币失败')
         }

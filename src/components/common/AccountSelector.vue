@@ -2,7 +2,7 @@
     <div class="account-selector">
         <el-cascader v-model="selectedValue" :options="accountOptions" :props="cascaderProps" :placeholder="placeholder"
             :filterable="true" :clearable="true" :show-all-levels="false" :separator="' > '" @change="handleChange"
-            @visible-change="handleVisibleChange" class="account-cascader">
+            @visible-change="handleVisibleChange" class="account-cascader" style="width: 100%;">
             <template #default="{ node, data }">
                 <div class="cascader-node">
                     <span class="node-label">{{ data.account }}</span>

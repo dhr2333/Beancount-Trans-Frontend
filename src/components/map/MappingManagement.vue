@@ -142,6 +142,10 @@
 
         <!-- 快速创建映射对话框 -->
         <el-dialog v-model="quickCreateDialog" title="快速创建映射" width="600px">
+            <!-- 提示信息 -->
+            <el-alert v-if="showTooltip" :title="payeetipContent" type="info" :closable="false" show-icon
+                style="margin-bottom: 20px;" />
+
             <el-form :model="quickCreateForm" :rules="quickCreateRules" ref="quickCreateFormRef" label-width="100px">
                 <el-form-item label="映射类型" prop="type">
                     <el-select v-model="quickCreateForm.type" placeholder="选择映射类型">
@@ -164,9 +168,9 @@
                 <el-form-item v-if="quickCreateForm.type === 'expense'" label="商家" prop="payee">
                     <el-input v-model="quickCreateForm.payee" placeholder="输入商家名称（可选）" />
                 </el-form-item>
-                <el-form-item v-if="quickCreateForm.type === 'income'" label="付款方" prop="payer">
+                <!-- <el-form-item v-if="quickCreateForm.type === 'income'" label="付款方" prop="payer">
                     <el-input v-model="quickCreateForm.payer" placeholder="输入付款方（可选）" />
-                </el-form-item>
+                </el-form-item> -->
                 <el-form-item v-if="quickCreateForm.type === 'assets'" label="账户描述" prop="full">
                     <el-input v-model="quickCreateForm.full" placeholder="输入账户描述（可选）" />
                 </el-form-item>
@@ -216,6 +220,10 @@ const statistics = ref<MappingStatistics>({
     incomeMappings: 0,
     assetsMappings: 0
 })
+
+// 提示信息
+const showTooltip = ref(true)
+const payeetipContent = ref("若商家存在，优先级 + 50 ,映射账户中每存在一个 ':' ，优先级以 ':' 数量 * 100计算 ")
 
 // 快速创建相关
 const quickCreateDialog = ref(false)
@@ -282,16 +290,16 @@ const fetchStatistics = async () => {
 }
 
 // 根据映射类型获取账户类型
-const getAccountTypeByMappingType = (type: string): string => {
-    const typeMap: Record<string, string> = {
-        'expense': 'Expenses',
-        'income': 'Income',
-        'assets': 'Assets'
-    }
-    const accountType = typeMap[type] || ''
-    console.log('映射管理总览 - 映射类型:', type, '-> 账户类型:', accountType)
-    return accountType
-}
+// const getAccountTypeByMappingType = (type: string): string => {
+//     const typeMap: Record<string, string> = {
+//         'expense': 'Expenses',
+//         'income': 'Income',
+//         'assets': 'Assets'
+//     }
+//     const accountType = typeMap[type] || ''
+//     console.log('映射管理总览 - 映射类型:', type, '-> 账户类型:', accountType)
+//     return accountType
+// }
 
 // 处理标签页切换
 const handleTabChange = (tabName: string) => {

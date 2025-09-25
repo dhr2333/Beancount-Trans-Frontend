@@ -60,15 +60,15 @@
             <el-table-column label="映射账户" prop="assets" sortable min-width="200">
                 <template #default="{ row }">
                     <div class="account-cell">
-                        <el-text type="info">{{ row.assets }}</el-text>
-                        <el-tag v-if="row.account_type" :type="getAccountTypeColor(row.account_type)" size="small">
-                            {{ row.account_type }}
+                        <el-text type="info">{{ typeof row.assets === 'object' ? row.assets?.account : row.assets }}</el-text>
+                        <el-tag v-if="typeof row.assets === 'object' && row.assets?.account_type" :type="getAccountTypeColor(row.assets.account_type)" size="small">
+                            {{ row.assets.account_type }}
                         </el-tag>
                     </div>
                 </template>
             </el-table-column>
 
-            <el-table-column label="关联货币" prop="currencies" width="150">
+            <!-- <el-table-column label="关联货币" prop="currencies" width="150">
                 <template #default="{ row }">
                     <div v-if="row.currencies && row.currencies.length > 0" class="currency-cell">
                         <el-tag v-for="currency in row.currencies" :key="currency.id" size="small" class="currency-tag">
@@ -77,7 +77,7 @@
                     </div>
                     <el-text v-else type="info" size="small">CNY</el-text>
                 </template>
-            </el-table-column>
+            </el-table-column> -->
 
             <el-table-column label="状态" prop="enable" width="100">
                 <template #default="{ row }">
@@ -134,10 +134,10 @@
             <el-form-item label="映射账户" prop="assets">
                 <AccountSelector v-model="ruleForm.assets" placeholder="选择账户" @change="handleAccountChange" />
             </el-form-item>
-
+            <!-- 
             <el-form-item label="关联货币" prop="currency_ids">
                 <CurrencySelector v-model="ruleForm.currency_ids" :account-id="ruleForm.assets" placeholder="选择货币" />
-            </el-form-item>
+            </el-form-item> -->
 
             <el-form-item>
                 <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
@@ -165,9 +165,9 @@
                 <AccountSelector v-model="ruleForm.assets" placeholder="选择账户" @change="handleAccountChange" />
             </el-form-item>
 
-            <el-form-item label="关联货币" prop="currency_ids">
+            <!-- <el-form-item label="关联货币" prop="currency_ids">
                 <CurrencySelector v-model="ruleForm.currency_ids" :account-id="ruleForm.assets" placeholder="选择货币" />
-            </el-form-item>
+            </el-form-item> -->
 
             <el-form-item>
                 <el-button type="primary" @click="editForm(editFormRef)">保存</el-button>
@@ -203,7 +203,7 @@ import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
 import { pinyin } from 'pinyin-pro';
 import AccountSelector from '../common/AccountSelector.vue'
-import CurrencySelector from '../common/CurrencySelector.vue'
+// import CurrencySelector from '../common/CurrencySelector.vue'
 
 const dialogError = ref(false)
 const lastEditedData = ref<Partial<Assets> | null>(null)
@@ -218,7 +218,7 @@ interface Assets {
     id: number
     key: string
     full: string
-    assets: string
+    assets: string | { id: number; account: string; enable: boolean; account_type?: string }
     assets_id?: number
     currencies: Currency[]
     currency_ids?: number[]
@@ -275,7 +275,7 @@ const filterAssetsData = computed(() =>
         return [
             data.key.toLowerCase(),
             data.full?.toLowerCase() ?? '',
-            data.assets.toLowerCase(),
+            typeof data.assets === 'string' ? data.assets.toLowerCase() : data.assets?.account?.toLowerCase() ?? '',
             ...(data.currencies?.map(c => c.code.toLowerCase()) ?? [])
         ].some(field => field.includes(searchTerm))
     })
@@ -296,7 +296,7 @@ const handleAdd = () => {
             key: lastEditedData.value.key || '',
             full: lastEditedData.value.full || '',
             assets: lastEditedData.value.assets_id || null,
-            currency_ids: lastEditedData.value.currency_ids || []
+            currency_id: lastEditedData.value.currency_ids?.[0] || null
         };
     } else {
         // 没有编辑记录则重置
@@ -304,7 +304,7 @@ const handleAdd = () => {
             key: '',
             full: '',
             assets: null,
-            currency_ids: []
+            currency_id: null
         };
         if (ruleFormRef.value) {
             ruleFormRef.value.resetFields();
@@ -318,8 +318,8 @@ const editFormRef = ref<FormInstance>()
 const ruleForm = ref({
     key: '',
     full: '',
-    assets: null as number | null,
-    currency_ids: [] as number[],
+    assets: null as number | null | undefined,
+    currency_id: null as number | null,
 })
 
 const rules = ref<FormRules>({
@@ -334,7 +334,7 @@ const rules = ref<FormRules>({
     assets: [
         { required: true, message: '请选择映射账户', trigger: 'change' },
     ],
-    currency_ids: [
+    currency_id: [
         { required: false, message: '请选择货币', trigger: 'change' },
     ],
 })
@@ -357,7 +357,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                     key: ruleForm.value.key,
                     full: ruleForm.value.full,
                     assets_id: ruleForm.value.assets, // 将 assets 转换为 assets_id
-                    currency_ids: ruleForm.value.currency_ids
+                    currency_ids: ruleForm.value.currency_id ? [ruleForm.value.currency_id] : []
                 }
 
                 console.log('资产映射提交数据:', submitData)
@@ -495,7 +495,8 @@ const handleEdit = (index: number, row: Assets) => {
 
     ruleForm.value.key = row.key
     ruleForm.value.full = row.full
-    ruleForm.value.assets = row.assets
+    ruleForm.value.assets = typeof row.assets === 'object' && row.assets ? row.assets.id : (typeof row.assets === 'number' ? row.assets : null)
+    ruleForm.value.currency_id = row.currencies?.[0]?.id || null
     dialogEdit.value = true
     selectedId.value = row.id
     // console.log(index, row)
@@ -532,7 +533,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
                     key: ruleForm.value.key,
                     full: ruleForm.value.full,
                     assets_id: ruleForm.value.assets, // 将 assets 转换为 assets_id
-                    currency_ids: ruleForm.value.currency_ids
+                    currency_ids: ruleForm.value.currency_id ? [ruleForm.value.currency_id] : []
                 }
 
                 console.log('资产映射编辑提交数据:', submitData)

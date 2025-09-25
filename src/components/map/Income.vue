@@ -3,7 +3,7 @@
         <!-- 搜索和操作栏 -->
         <div class="toolbar">
             <div class="search-section">
-                <el-input v-model="search" placeholder="搜索关键字、付款方、账户" clearable @input="handleSearch">
+                <el-input v-model="search" placeholder="搜索关键字、账户" clearable @input="handleSearch">
                     <template #prefix>
                         <el-icon>
                             <Search />
@@ -49,26 +49,26 @@
                     <el-tag type="success" size="small">{{ row.key }}</el-tag>
                 </template>
             </el-table-column>
-
+            <!-- 
             <el-table-column label="付款方" prop="payer" width="150">
                 <template #default="{ row }">
                     <span v-if="row.payer">{{ row.payer }}</span>
                     <el-text v-else type="info" size="small">-</el-text>
                 </template>
-            </el-table-column>
+            </el-table-column> -->
 
             <el-table-column label="映射账户" prop="income" sortable min-width="200">
                 <template #default="{ row }">
                     <div class="account-cell">
-                        <el-text type="success">{{ row.income }}</el-text>
-                        <el-tag v-if="row.account_type" :type="getAccountTypeColor(row.account_type)" size="small">
-                            {{ row.account_type }}
+                        <el-text type="success">{{ typeof row.income === 'object' ? row.income?.account : row.income }}</el-text>
+                        <el-tag v-if="typeof row.income === 'object' && row.income?.account_type" :type="getAccountTypeColor(row.income.account_type)" size="small">
+                            {{ row.income.account_type }}
                         </el-tag>
                     </div>
                 </template>
             </el-table-column>
 
-            <el-table-column label="关联货币" prop="currencies" width="150">
+            <!-- <el-table-column label="关联货币" prop="currencies" width="150">
                 <template #default="{ row }">
                     <div v-if="row.currencies && row.currencies.length > 0" class="currency-cell">
                         <el-tag v-for="currency in row.currencies" :key="currency.id" size="small" class="currency-tag">
@@ -77,7 +77,7 @@
                     </div>
                     <el-text v-else type="info" size="small">CNY</el-text>
                 </template>
-            </el-table-column>
+            </el-table-column> -->
 
             <el-table-column label="状态" prop="enable" width="100">
                 <template #default="{ row }">
@@ -124,20 +124,20 @@
                         <el-input v-model="ruleForm.key" placeholder="红包" />
                     </el-form-item>
                 </el-col>
-                <el-col :span="12">
+                <!-- <el-col :span="12">
                     <el-form-item label="付款方" prop="payer">
                         <el-input v-model="ruleForm.payer" placeholder="微信（可选）" />
                     </el-form-item>
-                </el-col>
+                </el-col> -->
             </el-row>
 
             <el-form-item label="映射账户" prop="income">
                 <AccountSelector v-model="ruleForm.income" placeholder="选择账户" @change="handleAccountChange" />
             </el-form-item>
 
-            <el-form-item label="关联货币" prop="currency_ids">
+            <!-- <el-form-item label="关联货币" prop="currency_ids">
                 <CurrencySelector v-model="ruleForm.currency_ids" :account-id="ruleForm.income" placeholder="选择货币" />
-            </el-form-item>
+            </el-form-item> -->
 
             <el-form-item>
                 <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
@@ -154,20 +154,21 @@
                         <el-input v-model="ruleForm.key" />
                     </el-form-item>
                 </el-col>
-                <el-col :span="12">
+                <!-- <el-col :span="12">
                     <el-form-item label="付款方" prop="payer">
                         <el-input v-model="ruleForm.payer" />
                     </el-form-item>
-                </el-col>
+                </el-col> -->
             </el-row>
 
             <el-form-item label="映射账户" prop="income">
                 <AccountSelector v-model="ruleForm.income" placeholder="选择账户" @change="handleAccountChange" />
             </el-form-item>
 
-            <el-form-item label="关联货币" prop="currency_ids">
-                <CurrencySelector v-model="ruleForm.currency_ids" :account-id="ruleForm.income" placeholder="选择货币" />
-            </el-form-item>
+            <!-- <el-form-item label="关联货币" prop="currency_id">
+                <CurrencySelector v-model="ruleForm.currency_id" :account-id="ruleForm.income || undefined"
+                    placeholder="选择货币" />
+            </el-form-item> -->
 
             <el-form-item>
                 <el-button type="primary" @click="editForm(editFormRef)">保存</el-button>
@@ -203,27 +204,27 @@ import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
 import { pinyin } from 'pinyin-pro';
 import AccountSelector from '../common/AccountSelector.vue'
-import CurrencySelector from '../common/CurrencySelector.vue'
+// import CurrencySelector from '../common/CurrencySelector.vue'
 
 
 const dialogError = ref(false)
 const loading = ref(false)
 const lastEditedData = ref<Partial<Income> | null>(null)
 
-interface Currency {
-    id: number
-    code: string
-    name: string
-}
+// interface Currency {
+//     id: number
+//     code: string
+//     name: string
+// }
 
 interface Income {
     id: number
     key: string
     payer: string | null | undefined
-    income: string
+    income: string | { id: number; account: string; enable: boolean; account_type?: string }
     income_id?: number
-    currencies: Currency[]
-    currency_ids?: number[]
+    // currencies: Currency[]
+    // currency_ids?: number[]
     account_type?: string
     enable: boolean
 }
@@ -272,8 +273,8 @@ const filterIncomeData = computed(() =>
         return [
             data.key.toLowerCase(),
             data.payer?.toLowerCase() ?? '',
-            data.income.toLowerCase(),
-            ...(data.currencies?.map(c => c.code.toLowerCase()) ?? [])
+            typeof data.income === 'string' ? data.income.toLowerCase() : data.income?.account?.toLowerCase() ?? '',
+            // ...(data.currencies?.map(c => c.code.toLowerCase()) ?? [])
         ].some(field => field.includes(searchTerm))
     })
 )
@@ -292,16 +293,16 @@ const handleAdd = () => {
         ruleForm.value = {
             key: lastEditedData.value.key || '',
             payer: lastEditedData.value.payer ?? null,
-            income: lastEditedData.value.income_id || null,
-            currency_ids: lastEditedData.value.currency_ids || []
+            income: lastEditedData.value.income_id || null
+            // currency_id: lastEditedData.value.currency_ids?.[0] || null
         };
     } else {
         // 没有编辑记录则重置
         ruleForm.value = {
             key: '',
             payer: null,
-            income: null,
-            currency_ids: []
+            income: null
+            // currency_id: null
         };
         if (ruleFormRef.value) {
             ruleFormRef.value.resetFields();
@@ -315,8 +316,8 @@ const editFormRef = ref<FormInstance>()
 const ruleForm = ref({
     key: '',
     payer: null as string | null | undefined,
-    income: null as number | null,
-    currency_ids: [] as number[],
+    income: null as number | null | undefined,
+    // currency_id: null as number | null,
 })
 
 const rules = ref<FormRules>({
@@ -331,9 +332,9 @@ const rules = ref<FormRules>({
     income: [
         { required: true, message: '请选择映射账户', trigger: 'change' },
     ],
-    currency_ids: [
-        { required: false, message: '请选择货币', trigger: 'change' },
-    ],
+    // currency_id: [
+    //     { required: false, message: '请选择货币', trigger: 'change' },
+    // ],
 })
 
 // 弹窗重置
@@ -354,7 +355,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                     key: ruleForm.value.key,
                     payer: ruleForm.value.payer,
                     income_id: ruleForm.value.income, // 将 income 转换为 income_id
-                    currency_ids: ruleForm.value.currency_ids
+                    // currency_ids: ruleForm.value.currency_id ? [ruleForm.value.currency_id] : []
                 }
 
                 console.log('收入映射提交数据:', submitData)
@@ -475,8 +476,9 @@ const handleEdit = (index: number, row: Income) => {
     lastEditedData.value = rest;
 
     ruleForm.value.key = row.key
-    // ruleForm.value.full = row.full
-    ruleForm.value.income = row.income
+    ruleForm.value.payer = row.payer !== null ? row.payer : null
+    ruleForm.value.income = typeof row.income === 'object' && row.income ? row.income.id : (typeof row.income === 'number' ? row.income : null)
+    // ruleForm.value.currency_id = row.currencies?.[0]?.id || null
     dialogEdit.value = true
     selectedId.value = row.id
     // console.log(index, row)
@@ -513,7 +515,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
                     key: ruleForm.value.key,
                     payer: ruleForm.value.payer,
                     income_id: ruleForm.value.income, // 将 income 转换为 income_id
-                    currency_ids: ruleForm.value.currency_ids
+                    // currency_ids: ruleForm.value.currency_id ? [ruleForm.value.currency_id] : []
                 }
 
                 console.log('收入映射编辑提交数据:', submitData)
