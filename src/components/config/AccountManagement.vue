@@ -839,7 +839,7 @@ const confirmDeleteAccount = async () => {
             const errorMsg = error.response.data?.error || '删除失败，请检查数据'
             ElMessage.error(errorMsg)
         } else {
-            ElMessage.error('删除账户失败')
+            ElMessage.error(error.response?.data?.error || '删除账户失败')
         }
     } finally {
         deleteAccountLoading.value = false
