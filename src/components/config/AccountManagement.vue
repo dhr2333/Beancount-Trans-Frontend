@@ -119,7 +119,7 @@
                                                 <span class="mapping-account">→ {{ selectedAccount?.account }}</span>
                                                 <span v-if="mapping.currency" class="mapping-currency">({{
                                                     mapping.currency
-                                                }})</span>
+                                                    }})</span>
                                             </div>
                                             <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
                                                 {{ mapping.enable ? '启用' : '禁用' }}
@@ -308,6 +308,112 @@
                 <el-button type="primary" @click="saveCurrency">确定</el-button>
             </template>
         </el-dialog>
+
+        <!-- 删除账户对话框 -->
+        <el-dialog v-model="deleteAccountDialog" title="删除账户" width="600px">
+            <div v-if="selectedAccount" class="delete-account-content">
+                <el-alert :title="`确定要删除账户 '${selectedAccount.account}' 吗？`" type="warning" :closable="false" show-icon
+                    style="margin-bottom: 20px;">
+                    <template #default>
+                        <p>此操作将：</p>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            <li>永久删除该账户</li>
+                            <li v-if="selectedAccount.mapping_count && selectedAccount.mapping_count.total > 0">
+                                将 {{ selectedAccount.mapping_count.total }} 个映射迁移到目标账户
+                            </li>
+                            <li v-else>该账户无映射数据，可直接删除</li>
+                        </ul>
+                    </template>
+                </el-alert>
+
+                <!-- 映射迁移选择 -->
+                <div v-if="selectedAccount.mapping_count && selectedAccount.mapping_count.total > 0"
+                    class="migration-section">
+                    <h4>选择迁移目标账户</h4>
+                    <p class="migration-tip">请选择要将映射迁移到的目标账户：</p>
+
+                    <div class="account-selector">
+                        <el-cascader v-model="selectedMigrationAccount" :options="migrationCandidates"
+                            :props="cascaderProps" placeholder="请选择迁移目标账户" :filterable="true" :clearable="true"
+                            :show-all-levels="false" :separator="' > '" @change="handleMigrationAccountChange"
+                            @visible-change="handleMigrationVisibleChange" class="account-cascader" style="width: 100%;"
+                            v-loading="migrationCandidatesLoading">
+                            <template #default="{ node, data }">
+                                <div class="cascader-node">
+                                    <span class="node-label">{{ data.account }}</span>
+                                    <el-tag v-if="data.account_type" :type="getAccountTypeColor(data.account_type)"
+                                        size="small" class="node-tag">
+                                        {{ data.account_type }}
+                                    </el-tag>
+                                    <el-tag v-if="data.mapping_count && data.mapping_count.total > 0" type="info"
+                                        size="small" class="mapping-tag">
+                                        {{ data.mapping_count.total }}映射
+                                    </el-tag>
+                                </div>
+                            </template>
+                        </el-cascader>
+
+                        <!-- 账户详情预览 -->
+                        <div v-if="selectedMigrationAccountInfo" class="account-preview">
+                            <el-card size="small">
+                                <div class="preview-content">
+                                    <div class="account-info">
+                                        <h4>{{ selectedMigrationAccountInfo.account }}</h4>
+                                        <el-tag :type="getAccountTypeColor(selectedMigrationAccountInfo.account_type)">
+                                            {{ selectedMigrationAccountInfo.account_type }}
+                                        </el-tag>
+                                    </div>
+                                    <div v-if="selectedMigrationAccountInfo.currencies && selectedMigrationAccountInfo.currencies.length > 0"
+                                        class="currencies">
+                                        <span class="label">关联货币：</span>
+                                        <el-tag v-for="currency in selectedMigrationAccountInfo.currencies"
+                                            :key="currency.id" size="small" class="currency-tag">
+                                            {{ currency.code }} - {{ currency.name }}
+                                        </el-tag>
+                                    </div>
+                                    <div v-if="selectedMigrationAccountInfo.mapping_count" class="mapping-stats">
+                                        <span class="label">映射统计：</span>
+                                        <el-tag type="success" size="small">{{
+                                            selectedMigrationAccountInfo.mapping_count.expense }}支出</el-tag>
+                                        <el-tag type="warning" size="small">{{
+                                            selectedMigrationAccountInfo.mapping_count.assets
+                                        }}资产</el-tag>
+                                        <el-tag type="primary" size="small">{{
+                                            selectedMigrationAccountInfo.mapping_count.income
+                                        }}收入</el-tag>
+                                    </div>
+                                </div>
+                            </el-card>
+                        </div>
+                    </div>
+
+                    <div v-if="migrationCandidates.length === 0 && !migrationCandidatesLoading" class="no-candidates">
+                        <el-alert title="无可用迁移目标" type="info" :closable="false" show-icon>
+                            <template #default>
+                                <p>当前没有可用的迁移目标账户。请先创建其他账户后再进行删除操作。</p>
+                            </template>
+                        </el-alert>
+                    </div>
+                </div>
+
+                <!-- 无映射时的提示 -->
+                <div v-else class="no-mappings-section">
+                    <el-alert title="该账户无映射数据" type="info" :closable="false" show-icon>
+                        <template #default>
+                            <p>该账户没有任何映射数据，可以直接删除，无需选择迁移目标。</p>
+                        </template>
+                    </el-alert>
+                </div>
+            </div>
+
+            <template #footer>
+                <el-button @click="deleteAccountDialog = false">取消</el-button>
+                <el-button type="danger" @click="confirmDeleteAccount"
+                    :disabled="hasMappings && !selectedMigrationAccount" :loading="deleteAccountLoading">
+                    确定删除
+                </el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -356,6 +462,7 @@ const addAccountDialog = ref(false)
 const editAccountDialog = ref(false)
 const currencyDialog = ref(false)
 const currencyFormDialog = ref(false)
+const deleteAccountDialog = ref(false)
 
 // 货币管理相关
 const activeCurrencyTab = ref('list')
@@ -394,6 +501,13 @@ const editAccountForm = ref({
 
 const selectedCurrencies = ref<number[]>([])
 
+// 删除账户相关
+const migrationCandidates = ref<any[]>([])
+const migrationCandidatesLoading = ref(false)
+const selectedMigrationAccount = ref<number | null>(null)
+const selectedMigrationAccountInfo = ref<any>(null)
+const deleteAccountLoading = ref(false)
+
 // 表单引用
 const accountForm = ref<FormInstance>()
 const editAccountFormRef = ref<FormInstance>()
@@ -402,6 +516,16 @@ const editAccountFormRef = ref<FormInstance>()
 const treeProps = {
     children: 'children',
     label: 'account'
+}
+
+// 级联选择器配置
+const cascaderProps = {
+    value: 'id',
+    label: 'account',
+    children: 'children',
+    emitPath: false,
+    checkStrictly: true,
+    expandTrigger: 'hover'
 }
 
 // 表单验证规则
@@ -444,6 +568,11 @@ const calculateDefaultExpandedKeys = (accounts: Account[], level: number = 1): n
 
     return expandedKeys
 }
+
+// 计算属性
+const hasMappings = computed(() => {
+    return selectedAccount.value?.mapping_count && selectedAccount.value.mapping_count.total > 0
+})
 
 // 获取账户树形数据
 const fetchAccountTree = async () => {
@@ -593,32 +722,127 @@ const updateAccount = async () => {
 const deleteAccount = async () => {
     if (!selectedAccount.value) return
 
-    try {
-        await ElMessageBox.confirm(
-            `确定要删除账户 "${selectedAccount.value.account}" 吗？此操作不可撤销。`,
-            '确认删除',
-            {
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                type: 'warning'
-            }
-        )
+    // 重置迁移选择
+    selectedMigrationAccount.value = null
+    selectedMigrationAccountInfo.value = null
+    migrationCandidates.value = []
 
-        await axios.delete(`/account/${selectedAccount.value.id}/`)
+    // 获取迁移候选账户
+    await fetchMigrationCandidates()
+
+    deleteAccountDialog.value = true
+}
+
+// 获取迁移候选账户
+const fetchMigrationCandidates = async () => {
+    if (!selectedAccount.value) return
+
+    try {
+        migrationCandidatesLoading.value = true
+        const response = await axios.get(`/account/${selectedAccount.value.id}/migration_candidates/`)
+
+        // 将候选账户转换为树形结构
+        migrationCandidates.value = buildAccountTree(response.data.candidates)
+    } catch (error: any) {
+        console.error('获取迁移候选账户失败:', error)
+        ElMessage.error('获取迁移候选账户失败')
+        migrationCandidates.value = []
+    } finally {
+        migrationCandidatesLoading.value = false
+    }
+}
+
+// 构建账户树形结构
+const buildAccountTree = (accounts: any[]): any[] => {
+    const accountMap = new Map()
+    const rootAccounts: any[] = []
+
+    // 创建账户映射
+    accounts.forEach(account => {
+        accountMap.set(account.id, { ...account, children: [] })
+    })
+
+    // 构建树形结构
+    accounts.forEach(account => {
+        const accountNode = accountMap.get(account.id)
+        if (account.parent && accountMap.has(account.parent)) {
+            accountMap.get(account.parent).children.push(accountNode)
+        } else {
+            rootAccounts.push(accountNode)
+        }
+    })
+
+    return rootAccounts
+}
+
+// 查找账户对象
+const findAccountById = (accounts: any[], id: number): any | null => {
+    for (const account of accounts) {
+        if (account.id === id) return account
+        if (account.children) {
+            const found = findAccountById(account.children, id)
+            if (found) return found
+        }
+    }
+    return null
+}
+
+// 处理迁移账户选择变化
+const handleMigrationAccountChange = (value: number) => {
+    if (value) {
+        const account = findAccountById(migrationCandidates.value, value)
+        selectedMigrationAccountInfo.value = account
+    } else {
+        selectedMigrationAccountInfo.value = null
+    }
+}
+
+// 处理迁移账户下拉框显示状态
+const handleMigrationVisibleChange = (visible: boolean) => {
+    if (visible && migrationCandidates.value.length === 0) {
+        fetchMigrationCandidates()
+    }
+}
+
+// 确认删除账户
+const confirmDeleteAccount = async () => {
+    if (!selectedAccount.value) return
+
+    // 如果有映射但没有选择迁移目标，则不允许删除
+    if (hasMappings.value && !selectedMigrationAccount.value) {
+        ElMessage.warning('请选择迁移目标账户')
+        return
+    }
+
+    try {
+        deleteAccountLoading.value = true
+
+        // 构建删除请求数据
+        const deleteData: any = {}
+        if (hasMappings.value && selectedMigrationAccount.value) {
+            deleteData.migrate_to = selectedMigrationAccount.value
+        }
+
+        await axios.delete(`/account/${selectedAccount.value.id}/`, {
+            data: deleteData
+        })
+
         ElMessage.success('账户删除成功')
+        deleteAccountDialog.value = false
         selectedAccount.value = null
         await fetchAccountTree()
     } catch (error: any) {
-        if (error === 'cancel') return
-
         console.error('删除账户失败:', error)
         if (error.response?.status === 401) {
             ElMessage.info('未认证，请登录后重试')
         } else if (error.response?.status === 400) {
-            ElMessage.error('删除失败，该账户可能有关联数据')
+            const errorMsg = error.response.data?.error || '删除失败，请检查数据'
+            ElMessage.error(errorMsg)
         } else {
             ElMessage.error('删除账户失败')
         }
+    } finally {
+        deleteAccountLoading.value = false
     }
 }
 
@@ -1101,6 +1325,124 @@ onMounted(() => {
     .header-actions {
         width: 100%;
         justify-content: flex-end;
+    }
+}
+
+/* 删除账户对话框样式 */
+.delete-account-content {
+    padding: 10px 0;
+}
+
+.migration-section {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.migration-section h4 {
+    margin: 0 0 10px 0;
+    color: #303133;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.migration-tip {
+    margin: 0 0 15px 0;
+    color: #606266;
+    font-size: 14px;
+}
+
+.no-candidates {
+    margin-top: 15px;
+}
+
+.no-mappings-section {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #f0f9ff;
+    border-radius: 8px;
+    border: 1px solid #bae6fd;
+}
+
+/* AccountSelector 样式 */
+.account-selector {
+    width: 100%;
+}
+
+.account-cascader {
+    width: 100%;
+}
+
+.cascader-node {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+/* AccountSelector 中的 node-label 样式 */
+.account-selector .node-label {
+    flex: 1;
+    font-weight: 500;
+}
+
+.node-tag,
+.mapping-tag {
+    margin: 0;
+}
+
+.account-preview {
+    margin-top: 12px;
+}
+
+.preview-content {
+    padding: 8px;
+}
+
+.account-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.account-info h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #303133;
+}
+
+.currencies,
+.mapping-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.label {
+    font-size: 12px;
+    color: #909399;
+    min-width: 60px;
+}
+
+.currency-tag {
+    margin: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .account-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .currencies,
+    .mapping-stats {
+        flex-wrap: wrap;
     }
 }
 </style>
