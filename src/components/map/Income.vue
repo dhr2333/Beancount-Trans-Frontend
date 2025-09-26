@@ -189,6 +189,67 @@
             </span>
         </template>
     </el-dialog>
+    <!-- 批量删除确认对话框 -->
+    <el-dialog v-model="batchDeleteDialog" title="批量删除收入映射" width="600px" :close-on-click-modal="false">
+        <div class="batch-delete-content">
+            <!-- 警告信息 -->
+            <el-alert title="删除确认" type="warning" :closable="false" show-icon style="margin-bottom: 20px;">
+                <template #default>
+                    <p>您即将删除 <strong>{{ selectedItems.length }}</strong> 个收入映射，此操作不可撤销！</p>
+                    <p>请仔细确认以下映射信息：</p>
+                </template>
+            </el-alert>
+
+            <!-- 删除项目列表 -->
+            <div class="delete-items-list">
+                <div v-for="(item, index) in selectedItems" :key="item.id" class="delete-item">
+                    <div class="item-info">
+                        <div class="item-main">
+                            <el-tag type="primary" size="small">{{ item.key }}</el-tag>
+                            <span v-if="item.payer" class="item-payer">{{ item.payer }}</span>
+                        </div>
+                        <div class="item-account">
+                            {{ typeof item.income === 'object' ? item.income?.account : item.income }}
+                        </div>
+                    </div>
+                    <div class="item-index">{{ index + 1 }}</div>
+                </div>
+            </div>
+
+            <!-- 进度条 -->
+            <div v-if="batchDeleteLoading" class="delete-progress">
+                <el-progress :percentage="batchDeleteProgress"
+                    :status="batchDeleteProgress === 100 ? 'success' : undefined" :stroke-width="8" />
+                <p class="progress-text">正在删除映射... {{ batchDeleteProgress }}%</p>
+            </div>
+
+            <!-- 错误信息 -->
+            <div v-if="batchDeleteErrors.length > 0" class="delete-errors">
+                <el-alert title="部分删除失败" type="error" :closable="false" show-icon>
+                    <template #default>
+                        <ul class="error-list">
+                            <li v-for="error in batchDeleteErrors" :key="error" class="error-item">
+                                {{ error }}
+                            </li>
+                        </ul>
+                    </template>
+                </el-alert>
+            </div>
+        </div>
+
+        <template #footer>
+            <div class="dialog-footer">
+                <el-button @click="cancelBatchDelete" :disabled="batchDeleteLoading">
+                    取消
+                </el-button>
+                <el-button type="danger" @click="confirmBatchDelete" :loading="batchDeleteLoading"
+                    :disabled="batchDeleteLoading">
+                    {{ batchDeleteLoading ? '删除中...' : '确认删除' }}
+                </el-button>
+            </div>
+        </template>
+    </el-dialog>
+
     <!-- <el-dialog v-model="dialogError" title="操作失败" width="30%">
         <el-icon>
             <WarningFilled />
@@ -657,33 +718,76 @@ const handleBatchDisable = async () => {
     }
 }
 
+// 批量删除相关状态
+const batchDeleteDialog = ref(false)
+const batchDeleteLoading = ref(false)
+const batchDeleteProgress = ref(0)
+const batchDeleteErrors = ref<string[]>([])
+
 // 批量删除
-const handleBatchDelete = async () => {
+const handleBatchDelete = () => {
+    if (selectedItems.value.length === 0) return
+    batchDeleteDialog.value = true
+    batchDeleteErrors.value = []
+    batchDeleteProgress.value = 0
+}
+
+// 确认批量删除
+const confirmBatchDelete = async () => {
     if (selectedItems.value.length === 0) return
 
-    try {
-        await ElMessageBox.confirm(
-            `确定要删除选中的 ${selectedItems.value.length} 个映射吗？此操作不可撤销。`,
-            '确认批量删除',
-            {
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                type: 'warning'
-            }
-        )
+    batchDeleteLoading.value = true
+    batchDeleteProgress.value = 0
+    batchDeleteErrors.value = []
 
-        const promises = selectedItems.value.map(item =>
-            axios.delete(`income/${item.id}/`)
-        )
-        await Promise.all(promises)
-        ElMessage.success(`成功删除 ${selectedItems.value.length} 个映射`)
-        await fetchData()
-        selectedItems.value = []
+    const totalItems = selectedItems.value.length
+    const errors: string[] = []
+    let successCount = 0
+
+    try {
+        // 逐个删除以显示进度
+        for (let i = 0; i < selectedItems.value.length; i++) {
+            const item = selectedItems.value[i]
+            try {
+                await axios.delete(`income/${item.id}/`)
+                successCount++
+            } catch (error: any) {
+                const errorMsg = `删除 "${item.key}" 失败: ${error.response?.data?.detail || error.message || '未知错误'}`
+                errors.push(errorMsg)
+                console.error(`删除收入映射失败 (ID: ${item.id}):`, error)
+            }
+
+            // 更新进度
+            batchDeleteProgress.value = Math.round(((i + 1) / totalItems) * 100)
+        }
+
+        // 处理结果
+        if (errors.length > 0) {
+            batchDeleteErrors.value = errors
+            if (successCount > 0) {
+                ElMessage.warning(`成功删除 ${successCount} 个映射，${errors.length} 个失败`)
+            } else {
+                ElMessage.error('批量删除失败')
+            }
+        } else {
+            ElMessage.success(`成功删除 ${successCount} 个收入映射`)
+            batchDeleteDialog.value = false
+            await fetchData()
+            selectedItems.value = []
+        }
     } catch (error: any) {
-        if (error === 'cancel') return
-        console.error('批量删除失败:', error)
-        ElMessage.error('批量删除失败')
+        console.error('批量删除过程出错:', error)
+        ElMessage.error('批量删除过程中发生错误')
+    } finally {
+        batchDeleteLoading.value = false
     }
+}
+
+// 取消批量删除
+const cancelBatchDelete = () => {
+    batchDeleteDialog.value = false
+    batchDeleteErrors.value = []
+    batchDeleteProgress.value = 0
 }
 
 // 高级排序方法：处理数字、英文和中文混合内容
@@ -774,6 +878,108 @@ const advancedSort = (a: Income, b: Income): number => {
     margin-right: 10px;
 }
 
+/* 批量删除对话框样式 */
+.batch-delete-content {
+    padding: 10px 0;
+}
+
+.delete-items-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e4e7ed;
+    border-radius: 6px;
+    background-color: #fafafa;
+    margin-bottom: 20px;
+}
+
+.delete-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e4e7ed;
+    transition: background-color 0.2s ease;
+}
+
+.delete-item:last-child {
+    border-bottom: none;
+}
+
+.delete-item:hover {
+    background-color: #f0f2f5;
+}
+
+.item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.item-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.item-payer {
+    color: #606266;
+    font-size: 14px;
+}
+
+.item-account {
+    color: #909399;
+    font-size: 12px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    background-color: #f0f9ff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.item-index {
+    color: #909399;
+    font-size: 12px;
+    font-weight: 500;
+    background-color: #e4e7ed;
+    padding: 4px 8px;
+    border-radius: 12px;
+    min-width: 24px;
+    text-align: center;
+}
+
+.delete-progress {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.progress-text {
+    margin-top: 8px;
+    color: #606266;
+    font-size: 14px;
+}
+
+.delete-errors {
+    margin-top: 20px;
+}
+
+.error-list {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.error-item {
+    margin-bottom: 4px;
+    color: #f56c6c;
+    font-size: 13px;
+}
+
+.dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
     .income-mapping {
@@ -791,6 +997,16 @@ const advancedSort = (a: Income, b: Income): number => {
 
     .action-section {
         justify-content: center;
+    }
+
+    .delete-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .item-index {
+        align-self: flex-end;
     }
 }
 </style>
