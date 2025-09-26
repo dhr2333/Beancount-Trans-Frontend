@@ -1,0 +1,1453 @@
+<template>
+    <div class="account-management">
+        <div class="management-header">
+            <h2>账户管理</h2>
+            <div class="header-actions">
+                <el-button type="primary" @click="showAddAccountDialog">
+                    <el-icon>
+                        <Plus />
+                    </el-icon>
+                    新增账户
+                </el-button>
+                <el-button @click="refreshData">
+                    <el-icon>
+                        <Refresh />
+                    </el-icon>
+                    刷新
+                </el-button>
+            </div>
+        </div>
+
+        <div class="management-content">
+            <!-- 左侧：账户树形结构 -->
+            <div class="account-tree-panel">
+                <el-tree :data="accountTree" :props="treeProps" node-key="id" :expand-on-click-node="false"
+                    :default-expand-all="false" :default-expanded-keys="defaultExpandedKeys"
+                    @node-click="handleNodeClick" class="account-tree" v-loading="loading">
+                    <template #default="{ node, data }">
+                        <div class="tree-node">
+                            <span class="node-label">{{ data.account }}</span>
+                            <div class="node-actions">
+                                <el-tag size="small" :type="getAccountTypeColor(data.account_type)">
+                                    {{ data.account_type }}
+                                </el-tag>
+                                <el-tag v-if="data.mapping_count && data.mapping_count.total > 0" size="small"
+                                    type="info">
+                                    {{ data.mapping_count.total }}映射
+                                </el-tag>
+                                <el-switch v-model="data.enable" size="small" @change="updateAccountStatus(data)"
+                                    style="margin-left: 8px;" />
+                            </div>
+                        </div>
+                    </template>
+                </el-tree>
+            </div>
+
+            <!-- 右侧：账户详情和货币管理 -->
+            <div class="account-detail-panel">
+                <div v-if="selectedAccount" class="account-detail">
+                    <h3>{{ selectedAccount.account }}</h3>
+
+                    <!-- 账户基本信息 -->
+                    <el-card class="info-card">
+                        <template #header>
+                            <span>基本信息</span>
+                        </template>
+                        <el-descriptions :column="2" border>
+                            <el-descriptions-item label="账户类型">
+                                <el-tag :type="getAccountTypeColor(selectedAccount.account_type)">
+                                    {{ selectedAccount.account_type }}
+                                </el-tag>
+                            </el-descriptions-item>
+                            <el-descriptions-item label="启用状态">
+                                <el-switch v-model="selectedAccount.enable"
+                                    @change="updateAccountStatus(selectedAccount)" />
+                            </el-descriptions-item>
+                            <el-descriptions-item label="映射统计" v-if="selectedAccount.mapping_count">
+                                <div class="mapping-stats">
+                                    <el-tooltip v-if="selectedAccount.mapping_count.expense > 0"
+                                        :content="getExpenseMappingTooltip()" placement="top" effect="dark">
+                                        <el-tag type="warning" style="cursor: help;">
+                                            {{ selectedAccount.mapping_count.expense }}支出
+                                        </el-tag>
+                                    </el-tooltip>
+                                    <el-tooltip v-if="selectedAccount.mapping_count.assets > 0"
+                                        :content="getAssetsMappingTooltip()" placement="top" effect="dark">
+                                        <el-tag type="success" style="cursor: help;">
+                                            {{ selectedAccount.mapping_count.assets }}资产
+                                        </el-tag>
+                                    </el-tooltip>
+                                    <el-tooltip v-if="selectedAccount.mapping_count.income > 0"
+                                        :content="getIncomeMappingTooltip()" placement="top" effect="dark">
+                                        <el-tag type="primary" style="cursor: help;">
+                                            {{ selectedAccount.mapping_count.income }}收入
+                                        </el-tag>
+                                    </el-tooltip>
+                                    <el-tag type="info">{{ selectedAccount.mapping_count.total }}总计</el-tag>
+                                    <el-button v-if="selectedAccount.mapping_count.total > 0" size="small" type="text"
+                                        @click="toggleMappingDetails" style="margin-left: 8px;">
+                                        {{ showMappingDetails ? '收起详情' : '查看详情' }}
+                                    </el-button>
+                                </div>
+                            </el-descriptions-item>
+                            <!-- <el-descriptions-item label="父账户" v-if="selectedAccount.parent_account">
+                                {{ selectedAccount.parent_account }}
+                            </el-descriptions-item> -->
+                            <el-descriptions-item label="创建时间">
+                                {{ formatDateTime(selectedAccount.created) }}
+                            </el-descriptions-item>
+                        </el-descriptions>
+                    </el-card>
+
+                    <!-- 映射详情 -->
+                    <el-card
+                        v-if="showMappingDetails && selectedAccount.mapping_count && selectedAccount.mapping_count.total > 0"
+                        class="mapping-details-card">
+                        <template #header>
+                            <span>映射详情</span>
+                        </template>
+                        <div class="mapping-details-content" v-loading="mappingDetailsLoading">
+                            <el-tabs v-model="activeMappingTab" type="card">
+                                <!-- 支出映射 -->
+                                <el-tab-pane label="支出映射" name="expense"
+                                    v-if="accountMappings.expense_mappings && accountMappings.expense_mappings.length > 0">
+                                    <div class="mapping-list">
+                                        <div v-for="mapping in accountMappings.expense_mappings" :key="mapping.id"
+                                            class="mapping-item">
+                                            <div class="mapping-info">
+                                                <span class="mapping-key">{{ mapping.key }}</span>
+                                                <span class="mapping-account">→ {{ selectedAccount?.account }}</span>
+                                                <span v-if="mapping.currency" class="mapping-currency">({{
+                                                    mapping.currency
+                                                }})</span>
+                                            </div>
+                                            <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
+                                                {{ mapping.enable ? '启用' : '禁用' }}
+                                            </el-tag>
+                                        </div>
+                                    </div>
+                                </el-tab-pane>
+
+                                <!-- 资产映射 -->
+                                <el-tab-pane label="资产映射" name="assets"
+                                    v-if="accountMappings.assets_mappings && accountMappings.assets_mappings.length > 0">
+                                    <div class="mapping-list">
+                                        <div v-for="mapping in accountMappings.assets_mappings" :key="mapping.id"
+                                            class="mapping-item">
+                                            <div class="mapping-info">
+                                                <span class="mapping-key">{{ mapping.key }}</span>
+                                                <span class="mapping-account">→ {{ selectedAccount?.account }}</span>
+                                            </div>
+                                            <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
+                                                {{ mapping.enable ? '启用' : '禁用' }}
+                                            </el-tag>
+                                        </div>
+                                    </div>
+                                </el-tab-pane>
+
+                                <!-- 收入映射 -->
+                                <el-tab-pane label="收入映射" name="income"
+                                    v-if="accountMappings.income_mappings && accountMappings.income_mappings.length > 0">
+                                    <div class="mapping-list">
+                                        <div v-for="mapping in accountMappings.income_mappings" :key="mapping.id"
+                                            class="mapping-item">
+                                            <div class="mapping-info">
+                                                <span class="mapping-key">{{ mapping.key }}</span>
+                                                <span class="mapping-account">→ {{ selectedAccount?.account }}</span>
+                                            </div>
+                                            <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
+                                                {{ mapping.enable ? '启用' : '禁用' }}
+                                            </el-tag>
+                                        </div>
+                                    </div>
+                                </el-tab-pane>
+                            </el-tabs>
+                        </div>
+                    </el-card>
+
+                    <!-- 货币管理 -->
+                    <el-card class="currency-card">
+                        <template #header>
+                            <div class="card-header">
+                                <span>关联货币</span>
+                                <el-button size="small" @click="showCurrencyDialog">
+                                    <el-icon>
+                                        <Edit />
+                                    </el-icon>
+                                    管理货币
+                                </el-button>
+                            </div>
+                        </template>
+                        <div class="currency-list">
+                            <el-tag v-for="currency in selectedAccount.currencies" :key="currency.id"
+                                class="currency-tag" closable @close="removeCurrency(currency.id)">
+                                {{ currency.code }} - {{ currency.name }}
+                            </el-tag>
+                            <el-empty v-if="selectedAccount.currencies.length === 0" description="暂无关联货币" />
+                        </div>
+                    </el-card>
+
+                    <!-- 操作按钮 -->
+                    <div class="action-buttons">
+                        <el-button type="primary" @click="editAccount">
+                            <el-icon>
+                                <Edit />
+                            </el-icon>
+                            编辑账户
+                        </el-button>
+                        <el-button type="danger" @click="deleteAccount">
+                            <el-icon>
+                                <Delete />
+                            </el-icon>
+                            删除账户
+                        </el-button>
+                    </div>
+                </div>
+
+                <el-empty v-else description="请选择账户查看详情" />
+            </div>
+        </div>
+
+        <!-- 新增账户对话框 -->
+        <el-dialog v-model="addAccountDialog" title="新增账户" width="500px">
+            <el-form :model="newAccount" :rules="accountRules" ref="accountForm">
+                <el-form-item label="账户路径" prop="account">
+                    <el-input v-model="newAccount.account" placeholder="Assets:Savings:Bank" />
+                </el-form-item>
+                <el-form-item label="关联货币" prop="currency_ids">
+                    <el-select v-model="newAccount.currency_ids" multiple placeholder="选择货币">
+                        <el-option v-for="currency in availableCurrencies" :key="currency.id"
+                            :label="`${currency.code} - ${currency.name}`" :value="currency.id" />
+                    </el-select>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="addAccountDialog = false">取消</el-button>
+                <el-button type="primary" @click="createAccount">确定</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 编辑账户对话框 -->
+        <el-dialog v-model="editAccountDialog" title="编辑账户" width="500px">
+            <el-form :model="editAccountForm" :rules="accountRules" ref="editAccountFormRef">
+                <el-form-item label="账户路径" prop="account">
+                    <el-input v-model="editAccountForm.account" />
+                </el-form-item>
+                <el-form-item label="关联货币" prop="currency_ids">
+                    <el-select v-model="editAccountForm.currency_ids" multiple placeholder="选择货币">
+                        <el-option v-for="currency in availableCurrencies" :key="currency.id"
+                            :label="`${currency.code} - ${currency.name}`" :value="currency.id" />
+                    </el-select>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="editAccountDialog = false">取消</el-button>
+                <el-button type="primary" @click="updateAccount">确定</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 货币管理对话框 -->
+        <el-dialog v-model="currencyDialog" title="货币管理" width="800px">
+            <el-tabs v-model="activeCurrencyTab" type="card">
+                <!-- 货币列表 -->
+                <el-tab-pane label="货币列表" name="list">
+                    <div class="currency-list-section">
+                        <div class="section-header">
+                            <h4>所有货币</h4>
+                            <el-button type="primary" size="small" @click="showAddCurrencyDialog">
+                                <el-icon>
+                                    <Plus />
+                                </el-icon>
+                                新增货币
+                            </el-button>
+                        </div>
+                        <el-table :data="allCurrencies" style="width: 100%" v-loading="currencyLoading">
+                            <el-table-column prop="code" label="货币代码" width="120" />
+                            <el-table-column prop="name" label="货币名称" />
+                            <el-table-column label="操作" width="150">
+                                <template #default="{ row }">
+                                    <el-button size="small" @click="editCurrency(row)">编辑</el-button>
+                                    <el-button size="small" type="danger" @click="deleteCurrency(row)">删除</el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+                </el-tab-pane>
+
+                <!-- 账户货币关联 -->
+                <el-tab-pane label="账户关联" name="association">
+                    <div class="currency-association-section">
+                        <h4>为账户 "{{ selectedAccount?.account }}" 关联货币</h4>
+                        <el-select v-model="selectedCurrencies" multiple placeholder="选择货币" style="width: 100%">
+                            <el-option v-for="currency in allCurrencies" :key="currency.id"
+                                :label="`${currency.code} - ${currency.name}`" :value="currency.id" />
+                        </el-select>
+                    </div>
+                </el-tab-pane>
+            </el-tabs>
+
+            <template #footer>
+                <el-button @click="currencyDialog = false">取消</el-button>
+                <el-button v-if="activeCurrencyTab === 'association'" type="primary"
+                    @click="updateAccountCurrencies">确定</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 新增/编辑货币对话框 -->
+        <el-dialog v-model="currencyFormDialog" :title="isEditingCurrency ? '编辑货币' : '新增货币'" width="400px">
+            <el-form :model="currencyForm" :rules="currencyRules" ref="currencyFormRef" label-width="80px">
+                <el-form-item label="货币代码" prop="code">
+                    <el-input v-model="currencyForm.code" placeholder="如：CNY, USD" />
+                </el-form-item>
+                <el-form-item label="货币名称" prop="name">
+                    <el-input v-model="currencyForm.name" placeholder="如：人民币, 美元" />
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="currencyFormDialog = false">取消</el-button>
+                <el-button type="primary" @click="saveCurrency">确定</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 删除账户对话框 -->
+        <el-dialog v-model="deleteAccountDialog" title="删除账户" width="600px">
+            <div v-if="selectedAccount" class="delete-account-content">
+                <el-alert :title="`确定要删除账户 '${selectedAccount.account}' 吗？`" type="warning" :closable="false" show-icon
+                    style="margin-bottom: 20px;">
+                    <template #default>
+                        <p>此操作将：</p>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            <li>永久删除该账户</li>
+                            <li v-if="selectedAccount.mapping_count && selectedAccount.mapping_count.total > 0">
+                                将 {{ selectedAccount.mapping_count.total }} 个映射迁移到目标账户
+                            </li>
+                            <li v-else>该账户无映射数据，可直接删除</li>
+                        </ul>
+                    </template>
+                </el-alert>
+
+                <!-- 映射迁移选择 -->
+                <div v-if="selectedAccount.mapping_count && selectedAccount.mapping_count.total > 0"
+                    class="migration-section">
+                    <h4>选择迁移目标账户</h4>
+                    <p class="migration-tip">请选择要将映射迁移到的目标账户：</p>
+
+                    <div class="account-selector">
+                        <el-cascader v-model="selectedMigrationAccount" :options="migrationCandidates"
+                            :props="cascaderProps" placeholder="请选择迁移目标账户" :filterable="true" :clearable="true"
+                            :show-all-levels="false" :separator="' > '" @change="handleMigrationAccountChange"
+                            @visible-change="handleMigrationVisibleChange" class="account-cascader" style="width: 100%;"
+                            v-loading="migrationCandidatesLoading">
+                            <template #default="{ node, data }">
+                                <div class="cascader-node">
+                                    <span class="node-label">{{ data.account }}</span>
+                                    <el-tag v-if="data.account_type" :type="getAccountTypeColor(data.account_type)"
+                                        size="small" class="node-tag">
+                                        {{ data.account_type }}
+                                    </el-tag>
+                                    <el-tag v-if="data.mapping_count && data.mapping_count.total > 0" type="info"
+                                        size="small" class="mapping-tag">
+                                        {{ data.mapping_count.total }}映射
+                                    </el-tag>
+                                </div>
+                            </template>
+                        </el-cascader>
+
+                        <!-- 账户详情预览 -->
+                        <div v-if="selectedMigrationAccountInfo" class="account-preview">
+                            <el-card size="small">
+                                <div class="preview-content">
+                                    <div class="account-info">
+                                        <h4>{{ selectedMigrationAccountInfo.account }}</h4>
+                                        <el-tag :type="getAccountTypeColor(selectedMigrationAccountInfo.account_type)">
+                                            {{ selectedMigrationAccountInfo.account_type }}
+                                        </el-tag>
+                                    </div>
+                                    <div v-if="selectedMigrationAccountInfo.currencies && selectedMigrationAccountInfo.currencies.length > 0"
+                                        class="currencies">
+                                        <span class="label">关联货币：</span>
+                                        <el-tag v-for="currency in selectedMigrationAccountInfo.currencies"
+                                            :key="currency.id" size="small" class="currency-tag">
+                                            {{ currency.code }} - {{ currency.name }}
+                                        </el-tag>
+                                    </div>
+                                    <div v-if="selectedMigrationAccountInfo.mapping_count" class="mapping-stats">
+                                        <span class="label">映射统计：</span>
+                                        <el-tag type="warning" size="small">{{
+                                            selectedMigrationAccountInfo.mapping_count.expense }}支出</el-tag>
+                                        <el-tag type="success" size="small">{{
+                                            selectedMigrationAccountInfo.mapping_count.assets
+                                            }}资产</el-tag>
+                                        <el-tag type="primary" size="small">{{
+                                            selectedMigrationAccountInfo.mapping_count.income
+                                            }}收入</el-tag>
+                                    </div>
+                                </div>
+                            </el-card>
+                        </div>
+                    </div>
+
+                    <div v-if="migrationCandidates.length === 0 && !migrationCandidatesLoading" class="no-candidates">
+                        <el-alert title="无可用迁移目标" type="info" :closable="false" show-icon>
+                            <template #default>
+                                <p>当前没有可用的迁移目标账户。请先创建其他账户后再进行删除操作。</p>
+                            </template>
+                        </el-alert>
+                    </div>
+                </div>
+
+                <!-- 无映射时的提示 -->
+                <div v-else class="no-mappings-section">
+                    <el-alert title="该账户无映射数据" type="info" :closable="false" show-icon>
+                        <template #default>
+                            <p>该账户没有任何映射数据，可以直接删除，无需选择迁移目标。</p>
+                        </template>
+                    </el-alert>
+                </div>
+            </div>
+
+            <template #footer>
+                <el-button @click="deleteAccountDialog = false">取消</el-button>
+                <el-button type="danger" @click="confirmDeleteAccount"
+                    :disabled="hasMappings && !selectedMigrationAccount" :loading="deleteAccountLoading">
+                    确定删除
+                </el-button>
+            </template>
+        </el-dialog>
+    </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Refresh, Edit, Delete } from '@element-plus/icons-vue'
+import axios from '../../utils/request'
+import type { FormInstance, FormRules } from 'element-plus'
+
+// 接口定义
+interface Currency {
+    id: number
+    code: string
+    name: string
+}
+
+interface Account {
+    id: number
+    account: string
+    currencies: Currency[]
+    parent?: number
+    parent_account?: string
+    account_type: string
+    enable: boolean
+    created: string
+    modified: string
+    children?: Account[]
+    mapping_count?: {
+        expense: number
+        assets: number
+        income: number
+        total: number
+    }
+}
+
+// 响应式数据
+const loading = ref(false)
+const accountTree = ref<Account[]>([])
+const selectedAccount = ref<Account | null>(null)
+const availableCurrencies = ref<Currency[]>([])
+const defaultExpandedKeys = ref<number[]>([])
+
+// 对话框状态
+const addAccountDialog = ref(false)
+const editAccountDialog = ref(false)
+const currencyDialog = ref(false)
+const currencyFormDialog = ref(false)
+const deleteAccountDialog = ref(false)
+
+// 货币管理相关
+const activeCurrencyTab = ref('list')
+const allCurrencies = ref<Currency[]>([])
+const currencyLoading = ref(false)
+const isEditingCurrency = ref(false)
+const currentCurrencyId = ref<number | null>(null)
+
+// 映射详情相关
+const showMappingDetails = ref(false)
+const mappingDetailsLoading = ref(false)
+const accountMappings = ref<any>({
+    expense_mappings: [],
+    assets_mappings: [],
+    income_mappings: []
+})
+const activeMappingTab = ref('expense')
+
+// 表单数据
+const newAccount = ref({
+    account: '',
+    currency_ids: [] as number[]
+})
+
+const currencyForm = ref({
+    code: '',
+    name: ''
+})
+
+const currencyFormRef = ref<FormInstance>()
+
+const editAccountForm = ref({
+    account: '',
+    currency_ids: [] as number[]
+})
+
+const selectedCurrencies = ref<number[]>([])
+
+// 删除账户相关
+const migrationCandidates = ref<any[]>([])
+const migrationCandidatesLoading = ref(false)
+const selectedMigrationAccount = ref<number | null>(null)
+const selectedMigrationAccountInfo = ref<any>(null)
+const deleteAccountLoading = ref(false)
+
+// 表单引用
+const accountForm = ref<FormInstance>()
+const editAccountFormRef = ref<FormInstance>()
+
+// 树形组件配置
+const treeProps = {
+    children: 'children',
+    label: 'account'
+}
+
+// 级联选择器配置
+const cascaderProps = {
+    value: 'id',
+    label: 'account',
+    children: 'children',
+    emitPath: false,
+    checkStrictly: true,
+    expandTrigger: 'hover'
+}
+
+// 表单验证规则
+const accountRules: FormRules = {
+    account: [
+        { required: true, message: '请输入账户路径', trigger: 'blur' },
+        { pattern: /^[A-Z][A-Za-z0-9:]*$/, message: '账户路径必须以大写字母开头，只能包含字母、数字和冒号', trigger: 'blur' }
+    ]
+}
+
+const currencyRules: FormRules = {
+    code: [
+        { required: true, message: '请输入货币代码', trigger: 'blur' },
+        { pattern: /^[A-Z]{3}$/, message: '货币代码必须是3位大写字母', trigger: 'blur' }
+    ],
+    name: [
+        { required: true, message: '请输入货币名称', trigger: 'blur' },
+        { max: 20, message: '货币名称不能超过20个字符', trigger: 'blur' }
+    ]
+}
+
+// 计算默认展开的节点
+const calculateDefaultExpandedKeys = (accounts: Account[], level: number = 1): number[] => {
+    const expandedKeys: number[] = []
+
+    accounts.forEach(account => {
+        const accountType = account.account.split(':')[0]
+
+        // 只展开Expenses类型的账户
+        if (accountType === 'Expenses' && level <= 2) {
+            expandedKeys.push(account.id)
+
+            // 递归处理子账户
+            if (account.children && account.children.length > 0) {
+                const childKeys = calculateDefaultExpandedKeys(account.children, level + 1)
+                expandedKeys.push(...childKeys)
+            }
+        }
+    })
+
+    return expandedKeys
+}
+
+// 计算属性
+const hasMappings = computed(() => {
+    return selectedAccount.value?.mapping_count && selectedAccount.value.mapping_count.total > 0
+})
+
+// 获取账户树形数据
+const fetchAccountTree = async () => {
+    try {
+        loading.value = true
+        const response = await axios.get('/account/tree/')
+        accountTree.value = response.data
+
+        // 计算默认展开的节点
+        defaultExpandedKeys.value = calculateDefaultExpandedKeys(response.data)
+    } catch (error: any) {
+        console.error('获取账户树失败:', error)
+        if (error.response?.status === 401) {
+            ElMessage.info('未认证，请登录后重试')
+        } else {
+            ElMessage.error('获取账户数据失败')
+        }
+    } finally {
+        loading.value = false
+    }
+}
+
+// 获取可用货币列表
+const fetchCurrencies = async () => {
+    try {
+        const response = await axios.get('/currencies/')
+        availableCurrencies.value = response.data
+    } catch (error: any) {
+        console.error('获取货币列表失败:', error)
+        ElMessage.error('获取货币列表失败')
+    }
+}
+
+// 节点点击处理
+const handleNodeClick = async (data: Account) => {
+    selectedAccount.value = data
+    // 重置映射详情状态
+    showMappingDetails.value = false
+
+    // 自动获取映射数据
+    await fetchAccountMappings()
+}
+
+// 获取账户类型颜色
+const getAccountTypeColor = (type: string) => {
+    const colorMap: Record<string, string> = {
+        'Assets': 'success',
+        'Expenses': 'warning',
+        'Income': 'primary',
+        'Liabilities': 'danger',
+        'Equity': 'info',
+        // 中文类型映射
+        '资产账户': 'success',
+        '支出账户': 'warning',
+        '收入账户': 'primary',
+        '负债账户': 'danger',
+        '权益账户': 'info'
+    }
+    return colorMap[type] || 'info'
+}
+// 更新账户状态
+const updateAccountStatus = async (account: Account) => {
+    try {
+        await axios.patch(`/account/${account.id}/`, {
+            enable: account.enable
+        })
+        ElMessage.success('账户状态更新成功')
+    } catch (error: any) {
+        // 回滚状态
+        account.enable = !account.enable
+        console.error('更新账户状态失败:', error)
+        if (error.response?.status === 401) {
+            ElMessage.info('未认证，请登录后重试')
+        } else {
+            ElMessage.error('更新账户状态失败')
+        }
+    }
+}
+
+// 显示新增账户对话框
+const showAddAccountDialog = () => {
+    newAccount.value = {
+        account: '',
+        currency_ids: []
+    }
+    addAccountDialog.value = true
+}
+
+// 创建账户
+const createAccount = async () => {
+    if (!accountForm.value) return
+
+    try {
+        await accountForm.value.validate()
+        await axios.post('/account/', newAccount.value)
+        ElMessage.success('账户创建成功')
+        addAccountDialog.value = false
+        await fetchAccountTree()
+    } catch (error: any) {
+        console.error('创建账户失败:', error)
+        if (error.response?.status === 401) {
+            ElMessage.info('未认证，请登录后重试')
+        } else if (error.response?.status === 400) {
+            ElMessage.error('创建失败，请检查账户路径格式')
+        } else {
+            ElMessage.error('创建账户失败')
+        }
+    }
+}
+
+// 编辑账户
+const editAccount = () => {
+    if (!selectedAccount.value) return
+
+    editAccountForm.value = {
+        account: selectedAccount.value.account,
+        currency_ids: selectedAccount.value.currencies.map(c => c.id)
+    }
+    editAccountDialog.value = true
+}
+
+// 更新账户
+const updateAccount = async () => {
+    if (!editAccountFormRef.value || !selectedAccount.value) return
+
+    try {
+        await editAccountFormRef.value.validate()
+        await axios.put(`/account/${selectedAccount.value.id}/`, editAccountForm.value)
+        ElMessage.success('账户更新成功')
+        editAccountDialog.value = false
+        await fetchAccountTree()
+        // 更新选中账户的信息
+        if (selectedAccount.value) {
+            const updatedAccount = accountTree.value.find(acc => acc.id === selectedAccount.value!.id)
+            if (updatedAccount) {
+                selectedAccount.value = updatedAccount
+            }
+        }
+    } catch (error: any) {
+        console.error('更新账户失败:', error)
+        if (error.response?.status === 401) {
+            ElMessage.info('未认证，请登录后重试')
+        } else if (error.response?.status === 400) {
+            ElMessage.error('更新失败，请检查账户路径格式')
+        } else {
+            ElMessage.error('更新账户失败')
+        }
+    }
+}
+
+// 删除账户
+const deleteAccount = async () => {
+    if (!selectedAccount.value) return
+
+    // 重置迁移选择
+    selectedMigrationAccount.value = null
+    selectedMigrationAccountInfo.value = null
+    migrationCandidates.value = []
+
+    // 获取迁移候选账户
+    await fetchMigrationCandidates()
+
+    deleteAccountDialog.value = true
+}
+
+// 获取迁移候选账户
+const fetchMigrationCandidates = async () => {
+    if (!selectedAccount.value) return
+
+    try {
+        migrationCandidatesLoading.value = true
+        const response = await axios.get(`/account/${selectedAccount.value.id}/migration_candidates/`)
+
+        // 将候选账户转换为树形结构
+        migrationCandidates.value = buildAccountTree(response.data.candidates)
+    } catch (error: any) {
+        console.error('获取迁移候选账户失败:', error)
+        ElMessage.error('获取迁移候选账户失败')
+        migrationCandidates.value = []
+    } finally {
+        migrationCandidatesLoading.value = false
+    }
+}
+
+// 构建账户树形结构
+const buildAccountTree = (accounts: any[]): any[] => {
+    const accountMap = new Map()
+    const rootAccounts: any[] = []
+
+    // 创建账户映射
+    accounts.forEach(account => {
+        accountMap.set(account.id, { ...account, children: [] })
+    })
+
+    // 构建树形结构
+    accounts.forEach(account => {
+        const accountNode = accountMap.get(account.id)
+        if (account.parent && accountMap.has(account.parent)) {
+            accountMap.get(account.parent).children.push(accountNode)
+        } else {
+            rootAccounts.push(accountNode)
+        }
+    })
+
+    return rootAccounts
+}
+
+// 查找账户对象
+const findAccountById = (accounts: any[], id: number): any | null => {
+    for (const account of accounts) {
+        if (account.id === id) return account
+        if (account.children) {
+            const found = findAccountById(account.children, id)
+            if (found) return found
+        }
+    }
+    return null
+}
+
+// 处理迁移账户选择变化
+const handleMigrationAccountChange = (value: number) => {
+    if (value) {
+        const account = findAccountById(migrationCandidates.value, value)
+        selectedMigrationAccountInfo.value = account
+    } else {
+        selectedMigrationAccountInfo.value = null
+    }
+}
+
+// 处理迁移账户下拉框显示状态
+const handleMigrationVisibleChange = (visible: boolean) => {
+    if (visible && migrationCandidates.value.length === 0) {
+        fetchMigrationCandidates()
+    }
+}
+
+// 确认删除账户
+const confirmDeleteAccount = async () => {
+    if (!selectedAccount.value) return
+
+    // 如果有映射但没有选择迁移目标，则不允许删除
+    if (hasMappings.value && !selectedMigrationAccount.value) {
+        ElMessage.warning('请选择迁移目标账户')
+        return
+    }
+
+    try {
+        deleteAccountLoading.value = true
+
+        // 构建删除请求数据
+        const deleteData: any = {}
+        if (hasMappings.value && selectedMigrationAccount.value) {
+            deleteData.migrate_to = selectedMigrationAccount.value
+        }
+
+        await axios.delete(`/account/${selectedAccount.value.id}/`, {
+            data: deleteData
+        })
+
+        ElMessage.success('账户删除成功')
+        deleteAccountDialog.value = false
+        selectedAccount.value = null
+        await fetchAccountTree()
+    } catch (error: any) {
+        console.error('删除账户失败:', error)
+        if (error.response?.status === 401) {
+            ElMessage.info('未认证，请登录后重试')
+        } else if (error.response?.status === 400) {
+            const errorMsg = error.response.data?.error || '删除失败，请检查数据'
+            ElMessage.error(errorMsg)
+        } else {
+            ElMessage.error(error.response?.data?.error || '删除账户失败')
+        }
+    } finally {
+        deleteAccountLoading.value = false
+    }
+}
+
+// 显示货币管理对话框
+const showCurrencyDialog = async () => {
+    if (!selectedAccount.value) return
+
+    selectedCurrencies.value = selectedAccount.value.currencies.map(c => c.id)
+    await fetchAllCurrencies()
+    currencyDialog.value = true
+}
+
+// 更新账户货币关联
+const updateAccountCurrencies = async () => {
+    if (!selectedAccount.value) return
+
+    try {
+        await axios.patch(`/account/${selectedAccount.value.id}/`, {
+            currency_ids: selectedCurrencies.value
+        })
+        ElMessage.success('货币关联更新成功')
+        currencyDialog.value = false
+        await fetchAccountTree()
+        // 更新选中账户的信息
+        const updatedAccount = accountTree.value.find(acc => acc.id === selectedAccount.value!.id)
+        if (updatedAccount) {
+            selectedAccount.value = updatedAccount
+        }
+    } catch (error: any) {
+        console.error('更新货币关联失败:', error)
+        if (error.response?.status === 401) {
+            ElMessage.info('未认证，请登录后重试')
+        } else {
+            ElMessage.error('更新货币关联失败')
+        }
+    }
+}
+
+// 移除货币关联
+const removeCurrency = async (currencyId: number) => {
+    if (!selectedAccount.value) return
+
+    try {
+        const newCurrencyIds = selectedAccount.value.currencies
+            .filter(c => c.id !== currencyId)
+            .map(c => c.id)
+
+        await axios.patch(`/account/${selectedAccount.value.id}/`, {
+            currency_ids: newCurrencyIds
+        })
+        ElMessage.success('货币关联移除成功')
+        await fetchAccountTree()
+        // 更新选中账户的信息
+        const updatedAccount = accountTree.value.find(acc => acc.id === selectedAccount.value!.id)
+        if (updatedAccount) {
+            selectedAccount.value = updatedAccount
+        }
+    } catch (error: any) {
+        console.error('移除货币关联失败:', error)
+        if (error.response?.status === 401) {
+            ElMessage.info('未认证，请登录后重试')
+        } else {
+            ElMessage.error('移除货币关联失败')
+        }
+    }
+}
+
+// 刷新数据
+const refreshData = async () => {
+    await Promise.all([
+        fetchAccountTree(),
+        fetchCurrencies()
+    ])
+}
+
+// 格式化日期时间
+const formatDateTime = (dateString: string): string => {
+    if (!dateString) return ''
+
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return ''
+
+    const pad = (num: number) => num.toString().padStart(2, '0')
+
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+        `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+// 获取所有货币
+const fetchAllCurrencies = async () => {
+    try {
+        currencyLoading.value = true
+        const response = await axios.get('/currencies/')
+        allCurrencies.value = response.data
+    } catch (error: any) {
+        console.error('获取货币列表失败:', error)
+        ElMessage.error('获取货币列表失败')
+    } finally {
+        currencyLoading.value = false
+    }
+}
+
+// 显示新增货币对话框
+const showAddCurrencyDialog = () => {
+    isEditingCurrency.value = false
+    currentCurrencyId.value = null
+    currencyForm.value = { code: '', name: '' }
+    currencyFormDialog.value = true
+}
+
+// 编辑货币
+const editCurrency = (currency: Currency) => {
+    isEditingCurrency.value = true
+    currentCurrencyId.value = currency.id
+    currencyForm.value = { code: currency.code, name: currency.name }
+    currencyFormDialog.value = true
+}
+
+// 保存货币
+const saveCurrency = async () => {
+    if (!currencyFormRef.value) return
+
+    try {
+        await currencyFormRef.value.validate()
+
+        console.log('保存货币数据:', currencyForm.value)
+
+        if (isEditingCurrency.value && currentCurrencyId.value) {
+            // 编辑货币
+            console.log('编辑货币，ID:', currentCurrencyId.value)
+            await axios.put(`/currencies/${currentCurrencyId.value}/`, currencyForm.value)
+            ElMessage.success('货币更新成功')
+        } else {
+            // 新增货币
+            console.log('新增货币')
+            const response = await axios.post('/currencies/', currencyForm.value)
+            console.log('新增货币响应:', response.data)
+            ElMessage.success('货币创建成功')
+        }
+
+        currencyFormDialog.value = false
+        await fetchAllCurrencies()
+    } catch (error: any) {
+        console.error('保存货币失败:', error)
+        console.error('错误详情:', error.response?.data)
+        if (error.response?.status === 400) {
+            ElMessage.error('货币代码已存在或数据格式错误')
+        } else if (error.response?.status === 401) {
+            ElMessage.error('未认证，请登录后重试')
+        } else if (error.response?.status === 403) {
+            ElMessage.error('权限不足，请登录后重试')
+        } else {
+            ElMessage.error('保存货币失败')
+        }
+    }
+}
+
+// 删除货币
+const deleteCurrency = async (currency: Currency) => {
+    try {
+        await ElMessageBox.confirm(
+            `确定要删除货币 "${currency.code} - ${currency.name}" 吗？此操作不可撤销。`,
+            '确认删除',
+            {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'warning',
+            }
+        )
+
+        await axios.delete(`/currencies/${currency.id}/`)
+        ElMessage.success('货币删除成功')
+        await fetchAllCurrencies()
+    } catch (error: any) {
+        if (error !== 'cancel') {
+            console.error('删除货币失败:', error)
+            ElMessage.error('删除货币失败')
+        }
+    }
+}
+
+// 切换映射详情显示
+const toggleMappingDetails = () => {
+    showMappingDetails.value = !showMappingDetails.value
+}
+
+// 获取账户映射详情
+const fetchAccountMappings = async () => {
+    if (!selectedAccount.value) return
+
+    try {
+        mappingDetailsLoading.value = true
+        const response = await axios.get(`/account/${selectedAccount.value.id}/mappings/`)
+        accountMappings.value = response.data
+
+        // 设置默认激活的标签页
+        if (response.data.expense_mappings && response.data.expense_mappings.length > 0) {
+            activeMappingTab.value = 'expense'
+        } else if (response.data.assets_mappings && response.data.assets_mappings.length > 0) {
+            activeMappingTab.value = 'assets'
+        } else if (response.data.income_mappings && response.data.income_mappings.length > 0) {
+            activeMappingTab.value = 'income'
+        }
+    } catch (error: any) {
+        console.error('获取映射详情失败:', error)
+        ElMessage.error('获取映射详情失败')
+    } finally {
+        mappingDetailsLoading.value = false
+    }
+}
+
+// 获取支出映射悬浮提示内容
+const getExpenseMappingTooltip = () => {
+    if (!accountMappings.value.expense_mappings || accountMappings.value.expense_mappings.length === 0) {
+        return '暂无支出映射'
+    }
+    return accountMappings.value.expense_mappings
+        .map((m: any) => `${m.key} → ${selectedAccount.value?.account || '未知账户'}`)
+        .join('\n')
+}
+
+// 获取资产映射悬浮提示内容
+const getAssetsMappingTooltip = () => {
+    if (!accountMappings.value.assets_mappings || accountMappings.value.assets_mappings.length === 0) {
+        return '暂无资产映射'
+    }
+    return accountMappings.value.assets_mappings
+        .map((m: any) => `${m.key} → ${selectedAccount.value?.account || '未知账户'}`)
+        .join('\n')
+}
+
+// 获取收入映射悬浮提示内容
+const getIncomeMappingTooltip = () => {
+    if (!accountMappings.value.income_mappings || accountMappings.value.income_mappings.length === 0) {
+        return '暂无收入映射'
+    }
+    return accountMappings.value.income_mappings
+        .map((m: any) => `${m.key} → ${selectedAccount.value?.account || '未知账户'}`)
+        .join('\n')
+}
+
+// 组件挂载时初始化数据
+onMounted(() => {
+    refreshData()
+})
+</script>
+
+<style scoped>
+.account-management {
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    animation: fadeIn 0.6s ease;
+}
+
+.management-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e4e7ed;
+}
+
+.management-header h2 {
+    margin: 0;
+    color: #303133;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.management-content {
+    display: flex;
+    gap: 20px;
+    min-height: 600px;
+}
+
+.account-tree-panel {
+    flex: 0 0 400px;
+    border: 1px solid #e4e7ed;
+    border-radius: 8px;
+    padding: 15px;
+    background-color: #fafafa;
+}
+
+.account-tree {
+    background-color: transparent;
+}
+
+.tree-node {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 4px 0;
+}
+
+.node-label {
+    font-weight: 500;
+    color: #303133;
+}
+
+.node-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.account-detail-panel {
+    flex: 1;
+    border: 1px solid #e4e7ed;
+    border-radius: 8px;
+    padding: 20px;
+    background-color: #ffffff;
+}
+
+.account-detail h3 {
+    margin: 0 0 20px 0;
+    color: #303133;
+    font-size: 20px;
+    font-weight: 600;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #409eff;
+}
+
+.info-card,
+.currency-card {
+    margin-bottom: 20px;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.currency-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 40px;
+    align-items: center;
+}
+
+.currency-tag {
+    margin: 0;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e4e7ed;
+}
+
+.currency-management {
+    padding: 10px 0;
+}
+
+.available-currencies h4 {
+    margin: 0 0 15px 0;
+    color: #606266;
+    font-size: 16px;
+}
+
+/* 映射统计样式 */
+.mapping-stats {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* 映射详情样式 */
+.mapping-details-card {
+    margin-bottom: 20px;
+}
+
+.mapping-details-content {
+    min-height: 200px;
+}
+
+.mapping-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.mapping-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    transition: all 0.2s ease;
+}
+
+.mapping-item:hover {
+    background-color: #e9ecef;
+    border-color: #dee2e6;
+}
+
+.mapping-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.mapping-key {
+    font-weight: 500;
+    color: #303133;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    background-color: #f1f3f4;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.mapping-payee,
+.mapping-full,
+.mapping-payer,
+.mapping-account {
+    color: #606266;
+    font-size: 14px;
+}
+
+.mapping-account {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    background-color: #f0f9ff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #0369a1;
+}
+
+.mapping-currency {
+    color: #909399;
+    font-size: 12px;
+    font-style: italic;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .management-content {
+        flex-direction: column;
+    }
+
+    .account-tree-panel {
+        flex: none;
+    }
+
+    .management-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+/* 删除账户对话框样式 */
+.delete-account-content {
+    padding: 10px 0;
+}
+
+.migration-section {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.migration-section h4 {
+    margin: 0 0 10px 0;
+    color: #303133;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.migration-tip {
+    margin: 0 0 15px 0;
+    color: #606266;
+    font-size: 14px;
+}
+
+.no-candidates {
+    margin-top: 15px;
+}
+
+.no-mappings-section {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #f0f9ff;
+    border-radius: 8px;
+    border: 1px solid #bae6fd;
+}
+
+/* AccountSelector 样式 */
+.account-selector {
+    width: 100%;
+}
+
+.account-cascader {
+    width: 100%;
+}
+
+.cascader-node {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+/* AccountSelector 中的 node-label 样式 */
+.account-selector .node-label {
+    flex: 1;
+    font-weight: 500;
+}
+
+.node-tag,
+.mapping-tag {
+    margin: 0;
+}
+
+.account-preview {
+    margin-top: 12px;
+}
+
+.preview-content {
+    padding: 8px;
+}
+
+.account-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.account-info h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #303133;
+}
+
+.currencies,
+.mapping-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.label {
+    font-size: 12px;
+    color: #909399;
+    min-width: 60px;
+}
+
+.currency-tag {
+    margin: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .account-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .currencies,
+    .mapping-stats {
+        flex-wrap: wrap;
+    }
+}
+</style>

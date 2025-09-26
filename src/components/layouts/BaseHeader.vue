@@ -31,9 +31,9 @@
 
     <el-sub-menu index="map">
       <template #title>映射管理</template>
-      <!-- <router-link to="/format" class="no-underline">
-        <el-menu-item index="/format">格式化输出</el-menu-item>
-      </router-link> -->
+      <router-link to="/mapping" class="no-underline">
+        <el-menu-item index="/mapping">映射总览</el-menu-item>
+      </router-link>
       <router-link to="/map/templates" class="no-underline">
         <el-menu-item index="/map/templates">映射模板</el-menu-item>
       </router-link>
@@ -50,6 +50,9 @@
 
     <el-sub-menu index="config">
       <template #title>配置管理</template>
+      <router-link to="/config/accounts" class="no-underline">
+        <el-menu-item index="/config/accounts">账户管理</el-menu-item>
+      </router-link>
       <router-link to="/format" class="no-underline">
         <el-menu-item index="/format">格式化输出</el-menu-item>
       </router-link>
