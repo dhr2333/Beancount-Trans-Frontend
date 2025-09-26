@@ -67,13 +67,13 @@
                                 <div class="mapping-stats">
                                     <el-tooltip v-if="selectedAccount.mapping_count.expense > 0"
                                         :content="getExpenseMappingTooltip()" placement="top" effect="dark">
-                                        <el-tag type="success" style="cursor: help;">
+                                        <el-tag type="warning" style="cursor: help;">
                                             {{ selectedAccount.mapping_count.expense }}支出
                                         </el-tag>
                                     </el-tooltip>
                                     <el-tooltip v-if="selectedAccount.mapping_count.assets > 0"
                                         :content="getAssetsMappingTooltip()" placement="top" effect="dark">
-                                        <el-tag type="warning" style="cursor: help;">
+                                        <el-tag type="success" style="cursor: help;">
                                             {{ selectedAccount.mapping_count.assets }}资产
                                         </el-tag>
                                     </el-tooltip>
@@ -119,7 +119,7 @@
                                                 <span class="mapping-account">→ {{ selectedAccount?.account }}</span>
                                                 <span v-if="mapping.currency" class="mapping-currency">({{
                                                     mapping.currency
-                                                    }})</span>
+                                                }})</span>
                                             </div>
                                             <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
                                                 {{ mapping.enable ? '启用' : '禁用' }}
@@ -373,14 +373,14 @@
                                     </div>
                                     <div v-if="selectedMigrationAccountInfo.mapping_count" class="mapping-stats">
                                         <span class="label">映射统计：</span>
-                                        <el-tag type="success" size="small">{{
-                                            selectedMigrationAccountInfo.mapping_count.expense }}支出</el-tag>
                                         <el-tag type="warning" size="small">{{
+                                            selectedMigrationAccountInfo.mapping_count.expense }}支出</el-tag>
+                                        <el-tag type="success" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.assets
-                                        }}资产</el-tag>
+                                            }}资产</el-tag>
                                         <el-tag type="primary" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.income
-                                        }}收入</el-tag>
+                                            }}收入</el-tag>
                                     </div>
                                 </div>
                             </el-card>
@@ -623,11 +623,16 @@ const getAccountTypeColor = (type: string) => {
         'Expenses': 'warning',
         'Income': 'primary',
         'Liabilities': 'danger',
-        'Equity': 'info'
+        'Equity': 'info',
+        // 中文类型映射
+        '资产账户': 'success',
+        '支出账户': 'warning',
+        '收入账户': 'primary',
+        '负债账户': 'danger',
+        '权益账户': 'info'
     }
     return colorMap[type] || 'info'
 }
-
 // 更新账户状态
 const updateAccountStatus = async (account: Account) => {
     try {

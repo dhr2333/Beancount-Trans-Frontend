@@ -37,8 +37,8 @@
                     </div>
                     <div v-if="selectedAccount.mapping_count" class="mapping-stats">
                         <span class="label">映射统计：</span>
-                        <el-tag type="success" size="small">{{ selectedAccount.mapping_count.expense }}支出</el-tag>
-                        <el-tag type="warning" size="small">{{ selectedAccount.mapping_count.assets }}资产</el-tag>
+                        <el-tag type="warning" size="small">{{ selectedAccount.mapping_count.expense }}支出</el-tag>
+                        <el-tag type="success" size="small">{{ selectedAccount.mapping_count.assets }}资产</el-tag>
                         <el-tag type="primary" size="small">{{ selectedAccount.mapping_count.income }}收入</el-tag>
                     </div>
                 </div>

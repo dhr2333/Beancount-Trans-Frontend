@@ -147,9 +147,12 @@ const getTypeText = (type: string) => {
 // 获取模板类型标签样式
 const getTypeTag = (type: string) => {
     const typeTagMap: Record<string, string> = {
-        'expense': 'danger',
-        'income': 'success',
-        'assets': 'warning'
+        // 'expense': 'danger',
+        // 'income': 'success',
+        // 'assets': 'warning'
+        'expense': 'warning',
+        'income': 'primary',
+        'assets': 'success'
     }
     return typeTagMap[type] || ''
 }

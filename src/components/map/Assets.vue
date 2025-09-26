@@ -46,7 +46,7 @@
 
             <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" width="120">
                 <template #default="{ row }">
-                    <el-tag type="info" size="small">{{ row.key }}</el-tag>
+                    <el-tag type="primary" size="small">{{ row.key }}</el-tag>
                 </template>
             </el-table-column>
 
@@ -60,8 +60,10 @@
             <el-table-column label="映射账户" prop="assets" sortable min-width="200">
                 <template #default="{ row }">
                     <div class="account-cell">
-                        <el-text type="info">{{ typeof row.assets === 'object' ? row.assets?.account : row.assets }}</el-text>
-                        <el-tag v-if="typeof row.assets === 'object' && row.assets?.account_type" :type="getAccountTypeColor(row.assets.account_type)" size="small">
+                        <el-text type="primary">{{ typeof row.assets === 'object' ? row.assets?.account : row.assets
+                        }}</el-text>
+                        <el-tag v-if="typeof row.assets === 'object' && row.assets?.account_type"
+                            :type="getAccountTypeColor(row.assets.account_type)" size="small">
                             {{ row.assets.account_type }}
                         </el-tag>
                     </div>

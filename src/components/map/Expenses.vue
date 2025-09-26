@@ -68,12 +68,13 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="关联货币" prop="currency" width="150">
+      <el-table-column label="货币" prop="currency" width="150">
         <template #default="{ row }">
           <div v-if="row.currency" class="currency-cell">
-            <el-tag size="small" class="currency-tag">
+            <el-text type="primary">{{ row.currency.code }}</el-text>
+            <!-- <el-tag size="small" class="currency-tag">
               {{ row.currency.code }}
-            </el-tag>
+            </el-tag> -->
           </div>
           <el-text v-else type="info" size="small">-</el-text>
         </template>
@@ -140,8 +141,7 @@
       </el-form-item>
 
       <el-form-item label="关联货币" prop="currency">
-        <CurrencySelector v-model="ruleForm.currency" :account-id="ruleForm.expend || undefined"
-          placeholder="选择货币" />
+        <CurrencySelector v-model="ruleForm.currency" :account-id="ruleForm.expend || undefined" placeholder="选择货币" />
       </el-form-item>
 
       <el-form-item>
@@ -171,8 +171,7 @@
       </el-form-item>
 
       <el-form-item label="关联货币" prop="currency">
-        <CurrencySelector v-model="ruleForm.currency" :account-id="ruleForm.expend || undefined"
-          placeholder="选择货币" />
+        <CurrencySelector v-model="ruleForm.currency" :account-id="ruleForm.expend || undefined" placeholder="选择货币" />
       </el-form-item>
 
       <el-form-item>
@@ -374,7 +373,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
           key: ruleForm.value.key,
           payee: ruleForm.value.payee,
           expend_id: ruleForm.value.expend, // 将 expend 转换为 expend_id
-            currency: ruleForm.value.currency
+          currency: ruleForm.value.currency
         }
 
         console.log('提交数据:', submitData)
@@ -553,7 +552,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
           key: ruleForm.value.key,
           payee: ruleForm.value.payee,
           expend_id: ruleForm.value.expend, // 将 expend 转换为 expend_id
-            currency: ruleForm.value.currency
+          currency: ruleForm.value.currency
         }
 
         console.log('编辑提交数据:', submitData)
