@@ -157,22 +157,22 @@
                 <el-form-item label="关键字" prop="key">
                     <el-input v-model="quickCreateForm.key" placeholder="输入关键字" />
                 </el-form-item>
-                <el-form-item label="映射账户" prop="accountId">
-                    <AccountSelector v-model="quickCreateForm.accountId" placeholder="选择映射账户"
-                        @change="handleAccountChange" />
-                </el-form-item>
-                <el-form-item label="关联货币" prop="currencyId">
-                    <CurrencySelector v-model="quickCreateForm.currencyId" :account-id="quickCreateForm.accountId"
-                        placeholder="选择货币" />
-                </el-form-item>
                 <el-form-item v-if="quickCreateForm.type === 'expense'" label="商家" prop="payee">
                     <el-input v-model="quickCreateForm.payee" placeholder="输入商家名称（可选）" />
+                </el-form-item>
+                <el-form-item v-if="quickCreateForm.type === 'assets'" label="账户描述" prop="full">
+                    <el-input v-model="quickCreateForm.full" placeholder="输入账户描述（可选）" />
                 </el-form-item>
                 <!-- <el-form-item v-if="quickCreateForm.type === 'income'" label="付款方" prop="payer">
                     <el-input v-model="quickCreateForm.payer" placeholder="输入付款方（可选）" />
                 </el-form-item> -->
-                <el-form-item v-if="quickCreateForm.type === 'assets'" label="账户描述" prop="full">
-                    <el-input v-model="quickCreateForm.full" placeholder="输入账户描述（可选）" />
+                <el-form-item label="映射账户" prop="accountId">
+                    <AccountSelector v-model="quickCreateForm.accountId" placeholder="选择映射账户"
+                        @change="handleAccountChange" />
+                </el-form-item>
+                <el-form-item v-if="quickCreateForm.type === 'expense'" label="货币" prop="currencyId">
+                    <CurrencySelector v-model="quickCreateForm.currencyId" :account-id="quickCreateForm.accountId"
+                        placeholder="选择货币" />
                 </el-form-item>
             </el-form>
             <template #footer>
