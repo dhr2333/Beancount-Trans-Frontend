@@ -51,7 +51,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="映射账户" prop="expend" sortable min-width="200">
+      <el-table-column label="映射账户" prop="expend" sortable :sort-method="sortByAccount" min-width="200">
         <template #default="{ row }">
           <div class="account-cell">
             <el-text type="primary">{{ row.expend?.account || row.expend }}</el-text>
@@ -997,6 +997,29 @@ const advancedSort = (a: Expense, b: Expense): number => {
   }).toLowerCase();
 
   const pinyinB = pinyin(b.key, {
+    toneType: 'none',
+    pattern: 'first',
+    type: 'string'
+  }).toLowerCase();
+
+  if (pinyinA < pinyinB) return -1;
+  if (pinyinA > pinyinB) return 1;
+  return 0;
+};
+
+// 映射账户排序方法：处理中文字符串排序
+const sortByAccount = (a: Expense, b: Expense): number => {
+  const accountA = typeof a.expend === 'string' ? a.expend : a.expend?.account || '';
+  const accountB = typeof b.expend === 'string' ? b.expend : b.expend?.account || '';
+
+  // 按拼音排序
+  const pinyinA = pinyin(accountA, {
+    toneType: 'none',
+    pattern: 'first',
+    type: 'string'
+  }).toLowerCase();
+
+  const pinyinB = pinyin(accountB, {
     toneType: 'none',
     pattern: 'first',
     type: 'string'

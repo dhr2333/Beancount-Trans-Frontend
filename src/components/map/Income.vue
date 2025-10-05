@@ -51,11 +51,11 @@
                 </template>
             </el-table-column> -->
 
-            <el-table-column label="映射账户" prop="income" sortable min-width="200">
+            <el-table-column label="映射账户" prop="income" sortable :sort-method="sortByAccount" min-width="200">
                 <template #default="{ row }">
                     <div class="account-cell">
                         <el-text type="primary">{{ typeof row.income === 'object' ? row.income?.account : row.income
-                        }}</el-text>
+                            }}</el-text>
                         <el-tag v-if="typeof row.income === 'object' && row.income?.account_type"
                             :type="getAccountTypeColor(row.income.account_type)" size="small">
                             {{ row.income.account_type }}
@@ -803,6 +803,29 @@ const advancedSort = (a: Income, b: Income): number => {
     }).toLowerCase();
 
     const pinyinB = pinyin(b.key, {
+        toneType: 'none',
+        pattern: 'first',
+        type: 'string'
+    }).toLowerCase();
+
+    if (pinyinA < pinyinB) return -1;
+    if (pinyinA > pinyinB) return 1;
+    return 0;
+};
+
+// 映射账户排序方法：处理中文字符串排序
+const sortByAccount = (a: Income, b: Income): number => {
+    const accountA = typeof a.income === 'string' ? a.income : a.income?.account || '';
+    const accountB = typeof b.income === 'string' ? b.income : b.income?.account || '';
+
+    // 按拼音排序
+    const pinyinA = pinyin(accountA, {
+        toneType: 'none',
+        pattern: 'first',
+        type: 'string'
+    }).toLowerCase();
+
+    const pinyinB = pinyin(accountB, {
         toneType: 'none',
         pattern: 'first',
         type: 'string'
