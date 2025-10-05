@@ -1,8 +1,9 @@
 <template>
     <div class="account-selector">
         <el-cascader v-model="selectedValue" :options="accountOptions" :props="cascaderProps" :placeholder="placeholder"
-            :filterable="true" :clearable="true" :show-all-levels="false" :separator="' > '" @change="handleChange"
-            @visible-change="handleVisibleChange" class="account-cascader" style="width: 100%;">
+            :filterable="true" :filter-method="customFilterMethod" :clearable="true" :show-all-levels="false"
+            :separator="' > '" @change="handleChange" @visible-change="handleVisibleChange" class="account-cascader"
+            style="width: 100%;">
             <template #default="{ node, data }">
                 <div class="cascader-node">
                     <span class="node-label">{{ data.account }}</span>
@@ -207,6 +208,25 @@ const getAccountTypeColor = (type: string) => {
         '权益账户': 'info'
     }
     return colorMap[type] || 'info'
+}
+
+// 自定义过滤方法 - 不区分大小写搜索
+const customFilterMethod = (node: any, keyword: string) => {
+    if (!keyword) return true
+
+    // 将搜索关键词转换为小写
+    const lowerKeyword = keyword.toLowerCase()
+
+    // 检查账户名称是否包含关键词（不区分大小写）
+    const accountName = node.data.account || ''
+    const lowerAccountName = accountName.toLowerCase()
+
+    // 检查账户类型是否包含关键词（不区分大小写）
+    const accountType = node.data.account_type || ''
+    const lowerAccountType = accountType.toLowerCase()
+
+    // 返回匹配结果
+    return lowerAccountName.includes(lowerKeyword) || lowerAccountType.includes(lowerKeyword)
 }
 
 // 处理选择变化

@@ -119,7 +119,7 @@
                                                 <span class="mapping-account">→ {{ selectedAccount?.account }}</span>
                                                 <span v-if="mapping.currency" class="mapping-currency">({{
                                                     mapping.currency
-                                                }})</span>
+                                                    }})</span>
                                             </div>
                                             <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
                                                 {{ mapping.enable ? '启用' : '禁用' }}
@@ -377,10 +377,10 @@
                                             selectedMigrationAccountInfo.mapping_count.expense }}支出</el-tag>
                                         <el-tag type="success" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.assets
-                                            }}资产</el-tag>
+                                        }}资产</el-tag>
                                         <el-tag type="primary" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.income
-                                            }}收入</el-tag>
+                                        }}收入</el-tag>
                                     </div>
                                 </div>
                             </el-card>
@@ -555,7 +555,8 @@ const calculateDefaultExpandedKeys = (accounts: Account[], level: number = 1): n
         const accountType = account.account.split(':')[0]
 
         // 只展开Expenses类型的账户
-        if (accountType === 'Expenses' && level <= 2) {
+        // if (accountType === 'Expenses' && level <= 2) {
+        if (accountType === 'Expenses' && level <= 0) {
             expandedKeys.push(account.id)
 
             // 递归处理子账户

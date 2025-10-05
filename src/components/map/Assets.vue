@@ -395,7 +395,7 @@ const rules = ref<FormRules>({
         { max: 32, message: '长度应控制在32个字符以内', trigger: 'blur' },
     ],
     assets: [
-        { required: true, message: '请选择映射账户', trigger: 'change' },
+        { required: false, message: '请选择映射账户', trigger: 'change' },
     ],
     currency_id: [
         { required: false, message: '请选择货币', trigger: 'change' },
