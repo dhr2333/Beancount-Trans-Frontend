@@ -38,20 +38,20 @@
       @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" />
 
-      <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" width="120">
+      <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" min-width="100" width="auto">
         <template #default="{ row }">
           <el-tag type="primary" size="small">{{ row.key }}</el-tag>
         </template>
       </el-table-column>
 
-      <el-table-column label="商家" prop="payee" width="150">
+      <el-table-column label="商家" prop="payee" min-width="120" width="auto">
         <template #default="{ row }">
           <span v-if="row.payee">{{ row.payee }}</span>
           <el-text v-else type="info" size="small">-</el-text>
         </template>
       </el-table-column>
 
-      <el-table-column label="映射账户" prop="expend" sortable :sort-method="sortByAccount" min-width="200">
+      <el-table-column label="映射账户" prop="expend" sortable :sort-method="sortByAccount" min-width="180" width="auto">
         <template #default="{ row }">
           <div class="account-cell">
             <el-text type="primary">{{ row.expend?.account || row.expend }}</el-text>
@@ -62,7 +62,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="货币" prop="currency" width="150">
+      <el-table-column label="货币" prop="currency" min-width="80" width="auto">
         <template #default="{ row }">
           <div v-if="row.currency" class="currency-cell">
             <el-text type="primary">{{ row.currency.code }}</el-text>
@@ -1063,12 +1063,39 @@ const sortByAccount = (a: Expense, b: Expense): number => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .currency-cell {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* 表格自适应优化 */
+:deep(.el-table) {
+  table-layout: auto;
+}
+
+:deep(.el-table__body-wrapper) {
+  overflow-x: auto;
+}
+
+/* 确保表格列能够自适应内容 */
+:deep(.el-table th),
+:deep(.el-table td) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 关键字列特殊处理 */
+:deep(.el-table .el-tag) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .currency-tag {
@@ -1212,6 +1239,16 @@ const sortByAccount = (a: Expense, b: Expense): number => {
 }
 
 /* 响应式设计 */
+@media (max-width: 1200px) {
+
+  /* 中等屏幕优化 */
+  .account-cell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
 @media (max-width: 768px) {
   .expense-mapping {
     padding: 12px;
@@ -1238,6 +1275,33 @@ const sortByAccount = (a: Expense, b: Expense): number => {
 
   .item-index {
     align-self: flex-end;
+  }
+
+  /* 小屏幕表格优化 */
+  :deep(.el-table) {
+    font-size: 12px;
+  }
+
+  :deep(.el-tag) {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  :deep(.el-button--small) {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+
+  /* 超小屏幕进一步优化 */
+  .account-cell {
+    gap: 2px;
+  }
+
+  .currency-cell {
+    gap: 2px;
   }
 }
 </style>

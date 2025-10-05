@@ -38,24 +38,25 @@
             @selection-change="handleSelectionChange">
             <el-table-column type="selection" width="55" />
 
-            <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" width="120">
+            <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" min-width="100" width="auto">
                 <template #default="{ row }">
                     <el-tag type="primary" size="small">{{ row.key }}</el-tag>
                 </template>
             </el-table-column>
 
-            <el-table-column label="账户描述" prop="full" width="200">
+            <el-table-column label="账户描述" prop="full" min-width="150" width="auto">
                 <template #default="{ row }">
                     <span v-if="row.full">{{ row.full }}</span>
                     <el-text v-else type="info" size="small">-</el-text>
                 </template>
             </el-table-column>
 
-            <el-table-column label="映射账户" prop="assets" sortable :sort-method="sortByAccount" min-width="200">
+            <el-table-column label="映射账户" prop="assets" sortable :sort-method="sortByAccount" min-width="180"
+                width="auto">
                 <template #default="{ row }">
                     <div class="account-cell">
                         <el-text type="primary">{{ typeof row.assets === 'object' ? row.assets?.account : row.assets
-                        }}</el-text>
+                            }}</el-text>
                         <el-tag v-if="typeof row.assets === 'object' && row.assets?.account_type"
                             :type="getAccountTypeColor(row.assets.account_type)" size="small">
                             {{ row.assets.account_type }}
@@ -881,12 +882,39 @@ const sortByAccount = (a: Assets, b: Assets): number => {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
 }
 
 .currency-cell {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
+    min-width: 0;
+}
+
+/* 表格自适应优化 */
+:deep(.el-table) {
+    table-layout: auto;
+}
+
+:deep(.el-table__body-wrapper) {
+    overflow-x: auto;
+}
+
+/* 确保表格列能够自适应内容 */
+:deep(.el-table th),
+:deep(.el-table td) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 关键字列特殊处理 */
+:deep(.el-table .el-tag) {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .currency-tag {
@@ -1010,6 +1038,16 @@ const sortByAccount = (a: Assets, b: Assets): number => {
 }
 
 /* 响应式设计 */
+@media (max-width: 1200px) {
+
+    /* 中等屏幕优化 */
+    .account-cell {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+}
+
 @media (max-width: 768px) {
     .assets-mapping {
         padding: 12px;
@@ -1036,6 +1074,33 @@ const sortByAccount = (a: Assets, b: Assets): number => {
 
     .item-index {
         align-self: flex-end;
+    }
+
+    /* 小屏幕表格优化 */
+    :deep(.el-table) {
+        font-size: 12px;
+    }
+
+    :deep(.el-tag) {
+        font-size: 11px;
+        padding: 2px 6px;
+    }
+
+    :deep(.el-button--small) {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+
+    /* 超小屏幕进一步优化 */
+    .account-cell {
+        gap: 2px;
+    }
+
+    .currency-cell {
+        gap: 2px;
     }
 }
 </style>

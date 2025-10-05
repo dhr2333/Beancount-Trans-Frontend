@@ -538,7 +538,7 @@ const accountRules: FormRules = {
 const currencyRules: FormRules = {
     code: [
         { required: true, message: '请输入货币代码', trigger: 'blur' },
-        { pattern: /^[A-Z]{3}$/, message: '货币代码必须是3位大写字母', trigger: 'blur' }
+        { pattern: /^[A-Z]+$/, message: '货币代码必须是3位大写字母', trigger: 'blur' }
     ],
     name: [
         { required: true, message: '请输入货币名称', trigger: 'blur' },
