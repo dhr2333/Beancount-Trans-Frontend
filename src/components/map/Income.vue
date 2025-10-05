@@ -30,12 +30,6 @@
                     </el-icon>
                     导出
                 </el-button>
-                <el-button @click="fetchData()">
-                    <el-icon>
-                        <Refresh />
-                    </el-icon>
-                    刷新
-                </el-button>
             </div>
         </div>
 
@@ -61,7 +55,7 @@
                 <template #default="{ row }">
                     <div class="account-cell">
                         <el-text type="primary">{{ typeof row.income === 'object' ? row.income?.account : row.income
-                            }}</el-text>
+                        }}</el-text>
                         <el-tag v-if="typeof row.income === 'object' && row.income?.account_type"
                             :type="getAccountTypeColor(row.income.account_type)" size="small">
                             {{ row.income.account_type }}
@@ -261,7 +255,7 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { Search, Plus, Upload, Download, Refresh, Edit, Delete } from '@element-plus/icons-vue'
+import { Search, Plus, Upload, Download, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'

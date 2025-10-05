@@ -30,12 +30,6 @@
           </el-icon>
           导出
         </el-button>
-        <el-button @click="fetchData()">
-          <el-icon>
-            <Refresh />
-          </el-icon>
-          刷新
-        </el-button>
       </div>
     </div>
 
@@ -322,7 +316,7 @@
 import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Upload, Download, Refresh, Edit, Delete } from '@element-plus/icons-vue'
+import { Search, Plus, Upload, Download, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'

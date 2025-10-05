@@ -9,23 +9,6 @@
                     </el-icon>
                     新增账户
                 </el-button>
-                <el-dropdown @command="handleRefreshCommand" trigger="click">
-                    <el-button>
-                        <el-icon>
-                            <Refresh />
-                        </el-icon>
-                        刷新
-                        <el-icon class="el-icon--right">
-                            <ArrowDown />
-                        </el-icon>
-                    </el-button>
-                    <template #dropdown>
-                        <el-dropdown-menu>
-                            <el-dropdown-item command="preserve">保持当前状态刷新</el-dropdown-item>
-                            <el-dropdown-item command="reset">重置到初始状态</el-dropdown-item>
-                        </el-dropdown-menu>
-                    </template>
-                </el-dropdown>
             </div>
         </div>
 
@@ -432,7 +415,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Edit, Delete, ArrowDown } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import type { FormInstance, FormRules } from 'element-plus'
 
@@ -592,7 +575,7 @@ const hasMappings = computed(() => {
 })
 
 // 获取账户树形数据
-const fetchAccountTree = async (preserveState: boolean = false) => {
+const fetchAccountTree = async () => {
     try {
         loading.value = true
 
@@ -603,24 +586,18 @@ const fetchAccountTree = async (preserveState: boolean = false) => {
         const response = await axios.get('/account/tree/')
         accountTree.value = response.data
 
-        if (preserveState) {
-            // 保持之前的展开状态
-            defaultExpandedKeys.value = previousExpandedKeys.length > 0 ? previousExpandedKeys : calculateDefaultExpandedKeys(response.data)
+        // 保持之前的展开状态
+        defaultExpandedKeys.value = previousExpandedKeys.length > 0 ? previousExpandedKeys : calculateDefaultExpandedKeys(response.data)
 
-            // 恢复选中的账户
-            if (previousSelectedId) {
-                const selectedAccount = findAccountById(accountTree.value, previousSelectedId)
-                if (selectedAccount) {
-                    selectedAccount.value = selectedAccount
-                    currentSelectedAccountId.value = previousSelectedId
-                    // 重新获取映射数据
-                    await fetchAccountMappings()
-                }
+        // 恢复选中的账户
+        if (previousSelectedId) {
+            const selectedAccount = findAccountById(accountTree.value, previousSelectedId)
+            if (selectedAccount) {
+                selectedAccount.value = selectedAccount
+                currentSelectedAccountId.value = previousSelectedId
+                // 重新获取映射数据
+                await fetchAccountMappings()
             }
-        } else {
-            // 首次加载或完全刷新时使用默认展开状态
-            defaultExpandedKeys.value = calculateDefaultExpandedKeys(response.data)
-            expandedKeys.value = [...defaultExpandedKeys.value]
         }
     } catch (error: any) {
         console.error('获取账户树失败:', error)
@@ -725,7 +702,7 @@ const createAccount = async () => {
         await axios.post('/account/', newAccount.value)
         ElMessage.success('账户创建成功')
         addAccountDialog.value = false
-        await fetchAccountTree(true) // 保持状态
+        await fetchAccountTree()
     } catch (error: any) {
         console.error('创建账户失败:', error)
         if (error.response?.status === 401) {
@@ -758,7 +735,7 @@ const updateAccount = async () => {
         await axios.put(`/account/${selectedAccount.value.id}/`, editAccountForm.value)
         ElMessage.success('账户更新成功')
         editAccountDialog.value = false
-        await fetchAccountTree(true) // 保持状态
+        await fetchAccountTree()
     } catch (error: any) {
         console.error('更新账户失败:', error)
         if (error.response?.status === 401) {
@@ -884,7 +861,7 @@ const confirmDeleteAccount = async () => {
         deleteAccountDialog.value = false
         selectedAccount.value = null
         currentSelectedAccountId.value = null
-        await fetchAccountTree(true) // 保持状态
+        await fetchAccountTree()
     } catch (error: any) {
         console.error('删除账户失败:', error)
         if (error.response?.status === 401) {
@@ -919,7 +896,7 @@ const updateAccountCurrencies = async () => {
         })
         ElMessage.success('货币关联更新成功')
         currencyDialog.value = false
-        await fetchAccountTree(true) // 保持状态
+        await fetchAccountTree()
     } catch (error: any) {
         console.error('更新货币关联失败:', error)
         if (error.response?.status === 401) {
@@ -943,7 +920,7 @@ const removeCurrency = async (currencyId: number) => {
             currency_ids: newCurrencyIds
         })
         ElMessage.success('货币关联移除成功')
-        await fetchAccountTree(true) // 保持状态
+        await fetchAccountTree()
     } catch (error: any) {
         console.error('移除货币关联失败:', error)
         if (error.response?.status === 401) {
@@ -954,24 +931,6 @@ const removeCurrency = async (currencyId: number) => {
     }
 }
 
-// 刷新数据
-const refreshData = async (preserveState: boolean = true) => {
-    await Promise.all([
-        fetchAccountTree(preserveState),
-        fetchCurrencies()
-    ])
-}
-
-// 处理刷新命令
-const handleRefreshCommand = async (command: string) => {
-    if (command === 'preserve') {
-        await refreshData(true)
-        ElMessage.success('已刷新数据，保持当前状态')
-    } else if (command === 'reset') {
-        await refreshData(false)
-        ElMessage.success('已刷新数据，重置到初始状态')
-    }
-}
 
 // 格式化日期时间
 const formatDateTime = (dateString: string): string => {
@@ -1141,7 +1100,8 @@ const getIncomeMappingTooltip = () => {
 
 // 组件挂载时初始化数据
 onMounted(() => {
-    refreshData(false) // 首次加载不保持状态
+    fetchAccountTree()
+    fetchCurrencies()
 })
 </script>
 
