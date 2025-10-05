@@ -9,12 +9,23 @@
                     </el-icon>
                     新增账户
                 </el-button>
-                <el-button @click="refreshData">
-                    <el-icon>
-                        <Refresh />
-                    </el-icon>
-                    刷新
-                </el-button>
+                <el-dropdown @command="handleRefreshCommand" trigger="click">
+                    <el-button>
+                        <el-icon>
+                            <Refresh />
+                        </el-icon>
+                        刷新
+                        <el-icon class="el-icon--right">
+                            <ArrowDown />
+                        </el-icon>
+                    </el-button>
+                    <template #dropdown>
+                        <el-dropdown-menu>
+                            <el-dropdown-item command="preserve">保持当前状态刷新</el-dropdown-item>
+                            <el-dropdown-item command="reset">重置到初始状态</el-dropdown-item>
+                        </el-dropdown-menu>
+                    </template>
+                </el-dropdown>
             </div>
         </div>
 
@@ -23,7 +34,8 @@
             <div class="account-tree-panel">
                 <el-tree :data="accountTree" :props="treeProps" node-key="id" :expand-on-click-node="false"
                     :default-expand-all="false" :default-expanded-keys="defaultExpandedKeys"
-                    @node-click="handleNodeClick" class="account-tree" v-loading="loading">
+                    @node-click="handleNodeClick" @node-expand="handleNodeExpand" @node-collapse="handleNodeCollapse"
+                    class="account-tree" v-loading="loading">
                     <template #default="{ node, data }">
                         <div class="tree-node">
                             <span class="node-label">{{ data.account }}</span>
@@ -119,7 +131,7 @@
                                                 <span class="mapping-account">→ {{ selectedAccount?.account }}</span>
                                                 <span v-if="mapping.currency" class="mapping-currency">({{
                                                     mapping.currency
-                                                    }})</span>
+                                                }})</span>
                                             </div>
                                             <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
                                                 {{ mapping.enable ? '启用' : '禁用' }}
@@ -377,10 +389,10 @@
                                             selectedMigrationAccountInfo.mapping_count.expense }}支出</el-tag>
                                         <el-tag type="success" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.assets
-                                        }}资产</el-tag>
+                                            }}资产</el-tag>
                                         <el-tag type="primary" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.income
-                                        }}收入</el-tag>
+                                            }}收入</el-tag>
                                     </div>
                                 </div>
                             </el-card>
@@ -420,7 +432,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Edit, Delete } from '@element-plus/icons-vue'
+import { Plus, Refresh, Edit, Delete, ArrowDown } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import type { FormInstance, FormRules } from 'element-plus'
 
@@ -456,6 +468,10 @@ const accountTree = ref<Account[]>([])
 const selectedAccount = ref<Account | null>(null)
 const availableCurrencies = ref<Currency[]>([])
 const defaultExpandedKeys = ref<number[]>([])
+
+// 树形结构状态保持
+const expandedKeys = ref<number[]>([])
+const currentSelectedAccountId = ref<number | null>(null)
 
 // 对话框状态
 const addAccountDialog = ref(false)
@@ -576,14 +592,36 @@ const hasMappings = computed(() => {
 })
 
 // 获取账户树形数据
-const fetchAccountTree = async () => {
+const fetchAccountTree = async (preserveState: boolean = false) => {
     try {
         loading.value = true
+
+        // 保存当前状态
+        const previousExpandedKeys = [...expandedKeys.value]
+        const previousSelectedId = currentSelectedAccountId.value
+
         const response = await axios.get('/account/tree/')
         accountTree.value = response.data
 
-        // 计算默认展开的节点
-        defaultExpandedKeys.value = calculateDefaultExpandedKeys(response.data)
+        if (preserveState) {
+            // 保持之前的展开状态
+            defaultExpandedKeys.value = previousExpandedKeys.length > 0 ? previousExpandedKeys : calculateDefaultExpandedKeys(response.data)
+
+            // 恢复选中的账户
+            if (previousSelectedId) {
+                const selectedAccount = findAccountById(accountTree.value, previousSelectedId)
+                if (selectedAccount) {
+                    selectedAccount.value = selectedAccount
+                    currentSelectedAccountId.value = previousSelectedId
+                    // 重新获取映射数据
+                    await fetchAccountMappings()
+                }
+            }
+        } else {
+            // 首次加载或完全刷新时使用默认展开状态
+            defaultExpandedKeys.value = calculateDefaultExpandedKeys(response.data)
+            expandedKeys.value = [...defaultExpandedKeys.value]
+        }
     } catch (error: any) {
         console.error('获取账户树失败:', error)
         if (error.response?.status === 401) {
@@ -610,11 +648,27 @@ const fetchCurrencies = async () => {
 // 节点点击处理
 const handleNodeClick = async (data: Account) => {
     selectedAccount.value = data
+    currentSelectedAccountId.value = data.id
     // 重置映射详情状态
     showMappingDetails.value = false
 
     // 自动获取映射数据
     await fetchAccountMappings()
+}
+
+// 节点展开处理
+const handleNodeExpand = (data: Account) => {
+    if (!expandedKeys.value.includes(data.id)) {
+        expandedKeys.value.push(data.id)
+    }
+}
+
+// 节点折叠处理
+const handleNodeCollapse = (data: Account) => {
+    const index = expandedKeys.value.indexOf(data.id)
+    if (index > -1) {
+        expandedKeys.value.splice(index, 1)
+    }
 }
 
 // 获取账户类型颜色
@@ -671,7 +725,7 @@ const createAccount = async () => {
         await axios.post('/account/', newAccount.value)
         ElMessage.success('账户创建成功')
         addAccountDialog.value = false
-        await fetchAccountTree()
+        await fetchAccountTree(true) // 保持状态
     } catch (error: any) {
         console.error('创建账户失败:', error)
         if (error.response?.status === 401) {
@@ -704,14 +758,7 @@ const updateAccount = async () => {
         await axios.put(`/account/${selectedAccount.value.id}/`, editAccountForm.value)
         ElMessage.success('账户更新成功')
         editAccountDialog.value = false
-        await fetchAccountTree()
-        // 更新选中账户的信息
-        if (selectedAccount.value) {
-            const updatedAccount = accountTree.value.find(acc => acc.id === selectedAccount.value!.id)
-            if (updatedAccount) {
-                selectedAccount.value = updatedAccount
-            }
-        }
+        await fetchAccountTree(true) // 保持状态
     } catch (error: any) {
         console.error('更新账户失败:', error)
         if (error.response?.status === 401) {
@@ -836,7 +883,8 @@ const confirmDeleteAccount = async () => {
         ElMessage.success('账户删除成功')
         deleteAccountDialog.value = false
         selectedAccount.value = null
-        await fetchAccountTree()
+        currentSelectedAccountId.value = null
+        await fetchAccountTree(true) // 保持状态
     } catch (error: any) {
         console.error('删除账户失败:', error)
         if (error.response?.status === 401) {
@@ -871,12 +919,7 @@ const updateAccountCurrencies = async () => {
         })
         ElMessage.success('货币关联更新成功')
         currencyDialog.value = false
-        await fetchAccountTree()
-        // 更新选中账户的信息
-        const updatedAccount = accountTree.value.find(acc => acc.id === selectedAccount.value!.id)
-        if (updatedAccount) {
-            selectedAccount.value = updatedAccount
-        }
+        await fetchAccountTree(true) // 保持状态
     } catch (error: any) {
         console.error('更新货币关联失败:', error)
         if (error.response?.status === 401) {
@@ -900,12 +943,7 @@ const removeCurrency = async (currencyId: number) => {
             currency_ids: newCurrencyIds
         })
         ElMessage.success('货币关联移除成功')
-        await fetchAccountTree()
-        // 更新选中账户的信息
-        const updatedAccount = accountTree.value.find(acc => acc.id === selectedAccount.value!.id)
-        if (updatedAccount) {
-            selectedAccount.value = updatedAccount
-        }
+        await fetchAccountTree(true) // 保持状态
     } catch (error: any) {
         console.error('移除货币关联失败:', error)
         if (error.response?.status === 401) {
@@ -917,11 +955,22 @@ const removeCurrency = async (currencyId: number) => {
 }
 
 // 刷新数据
-const refreshData = async () => {
+const refreshData = async (preserveState: boolean = true) => {
     await Promise.all([
-        fetchAccountTree(),
+        fetchAccountTree(preserveState),
         fetchCurrencies()
     ])
+}
+
+// 处理刷新命令
+const handleRefreshCommand = async (command: string) => {
+    if (command === 'preserve') {
+        await refreshData(true)
+        ElMessage.success('已刷新数据，保持当前状态')
+    } else if (command === 'reset') {
+        await refreshData(false)
+        ElMessage.success('已刷新数据，重置到初始状态')
+    }
 }
 
 // 格式化日期时间
@@ -1092,7 +1141,7 @@ const getIncomeMappingTooltip = () => {
 
 // 组件挂载时初始化数据
 onMounted(() => {
-    refreshData()
+    refreshData(false) // 首次加载不保持状态
 })
 </script>
 
