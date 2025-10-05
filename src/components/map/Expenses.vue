@@ -110,6 +110,7 @@
           <div class="batch-buttons">
             <el-button size="small" @click="handleBatchEnable">批量启用</el-button>
             <el-button size="small" @click="handleBatchDisable">批量禁用</el-button>
+            <el-button size="small" type="primary" @click="handleBatchUpdateAccount">批量修改账户</el-button>
             <el-button size="small" type="danger" @click="handleBatchDelete">批量删除</el-button>
           </div>
         </template>
@@ -247,6 +248,64 @@
         <el-button type="danger" @click="confirmBatchDelete" :loading="batchDeleteLoading"
           :disabled="batchDeleteLoading">
           {{ batchDeleteLoading ? '删除中...' : '确认删除' }}
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
+
+  <!-- 批量修改账户对话框 -->
+  <el-dialog v-model="batchUpdateAccountDialog" title="批量修改支出映射账户" width="600px" :close-on-click-modal="false">
+    <div class="batch-update-content">
+      <!-- 提示信息 -->
+      <el-alert :title="`您即将修改 ${selectedItems.length} 个支出映射的账户设置`" type="info" :closable="false" show-icon
+        style="margin-bottom: 20px;">
+        <template #default>
+          <p>请选择要修改的字段，留空的字段将保持不变。</p>
+        </template>
+      </el-alert>
+
+      <!-- 表单 -->
+      <el-form ref="batchUpdateFormRef" :model="batchUpdateForm" label-width="100px" status-icon>
+        <el-form-item label="映射账户">
+          <AccountSelector v-model="batchUpdateForm.expend" placeholder="选择新的映射账户（留空保持不变）"
+            @change="handleBatchAccountChange" />
+        </el-form-item>
+
+        <el-form-item label="关联货币">
+          <CurrencySelector v-model="batchUpdateForm.currency" :account-id="batchUpdateForm.expend || undefined"
+            placeholder="选择新的货币（留空保持不变）" />
+        </el-form-item>
+      </el-form>
+
+      <!-- 进度条 -->
+      <div v-if="batchUpdateLoading" class="update-progress">
+        <el-progress :percentage="batchUpdateProgress" :status="batchUpdateProgress === 100 ? 'success' : undefined"
+          :stroke-width="8" />
+        <p class="progress-text">正在更新映射... {{ batchUpdateProgress }}%</p>
+      </div>
+
+      <!-- 错误信息 -->
+      <div v-if="batchUpdateErrors.length > 0" class="update-errors">
+        <el-alert title="部分更新失败" type="error" :closable="false" show-icon>
+          <template #default>
+            <ul class="error-list">
+              <li v-for="error in batchUpdateErrors" :key="error" class="error-item">
+                {{ error }}
+              </li>
+            </ul>
+          </template>
+        </el-alert>
+      </div>
+    </div>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="cancelBatchUpdateAccount" :disabled="batchUpdateLoading">
+          取消
+        </el-button>
+        <el-button type="primary" @click="confirmBatchUpdateAccount" :loading="batchUpdateLoading"
+          :disabled="batchUpdateLoading || (!batchUpdateForm.expend && !batchUpdateForm.currency)">
+          {{ batchUpdateLoading ? '更新中...' : '确认更新' }}
         </el-button>
       </div>
     </template>
@@ -759,6 +818,17 @@ const batchDeleteLoading = ref(false)
 const batchDeleteProgress = ref(0)
 const batchDeleteErrors = ref<string[]>([])
 
+// 批量修改账户相关状态
+const batchUpdateAccountDialog = ref(false)
+const batchUpdateLoading = ref(false)
+const batchUpdateProgress = ref(0)
+const batchUpdateErrors = ref<string[]>([])
+const batchUpdateFormRef = ref<FormInstance>()
+const batchUpdateForm = ref({
+  expend: null as number | null,
+  currency: null as number | null
+})
+
 // 批量删除
 const handleBatchDelete = () => {
   if (selectedItems.value.length === 0) return
@@ -823,6 +893,95 @@ const cancelBatchDelete = () => {
   batchDeleteDialog.value = false
   batchDeleteErrors.value = []
   batchDeleteProgress.value = 0
+}
+
+// 批量修改账户
+const handleBatchUpdateAccount = () => {
+  if (selectedItems.value.length === 0) return
+  batchUpdateAccountDialog.value = true
+  batchUpdateErrors.value = []
+  batchUpdateProgress.value = 0
+  // 重置表单
+  batchUpdateForm.value = {
+    expend: null,
+    currency: null
+  }
+}
+
+// 处理批量修改账户选择变化
+const handleBatchAccountChange = (account: any) => {
+  // 账户变化时可以做一些额外处理
+  console.log('批量修改账户选择变化:', account)
+}
+
+// 确认批量修改账户
+const confirmBatchUpdateAccount = async () => {
+  if (selectedItems.value.length === 0) return
+
+  batchUpdateLoading.value = true
+  batchUpdateProgress.value = 0
+  batchUpdateErrors.value = []
+
+  const totalItems = selectedItems.value.length
+  const errors: string[] = []
+  let successCount = 0
+
+  try {
+    // 准备批量更新数据
+    const updateData = {
+      expense_ids: selectedItems.value.map(item => item.id),
+      expend_id: batchUpdateForm.value.expend,
+      currency_id: batchUpdateForm.value.currency
+    }
+
+    console.log('批量更新数据:', updateData)
+
+    // 发送批量更新请求
+    const response = await axios.post('expense/batch_update_account/', updateData)
+
+    if (response.data && response.data.updated_count) {
+      successCount = response.data.updated_count
+      batchUpdateProgress.value = 100
+
+      if (successCount === totalItems) {
+        ElMessage.success(`成功更新 ${successCount} 个支出映射`)
+        batchUpdateAccountDialog.value = false
+        await fetchData()
+        selectedItems.value = []
+      } else {
+        ElMessage.warning(`成功更新 ${successCount} 个映射，${totalItems - successCount} 个失败`)
+        batchUpdateErrors.value = [`${totalItems - successCount} 个映射更新失败`]
+      }
+    } else {
+      throw new Error('更新响应格式错误')
+    }
+  } catch (error: any) {
+    console.error('批量更新账户失败:', error)
+
+    if (error.response?.data?.error) {
+      errors.push(error.response.data.error)
+    } else if (error.response?.data?.detail) {
+      errors.push(error.response.data.detail)
+    } else {
+      errors.push('批量更新过程中发生未知错误')
+    }
+
+    batchUpdateErrors.value = errors
+    ElMessage.error('批量更新失败')
+  } finally {
+    batchUpdateLoading.value = false
+  }
+}
+
+// 取消批量修改账户
+const cancelBatchUpdateAccount = () => {
+  batchUpdateAccountDialog.value = false
+  batchUpdateErrors.value = []
+  batchUpdateProgress.value = 0
+  batchUpdateForm.value = {
+    expend: null,
+    currency: null
+  }
 }
 
 // 高级排序方法：处理数字、英文和中文混合内容
@@ -916,6 +1075,26 @@ const advancedSort = (a: Expense, b: Expense): number => {
 /* 批量删除对话框样式 */
 .batch-delete-content {
   padding: 10px 0;
+}
+
+/* 批量修改账户对话框样式 */
+.batch-update-content {
+  padding: 10px 0;
+}
+
+.update-progress {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.progress-text {
+  margin-top: 8px;
+  color: #606266;
+  font-size: 14px;
+}
+
+.update-errors {
+  margin-top: 20px;
 }
 
 .delete-items-list {
