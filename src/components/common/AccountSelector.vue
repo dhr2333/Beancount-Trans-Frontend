@@ -29,13 +29,6 @@
                             {{ selectedAccount.account_type }}
                         </el-tag>
                     </div>
-                    <div v-if="selectedAccount.currencies && selectedAccount.currencies.length > 0" class="currencies">
-                        <span class="label">关联货币：</span>
-                        <el-tag v-for="currency in selectedAccount.currencies" :key="currency.id" size="small"
-                            class="currency-tag">
-                            {{ currency.code }} - {{ currency.name }}
-                        </el-tag>
-                    </div>
                     <div v-if="selectedAccount.mapping_count" class="mapping-stats">
                         <span class="label">映射统计：</span>
                         <el-tag type="warning" size="small">{{ selectedAccount.mapping_count.expense }}支出</el-tag>
@@ -54,16 +47,9 @@ import { ElMessage } from 'element-plus'
 import axios from '../../utils/request'
 
 // 接口定义
-interface Currency {
-    id: number
-    code: string
-    name: string
-}
-
 interface Account {
     id: number
     account: string
-    currencies: Currency[]
     parent?: number
     parent_account?: string
     account_type: string

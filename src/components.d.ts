@@ -16,7 +16,6 @@ declare module '@vue/runtime-core' {
     Assets: typeof import('./components/map/Assets.vue')['default']
     BaseHeader: typeof import('./components/layouts/BaseHeader.vue')['default']
     BaseSide: typeof import('./components/layouts/BaseSide.vue')['default']
-    CurrencySelector: typeof import('./components/common/CurrencySelector.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElBadge: typeof import('element-plus/es')['ElBadge']
     ElBreadcrumb: typeof import('element-plus/es')['ElBreadcrumb']

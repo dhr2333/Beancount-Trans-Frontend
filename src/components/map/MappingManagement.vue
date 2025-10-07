@@ -152,9 +152,10 @@
                     <AccountSelector v-model="quickCreateForm.accountId" placeholder="选择映射账户"
                         @change="handleAccountChange" />
                 </el-form-item>
-                <el-form-item v-if="quickCreateForm.type === 'expense'" label="货币" prop="currencyId">
-                    <CurrencySelector v-model="quickCreateForm.currencyId" :account-id="quickCreateForm.accountId"
-                        placeholder="选择货币" />
+                <el-form-item v-if="quickCreateForm.type === 'expense'" label="货币代码" prop="currency">
+                    <el-input v-model="quickCreateForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable>
+                        <template #prepend>货币</template>
+                    </el-input>
                 </el-form-item>
             </el-form>
             <template #footer>
@@ -173,7 +174,6 @@ import {
 } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import AccountSelector from '../common/AccountSelector.vue'
-import CurrencySelector from '../common/CurrencySelector.vue'
 import ExpenseMapping from './Expenses.vue'
 import IncomeMapping from './Income.vue'
 import AssetsMapping from './Assets.vue'
@@ -193,7 +193,7 @@ const quickCreateForm = ref({
     type: 'expense',
     key: '',
     accountId: null as number | null,
-    currencyId: null as number | null,
+    currency: null as string | null,
     payee: '',
     payer: '',
     full: ''
@@ -234,7 +234,7 @@ const showQuickCreateDialog = () => {
         type: 'expense',
         key: '',
         accountId: null,
-        currencyId: null,
+        currency: null,
         payee: '',
         payer: '',
         full: ''
@@ -252,7 +252,7 @@ const handleQuickCreate = async () => {
         // 根据映射类型转换字段名
         let formData: any = {
             key: quickCreateForm.value.key,
-            currency_ids: quickCreateForm.value.currencyId ? [quickCreateForm.value.currencyId] : []
+            currency: quickCreateForm.value.currency
         }
 
         let apiUrl = ''
@@ -326,8 +326,8 @@ const refreshAnalytics = async () => {
 // 处理账户选择变化
 const handleAccountChange = (account: any) => {
     console.log('映射管理总览 - 账户选择变化:', account)
-    // 账户选择变化时，清空已选择的货币，让用户重新选择
-    quickCreateForm.value.currencyId = null
+    // 账户选择变化时，清空已选择的货币
+    quickCreateForm.value.currency = null
 }
 
 // 组件挂载时初始化

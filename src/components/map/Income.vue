@@ -331,8 +331,7 @@ const filterIncomeData = computed(() =>
         return [
             data.key.toLowerCase(),
             data.payer?.toLowerCase() ?? '',
-            typeof data.income === 'string' ? data.income.toLowerCase() : data.income?.account?.toLowerCase() ?? '',
-            // ...(data.currencies?.map(c => c.code.toLowerCase()) ?? [])
+            typeof data.income === 'string' ? data.income.toLowerCase() : data.income?.account?.toLowerCase() ?? ''
         ].some(field => field.includes(searchTerm))
     })
 )
@@ -536,7 +535,6 @@ const handleEdit = (index: number, row: Income) => {
     ruleForm.value.key = row.key
     ruleForm.value.payer = row.payer !== null ? row.payer : null
     ruleForm.value.income = typeof row.income === 'object' && row.income ? row.income.id : (typeof row.income === 'number' ? row.income : null)
-    // ruleForm.value.currency_id = row.currencies?.[0]?.id || null
     dialogEdit.value = true
     selectedId.value = row.id
     // console.log(index, row)

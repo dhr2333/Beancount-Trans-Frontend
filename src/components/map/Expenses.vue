@@ -65,10 +65,7 @@
       <el-table-column label="货币" prop="currency" min-width="80" width="auto">
         <template #default="{ row }">
           <div v-if="row.currency" class="currency-cell">
-            <el-text type="primary">{{ row.currency.code }}</el-text>
-            <!-- <el-tag size="small" class="currency-tag">
-              {{ row.currency.code }}
-            </el-tag> -->
+            <el-text type="primary">{{ row.currency }}</el-text>
           </div>
           <el-text v-else type="info" size="small">-</el-text>
         </template>
@@ -135,8 +132,10 @@
         <AccountSelector v-model="ruleForm.expend" placeholder="选择账户" @change="handleAccountChange" />
       </el-form-item>
 
-      <el-form-item label="关联货币" prop="currency">
-        <CurrencySelector v-model="ruleForm.currency" :account-id="ruleForm.expend || undefined" placeholder="选择货币" />
+      <el-form-item label="货币代码" prop="currency">
+        <el-input v-model="ruleForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable>
+          <template #prepend>货币</template>
+        </el-input>
       </el-form-item>
 
       <el-form-item>
@@ -165,8 +164,10 @@
         <AccountSelector v-model="ruleForm.expend" placeholder="选择账户" @change="handleAccountChange" />
       </el-form-item>
 
-      <el-form-item label="关联货币" prop="currency">
-        <CurrencySelector v-model="ruleForm.currency" :account-id="ruleForm.expend || undefined" placeholder="选择货币" />
+      <el-form-item label="货币代码" prop="currency">
+        <el-input v-model="ruleForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable>
+          <template #prepend>货币</template>
+        </el-input>
       </el-form-item>
 
       <el-form-item>
@@ -265,9 +266,10 @@
             @change="handleBatchAccountChange" />
         </el-form-item>
 
-        <el-form-item label="关联货币">
-          <CurrencySelector v-model="batchUpdateForm.currency" :account-id="batchUpdateForm.expend || undefined"
-            placeholder="选择新的货币（留空保持不变）" />
+        <el-form-item label="货币代码">
+          <el-input v-model="batchUpdateForm.currency" placeholder="请输入新的货币代码（留空保持不变）" clearable>
+            <template #prepend>货币</template>
+          </el-input>
         </el-form-item>
       </el-form>
 
@@ -322,18 +324,11 @@ import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
 import { pinyin } from 'pinyin-pro';
 import AccountSelector from '../common/AccountSelector.vue'
-import CurrencySelector from '../common/CurrencySelector.vue'
 
 // const apiUrl = import.meta.env.VITE_API_URL;
 const dialogError = ref(false)
 const lastEditedData = ref<Partial<Expense> | null>(null)
 // console.log(import.meta.env);
-
-interface Currency {
-  id: number
-  code: string
-  name: string
-}
 
 interface Expense {
   id: number
@@ -345,11 +340,7 @@ interface Expense {
     enable: boolean
     account_type?: string
   } | string
-  currency: {
-    id: number
-    code: string
-    name: string
-  } | null
+  currency: string | null
   enable: boolean
 }
 
@@ -427,7 +418,7 @@ const handleAdd = () => {
       key: lastEditedData.value.key || '',
       payee: lastEditedData.value.payee ?? null,
       expend: typeof expendId === 'number' ? expendId : null,
-      currency: lastEditedData.value.currency?.id || null
+      currency: lastEditedData.value.currency || null
     };
   } else {
     // 没有编辑记录则重置
@@ -450,7 +441,7 @@ const ruleForm = ref({
   key: '',
   payee: null as string | null | undefined,
   expend: null as number | null | undefined,
-  currency: null as number | null,
+  currency: null as string | null,
 })
 
 const rules = ref<FormRules>({
@@ -820,7 +811,7 @@ const batchUpdateErrors = ref<string[]>([])
 const batchUpdateFormRef = ref<FormInstance>()
 const batchUpdateForm = ref({
   expend: null as number | null,
-  currency: null as number | null
+  currency: null as string | null
 })
 
 // 批量删除
@@ -925,7 +916,7 @@ const confirmBatchUpdateAccount = async () => {
     const updateData = {
       expense_ids: selectedItems.value.map(item => item.id),
       expend_id: batchUpdateForm.value.expend,
-      currency_id: batchUpdateForm.value.currency
+      currency: batchUpdateForm.value.currency
     }
 
     console.log('批量更新数据:', updateData)

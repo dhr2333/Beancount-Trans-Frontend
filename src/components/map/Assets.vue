@@ -266,20 +266,12 @@ import AccountSelector from '../common/AccountSelector.vue'
 const dialogError = ref(false)
 const lastEditedData = ref<Partial<Assets> | null>(null)
 
-interface Currency {
-    id: number
-    code: string
-    name: string
-}
-
 interface Assets {
     id: number
     key: string
     full: string
     assets: string | { id: number; account: string; enable: boolean; account_type?: string }
     assets_id?: number
-    currencies: Currency[]
-    currency_ids?: number[]
     account_type?: string
     enable: boolean
 }
@@ -333,8 +325,7 @@ const filterAssetsData = computed(() =>
         return [
             data.key.toLowerCase(),
             data.full?.toLowerCase() ?? '',
-            typeof data.assets === 'string' ? data.assets.toLowerCase() : data.assets?.account?.toLowerCase() ?? '',
-            ...(data.currencies?.map(c => c.code.toLowerCase()) ?? [])
+            typeof data.assets === 'string' ? data.assets.toLowerCase() : data.assets?.account?.toLowerCase() ?? ''
         ].some(field => field.includes(searchTerm))
     })
 )
@@ -554,7 +545,6 @@ const handleEdit = (index: number, row: Assets) => {
     ruleForm.value.key = row.key
     ruleForm.value.full = row.full
     ruleForm.value.assets = typeof row.assets === 'object' && row.assets ? row.assets.id : (typeof row.assets === 'number' ? row.assets : null)
-    ruleForm.value.currency_id = row.currencies?.[0]?.id || null
     dialogEdit.value = true
     selectedId.value = row.id
     // console.log(index, row)
