@@ -141,4 +141,10 @@ export const removeTagsFromMapping = (mappingType: 'expense' | 'assets' | 'incom
   })
 }
 
+/**
+ * 获取标签相关的映射
+ */
+export const fetchTagMappings = (id: number) => {
+  return axios.get(`/tags/${id}/mappings/`)
+}
 

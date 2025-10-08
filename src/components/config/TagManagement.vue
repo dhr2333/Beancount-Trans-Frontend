@@ -54,22 +54,105 @@
                             </el-descriptions-item>
                             <el-descriptions-item label="映射统计" v-if="selectedTag.mapping_count">
                                 <div class="mapping-stats">
-                                    <el-tag v-if="selectedTag.mapping_count.expense > 0" type="warning" size="small">
-                                        {{ selectedTag.mapping_count.expense }}支出
-                                    </el-tag>
-                                    <el-tag v-if="selectedTag.mapping_count.assets > 0" type="success" size="small">
-                                        {{ selectedTag.mapping_count.assets }}资产
-                                    </el-tag>
-                                    <el-tag v-if="selectedTag.mapping_count.income > 0" type="primary" size="small">
-                                        {{ selectedTag.mapping_count.income }}收入
-                                    </el-tag>
+                                    <el-tooltip v-if="selectedTag.mapping_count.expense > 0"
+                                        :content="getExpenseMappingTooltip()" placement="top" effect="dark">
+                                        <el-tag type="warning" style="cursor: help;">
+                                            {{ selectedTag.mapping_count.expense }}支出
+                                        </el-tag>
+                                    </el-tooltip>
+                                    <el-tooltip v-if="selectedTag.mapping_count.assets > 0"
+                                        :content="getAssetsMappingTooltip()" placement="top" effect="dark">
+                                        <el-tag type="success" style="cursor: help;">
+                                            {{ selectedTag.mapping_count.assets }}资产
+                                        </el-tag>
+                                    </el-tooltip>
+                                    <el-tooltip v-if="selectedTag.mapping_count.income > 0"
+                                        :content="getIncomeMappingTooltip()" placement="top" effect="dark">
+                                        <el-tag type="primary" style="cursor: help;">
+                                            {{ selectedTag.mapping_count.income }}收入
+                                        </el-tag>
+                                    </el-tooltip>
                                     <el-tag type="info" size="small">{{ selectedTag.mapping_count.total }}总计</el-tag>
+                                    <el-button v-if="selectedTag.mapping_count.total > 0" size="small" type="text"
+                                        @click="toggleMappingDetails" style="margin-left: 8px;">
+                                        {{ showMappingDetails ? '收起详情' : '查看详情' }}
+                                    </el-button>
                                 </div>
                             </el-descriptions-item>
                             <el-descriptions-item label="描述">
                                 {{ selectedTag.description || '暂无描述' }}
                             </el-descriptions-item>
                         </el-descriptions>
+                    </el-card>
+
+                    <!-- 映射详情 -->
+                    <el-card
+                        v-if="showMappingDetails && selectedTag.mapping_count && selectedTag.mapping_count.total > 0"
+                        class="mapping-details-card">
+                        <template #header>
+                            <span>映射详情</span>
+                        </template>
+                        <div class="mapping-details-content" v-loading="mappingDetailsLoading">
+                            <el-tabs v-model="activeMappingTab" type="card">
+                                <!-- 支出映射 -->
+                                <el-tab-pane label="支出映射" name="expense"
+                                    v-if="tagMappings.expense_mappings && tagMappings.expense_mappings.length > 0">
+                                    <div class="mapping-list">
+                                        <div v-for="mapping in tagMappings.expense_mappings" :key="mapping.id"
+                                            class="mapping-item">
+                                            <div class="mapping-info">
+                                                <span class="mapping-key">{{ mapping.key }}</span>
+                                                <span v-if="mapping.payee" class="mapping-payee">{{ mapping.payee
+                                                }}</span>
+                                                <span class="mapping-account">→ {{ mapping.account || '未知账户' }}</span>
+                                                <span v-if="mapping.currency" class="mapping-currency">{{
+                                                    mapping.currency }}</span>
+                                            </div>
+                                            <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
+                                                {{ mapping.enable ? '启用' : '禁用' }}
+                                            </el-tag>
+                                        </div>
+                                    </div>
+                                </el-tab-pane>
+
+                                <!-- 资产映射 -->
+                                <el-tab-pane label="资产映射" name="assets"
+                                    v-if="tagMappings.assets_mappings && tagMappings.assets_mappings.length > 0">
+                                    <div class="mapping-list">
+                                        <div v-for="mapping in tagMappings.assets_mappings" :key="mapping.id"
+                                            class="mapping-item">
+                                            <div class="mapping-info">
+                                                <span class="mapping-key">{{ mapping.key }}</span>
+                                                <span v-if="mapping.full" class="mapping-full">{{ mapping.full }}</span>
+                                                <span class="mapping-account">→ {{ mapping.account || '未知账户' }}</span>
+                                            </div>
+                                            <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
+                                                {{ mapping.enable ? '启用' : '禁用' }}
+                                            </el-tag>
+                                        </div>
+                                    </div>
+                                </el-tab-pane>
+
+                                <!-- 收入映射 -->
+                                <el-tab-pane label="收入映射" name="income"
+                                    v-if="tagMappings.income_mappings && tagMappings.income_mappings.length > 0">
+                                    <div class="mapping-list">
+                                        <div v-for="mapping in tagMappings.income_mappings" :key="mapping.id"
+                                            class="mapping-item">
+                                            <div class="mapping-info">
+                                                <span class="mapping-key">{{ mapping.key }}</span>
+                                                <span v-if="mapping.payer" class="mapping-payer">{{ mapping.payer
+                                                }}</span>
+                                                <span class="mapping-account">→ {{ mapping.account || '未知账户' }}</span>
+                                            </div>
+                                            <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
+                                                {{ mapping.enable ? '启用' : '禁用' }}
+                                            </el-tag>
+                                        </div>
+                                    </div>
+                                </el-tab-pane>
+                            </el-tabs>
+                        </div>
                     </el-card>
 
                     <!-- 操作按钮 -->
@@ -89,7 +172,7 @@
                     </div>
                 </div>
 
-                <el-empty v-else description="请选择一个标签查看详情" />
+                <el-empty v-else description="请选择标签查看详情" />
             </div>
         </div>
 
@@ -123,7 +206,8 @@ import {
     createTag,
     updateTag,
     deleteTag,
-    toggleTagEnable
+    toggleTagEnable,
+    fetchTagMappings
 } from '../../api/tags'
 import type { Tag, TagForm } from '../../types/tag'
 
@@ -137,6 +221,16 @@ const dialogTitle = ref('新增标签')
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
 const defaultExpandedKeys = ref<number[]>([])
+
+// 映射详情相关
+const showMappingDetails = ref(false)
+const mappingDetailsLoading = ref(false)
+const tagMappings = ref<any>({
+    expense_mappings: [],
+    assets_mappings: [],
+    income_mappings: []
+})
+const activeMappingTab = ref('expense')
 
 // 树形配置
 const treeProps = {
@@ -228,9 +322,14 @@ const handleSearch = () => {
 }
 
 // 点击节点
-const handleNodeClick = (tag: Tag) => {
+const handleNodeClick = async (tag: Tag) => {
     selectedTag.value = tag
     console.log('选中标签:', tag)
+    // 重置映射详情状态
+    showMappingDetails.value = false
+
+    // 自动获取映射数据
+    await fetchMappings()
 }
 
 // 节点展开
@@ -384,6 +483,66 @@ const formatDateTime = (dateStr: string) => {
     })
 }
 
+// 切换映射详情显示
+const toggleMappingDetails = () => {
+    showMappingDetails.value = !showMappingDetails.value
+}
+
+// 获取标签映射详情
+const fetchMappings = async () => {
+    if (!selectedTag.value) return
+
+    try {
+        mappingDetailsLoading.value = true
+        const response = await fetchTagMappings(selectedTag.value.id)
+        tagMappings.value = response.data
+
+        // 设置默认激活的标签页
+        if (response.data.expense_mappings && response.data.expense_mappings.length > 0) {
+            activeMappingTab.value = 'expense'
+        } else if (response.data.assets_mappings && response.data.assets_mappings.length > 0) {
+            activeMappingTab.value = 'assets'
+        } else if (response.data.income_mappings && response.data.income_mappings.length > 0) {
+            activeMappingTab.value = 'income'
+        }
+    } catch (error: any) {
+        console.error('获取映射详情失败:', error)
+        ElMessage.error('获取映射详情失败')
+    } finally {
+        mappingDetailsLoading.value = false
+    }
+}
+
+// 获取支出映射悬浮提示内容
+const getExpenseMappingTooltip = () => {
+    if (!tagMappings.value.expense_mappings || tagMappings.value.expense_mappings.length === 0) {
+        return '暂无支出映射'
+    }
+    return tagMappings.value.expense_mappings
+        .map((m: any) => `${m.key} → ${m.account || '未知账户'}`)
+        .join('\n')
+}
+
+// 获取资产映射悬浮提示内容
+const getAssetsMappingTooltip = () => {
+    if (!tagMappings.value.assets_mappings || tagMappings.value.assets_mappings.length === 0) {
+        return '暂无资产映射'
+    }
+    return tagMappings.value.assets_mappings
+        .map((m: any) => `${m.key} → ${m.account || '未知账户'}`)
+        .join('\n')
+}
+
+// 获取收入映射悬浮提示内容
+const getIncomeMappingTooltip = () => {
+    if (!tagMappings.value.income_mappings || tagMappings.value.income_mappings.length === 0) {
+        return '暂无收入映射'
+    }
+    return tagMappings.value.income_mappings
+        .map((m: any) => `${m.key} → ${m.account || '未知账户'}`)
+        .join('\n')
+}
+
 // 组件挂载
 onMounted(() => {
     loadTagTree()
@@ -509,6 +668,76 @@ onMounted(() => {
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
+}
+
+/* 映射详情样式 */
+.mapping-details-card {
+    margin-bottom: 20px;
+}
+
+.mapping-details-content {
+    min-height: 200px;
+}
+
+.mapping-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.mapping-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    transition: all 0.2s ease;
+}
+
+.mapping-item:hover {
+    background-color: #e9ecef;
+    border-color: #dee2e6;
+}
+
+.mapping-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.mapping-key {
+    font-weight: 500;
+    color: #303133;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    background-color: #f1f3f4;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.mapping-payee,
+.mapping-full,
+.mapping-payer {
+    color: #606266;
+    font-size: 14px;
+}
+
+.mapping-account {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    background-color: #f0f9ff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #0369a1;
+}
+
+.mapping-currency {
+    color: #909399;
+    font-size: 12px;
+    font-style: italic;
 }
 
 @keyframes fadeIn {
