@@ -3,6 +3,16 @@
  */
 
 /**
+ * 映射统计
+ */
+export interface MappingCount {
+  expense: number
+  assets: number
+  income: number
+  total: number
+}
+
+/**
  * 标签接口
  */
 export interface Tag {
@@ -18,6 +28,7 @@ export interface Tag {
   children?: Tag[]
   created: string
   modified: string
+  mapping_count?: MappingCount
 }
 
 /**

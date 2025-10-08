@@ -9,38 +9,23 @@
                     </el-icon>
                     新增标签
                 </el-button>
-                <el-button @click="loadTagTree">
-                    <el-icon>
-                        <Refresh />
-                    </el-icon>
-                    刷新
-                </el-button>
             </div>
         </div>
 
         <div class="management-content">
             <!-- 左侧：标签树 -->
             <div class="tag-tree-panel">
-                <div class="tree-toolbar">
-                    <el-input v-model="searchKeyword" placeholder="搜索标签" clearable @input="handleSearch">
-                        <template #prefix>
-                            <el-icon>
-                                <Search />
-                            </el-icon>
-                        </template>
-                    </el-input>
-                </div>
-
                 <el-tree :data="filteredTagTree" :props="treeProps" node-key="id" :expand-on-click-node="false"
-                    :default-expand-all="false" :default-expanded-keys="defaultExpandedKeys" @node-click="handleNodeClick"
-                    @node-expand="handleNodeExpand" @node-collapse="handleNodeCollapse" class="tag-tree"
-                    v-loading="loading">
+                    :default-expand-all="false" :default-expanded-keys="defaultExpandedKeys"
+                    @node-click="handleNodeClick" @node-expand="handleNodeExpand" @node-collapse="handleNodeCollapse"
+                    class="tag-tree" v-loading="loading">
                     <template #default="{ node, data }">
                         <div class="tree-node">
-                            <span class="node-label">{{ data.full_path }}</span>
+                            <span class="node-label">{{ data.name }}</span>
                             <div class="node-actions">
-                                <el-tag v-if="data.has_children" size="small" type="info">
-                                    {{ data.children?.length || 0 }}子标签
+                                <el-tag v-if="data.mapping_count && data.mapping_count.total > 0" size="small"
+                                    type="info">
+                                    {{ data.mapping_count.total }}映射
                                 </el-tag>
                                 <el-switch v-model="data.enable" size="small" @change="updateTagStatus(data)"
                                     style="margin-left: 8px;" />
@@ -62,28 +47,27 @@
                         </template>
                         <el-descriptions :column="2" border>
                             <el-descriptions-item label="标签名称">
-                                {{ selectedTag.name }}
-                            </el-descriptions-item>
-                            <el-descriptions-item label="完整路径">
                                 <code>{{ selectedTag.full_path }}</code>
                             </el-descriptions-item>
                             <el-descriptions-item label="启用状态">
                                 <el-switch v-model="selectedTag.enable" @change="updateTagStatus(selectedTag)" />
                             </el-descriptions-item>
-                            <el-descriptions-item label="子标签">
-                                {{ selectedTag.has_children ? (selectedTag.children?.length || 0) : 0 }}
+                            <el-descriptions-item label="映射统计" v-if="selectedTag.mapping_count">
+                                <div class="mapping-stats">
+                                    <el-tag v-if="selectedTag.mapping_count.expense > 0" type="warning" size="small">
+                                        {{ selectedTag.mapping_count.expense }}支出
+                                    </el-tag>
+                                    <el-tag v-if="selectedTag.mapping_count.assets > 0" type="success" size="small">
+                                        {{ selectedTag.mapping_count.assets }}资产
+                                    </el-tag>
+                                    <el-tag v-if="selectedTag.mapping_count.income > 0" type="primary" size="small">
+                                        {{ selectedTag.mapping_count.income }}收入
+                                    </el-tag>
+                                    <el-tag type="info" size="small">{{ selectedTag.mapping_count.total }}总计</el-tag>
+                                </div>
                             </el-descriptions-item>
-                            <el-descriptions-item label="父标签" :span="2">
-                                {{ selectedTag.parent_name || '无（根标签）' }}
-                            </el-descriptions-item>
-                            <el-descriptions-item label="描述" :span="2">
+                            <el-descriptions-item label="描述">
                                 {{ selectedTag.description || '暂无描述' }}
-                            </el-descriptions-item>
-                            <el-descriptions-item label="创建时间">
-                                {{ formatDateTime(selectedTag.created) }}
-                            </el-descriptions-item>
-                            <el-descriptions-item label="修改时间">
-                                {{ formatDateTime(selectedTag.modified) }}
                             </el-descriptions-item>
                         </el-descriptions>
                     </el-card>
@@ -113,19 +97,13 @@
         <el-dialog v-model="dialogVisible" :title="dialogTitle" width="600px" @close="resetForm">
             <el-form :model="tagForm" :rules="formRules" ref="formRef" label-width="100px">
                 <el-form-item label="标签名称" prop="name">
-                    <el-input v-model="tagForm.name" placeholder="请输入标签名称（不能包含空格、#等特殊字符）" />
-                </el-form-item>
-                <el-form-item label="父标签" prop="parent">
-                    <TagSelector v-model="tagForm.parent" :multiple="false" placeholder="不选择则为根标签" />
+                    <el-input v-model="tagForm.name" placeholder="例如：Project/Decoration 或 Irregular" />
                     <div class="form-help-text">
-                        选择父标签后，完整路径将为：父标签/{{ tagForm.name || '标签名称' }}
+                        支持层级格式：使用斜杠分隔，如 Project/Decoration 将自动创建父标签 Project
                     </div>
                 </el-form-item>
                 <el-form-item label="描述" prop="description">
                     <el-input v-model="tagForm.description" type="textarea" :rows="3" placeholder="请输入标签描述（可选）" />
-                </el-form-item>
-                <el-form-item label="启用状态" prop="enable">
-                    <el-switch v-model="tagForm.enable" active-text="启用" inactive-text="禁用" />
                 </el-form-item>
             </el-form>
             <template #footer>
@@ -139,8 +117,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { Plus, Refresh, Search, Edit, Delete } from '@element-plus/icons-vue'
-import TagSelector from '../common/TagSelector.vue'
+import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import {
     fetchTagTree,
     createTag,
@@ -170,9 +147,7 @@ const treeProps = {
 // 表单数据
 const tagForm = ref<TagForm>({
     name: '',
-    parent: null,
-    description: '',
-    enable: true
+    description: ''
 })
 
 // 表单验证规则
@@ -181,8 +156,8 @@ const formRules: FormRules = {
         { required: true, message: '请输入标签名称', trigger: 'blur' },
         { min: 1, max: 64, message: '标签名称长度在 1 到 64 个字符', trigger: 'blur' },
         {
-            pattern: /^[a-zA-Z0-9\u4e00-\u9fa5_-]+$/,
-            message: '标签名称不能包含空格、#等特殊字符',
+            pattern: /^[a-zA-Z0-9\u4e00-\u9fa5_/-]+$/,
+            message: '标签名称只能包含字母、数字、中文、下划线、横线和斜杠',
             trigger: 'blur'
         }
     ]
@@ -284,10 +259,8 @@ const showAddDialog = () => {
 const showEditDialog = (tag: Tag) => {
     dialogTitle.value = '编辑标签'
     tagForm.value = {
-        name: tag.name,
-        parent: tag.parent,
-        description: tag.description,
-        enable: tag.enable
+        name: tag.full_path,  // 使用完整路径
+        description: tag.description
     }
     dialogVisible.value = true
 }
@@ -296,9 +269,7 @@ const showEditDialog = (tag: Tag) => {
 const resetForm = () => {
     tagForm.value = {
         name: '',
-        parent: null,
-        description: '',
-        enable: true
+        description: ''
     }
     formRef.value?.clearValidate()
 }
@@ -422,10 +393,10 @@ onMounted(() => {
 <style scoped>
 .tag-management {
     padding: 20px;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background-color: #f5f7fa;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    animation: fadeIn 0.6s ease;
 }
 
 .management-header {
@@ -433,16 +404,15 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
-    padding: 16px 20px;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e4e7ed;
 }
 
 .management-header h2 {
     margin: 0;
-    font-size: 24px;
     color: #303133;
+    font-size: 24px;
+    font-weight: 600;
 }
 
 .header-actions {
@@ -451,47 +421,47 @@ onMounted(() => {
 }
 
 .management-content {
-    flex: 1;
-    display: grid;
-    grid-template-columns: 450px 1fr;
-    gap: 20px;
-    overflow: hidden;
-}
-
-.tag-tree-panel,
-.tag-detail-panel {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
     display: flex;
-    flex-direction: column;
+    gap: 20px;
+    min-height: 600px;
 }
 
-.tree-toolbar {
-    padding: 16px;
-    border-bottom: 1px solid #ebeef5;
+.tag-tree-panel {
+    flex: 0 0 400px;
+    border: 1px solid #e4e7ed;
+    border-radius: 8px;
+    padding: 15px;
+    background-color: #fafafa;
+}
+
+.tag-detail-panel {
+    flex: 1;
+    border: 1px solid #e4e7ed;
+    border-radius: 8px;
+    padding: 20px;
+    background-color: #ffffff;
 }
 
 .tag-tree {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
+    background-color: transparent;
+}
+
+/* 树节点左对齐 */
+:deep(.el-tree-node__content) {
+    justify-content: flex-start;
 }
 
 .tree-node {
-    flex: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 14px;
-    padding: 4px 8px;
+    width: 100%;
+    padding: 4px 0;
 }
 
 .node-label {
-    flex: 1;
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
     font-weight: 500;
+    color: #303133;
 }
 
 .node-actions {
@@ -500,16 +470,13 @@ onMounted(() => {
     gap: 8px;
 }
 
-.tag-detail-panel {
-    padding: 20px;
-    overflow-y: auto;
-}
-
 .tag-detail h3 {
     margin: 0 0 20px 0;
-    font-size: 20px;
     color: #303133;
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 20px;
+    font-weight: 600;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #409eff;
 }
 
 .info-card {
@@ -525,7 +492,10 @@ onMounted(() => {
 
 .detail-actions {
     display: flex;
-    gap: 12px;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e4e7ed;
 }
 
 .form-help-text {
@@ -534,39 +504,44 @@ onMounted(() => {
     margin-top: 4px;
 }
 
-/* 响应式设计 */
-@media (max-width: 1200px) {
-    .management-content {
-        grid-template-columns: 1fr;
+.mapping-stats {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
     }
 
-    .tag-tree-panel {
-        max-height: 400px;
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 
+/* 响应式设计 */
 @media (max-width: 768px) {
-    .tag-management {
-        padding: 10px;
+    .management-content {
+        flex-direction: column;
+    }
+
+    .tag-tree-panel {
+        flex: none;
     }
 
     .management-header {
         flex-direction: column;
-        gap: 12px;
-        align-items: stretch;
+        align-items: flex-start;
+        gap: 15px;
     }
 
     .header-actions {
         width: 100%;
-        justify-content: space-between;
-    }
-
-    .tree-node {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
+        justify-content: flex-end;
     }
 }
 </style>
-
-
