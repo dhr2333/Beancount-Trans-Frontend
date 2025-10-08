@@ -71,35 +71,14 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="关联标签" min-width="180" width="auto">
+      <el-table-column label="标签" min-width="180" width="auto">
         <template #default="{ row }">
           <div v-if="row.tags && row.tags.length > 0" class="tags-cell">
-            <el-tag 
-              v-for="tag in row.tags" 
-              :key="tag.id"
-              size="small"
-              style="margin-right: 4px; margin-bottom: 4px;"
-            >
+            <el-tag v-for="tag in row.tags" :key="tag.id" size="small" style="margin-right: 4px; margin-bottom: 4px;">
               {{ tag.full_path }}
             </el-tag>
-            <el-button 
-              size="small" 
-              text 
-              @click.stop="showTagDialog(row)"
-              style="margin-left: 4px;"
-            >
-              管理
-            </el-button>
           </div>
-          <div v-else>
-            <el-button 
-              size="small" 
-              text 
-              @click.stop="showTagDialog(row)"
-            >
-              添加标签
-            </el-button>
-          </div>
+          <el-text v-else type="info" size="small">-</el-text>
         </template>
       </el-table-column>
 
@@ -170,15 +149,8 @@
         </el-input>
       </el-form-item>
 
-      <el-form-item label="关联标签" prop="tag_ids">
-        <TagSelector 
-          v-model="ruleForm.tag_ids" 
-          multiple 
-          placeholder="选择标签（可多选）" 
-        />
-        <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-          标签将在交易解析时自动应用
-        </div>
+      <el-form-item label="标签" prop="tag_ids">
+        <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="选择标签（可多选）" />
       </el-form-item>
 
       <el-form-item>
@@ -213,12 +185,8 @@
         </el-input>
       </el-form-item>
 
-      <el-form-item label="关联标签" prop="tag_ids">
-        <TagSelector 
-          v-model="ruleForm.tag_ids" 
-          multiple 
-          placeholder="选择标签（可多选）" 
-        />
+      <el-form-item label="标签" prop="tag_ids">
+        <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="选择标签（可多选）" />
       </el-form-item>
 
       <el-form-item>
@@ -356,46 +324,6 @@
         </el-button>
       </div>
     </template>
-  </el-dialog>
-
-  <!-- 标签管理对话框 -->
-  <el-dialog v-model="tagDialogVisible" title="管理标签" width="600px">
-    <div v-if="currentMapping" class="tag-management-dialog">
-      <div class="current-tags-section">
-        <h4>当前标签</h4>
-        <div v-if="currentMapping.tags && currentMapping.tags.length > 0" class="current-tags">
-          <el-tag
-            v-for="tag in currentMapping.tags"
-            :key="tag.id"
-            closable
-            @close="removeTagFromMapping(tag.id)"
-            style="margin-right: 8px; margin-bottom: 8px;"
-          >
-            {{ tag.full_path }}
-          </el-tag>
-        </div>
-        <el-empty v-else description="暂无标签" :image-size="80" />
-      </div>
-      
-      <el-divider />
-      
-      <div class="add-tags-section">
-        <h4>添加标签</h4>
-        <TagSelector 
-          v-model="tagsToAdd" 
-          multiple
-          placeholder="选择要添加的标签" 
-        />
-        <el-button 
-          type="primary" 
-          @click="addTagsToMapping"
-          :disabled="tagsToAdd.length === 0"
-          style="margin-top: 12px; width: 100%;"
-        >
-          添加标签
-        </el-button>
-      </div>
-    </div>
   </el-dialog>
 
   <!-- <el-dialog v-model="dialogError" title="操作失败" width="30%">
@@ -544,11 +472,6 @@ const ruleForm = ref({
   currency: null as string | null,
   tag_ids: [] as number[],
 })
-
-// 标签管理相关
-const tagDialogVisible = ref(false)
-const currentMapping = ref<Expense | null>(null)
-const tagsToAdd = ref<number[]>([])
 
 const rules = ref<FormRules>({
   key: [
@@ -1129,56 +1052,6 @@ const sortByAccount = (a: Expense, b: Expense): number => {
   return 0;
 };
 
-// 显示标签管理对话框
-const showTagDialog = (row: Expense) => {
-  currentMapping.value = row
-  tagsToAdd.value = []
-  tagDialogVisible.value = true
-  console.log('管理标签:', row)
-}
-
-// 为映射添加标签
-const addTagsToMapping = async () => {
-  if (!currentMapping.value || tagsToAdd.value.length === 0) return
-
-  try {
-    await axios.post(`/expense/${currentMapping.value.id}/add_tags/`, {
-      tag_ids: tagsToAdd.value
-    })
-    ElMessage.success('标签添加成功')
-    tagsToAdd.value = []
-    // 刷新数据
-    await fetchData()
-  } catch (error) {
-    console.error('添加标签失败:', error)
-    ElMessage.error('添加标签失败')
-  }
-}
-
-// 从映射中移除标签
-const removeTagFromMapping = async (tagId: number) => {
-  if (!currentMapping.value) return
-
-  try {
-    await ElMessageBox.confirm('确定要移除此标签吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-
-    await axios.post(`/expense/${currentMapping.value.id}/remove_tags/`, {
-      tag_ids: [tagId]
-    })
-    ElMessage.success('标签移除成功')
-    // 刷新数据
-    await fetchData()
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      console.error('移除标签失败:', error)
-      ElMessage.error('移除标签失败')
-    }
-  }
-}
 
 </script>
 

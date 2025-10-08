@@ -2,30 +2,57 @@
     <div class="tag-selector">
         <!-- 多选模式：使用下拉多选框 -->
         <el-select v-if="multiple" v-model="selectedValues" multiple filterable :placeholder="placeholder"
-            @change="handleChange" style="width: 100%;" :disabled="disabled" v-loading="loading">
+            @change="handleChange" @visible-change="handleVisibleChange" style="width: 100%;" :disabled="disabled"
+            v-loading="loading">
             <el-option v-for="tag in enabledFlatTags" :key="tag.id" :label="tag.full_path" :value="tag.id">
                 <div class="tag-option">
                     <span class="tag-label">{{ tag.full_path }}</span>
                     <el-tag v-if="tag.description" size="small" type="info" class="tag-desc">
                         {{ tag.description }}
                     </el-tag>
+                    <el-tag v-if="tag.has_children" size="small" type="warning" class="children-tag">
+                        {{ tag.children?.length || 0 }}子标签
+                    </el-tag>
                 </div>
             </el-option>
         </el-select>
 
         <!-- 单选模式：使用级联选择器 -->
-        <el-cascader v-else v-model="selectedValue" :options="tagTree" :props="cascaderProps" filterable clearable
-            :placeholder="placeholder" @change="handleChange" style="width: 100%;" :disabled="disabled"
-            v-loading="loading">
+        <el-cascader v-else v-model="selectedValue" :options="tagOptions" :props="cascaderProps" :filterable="true"
+            :filter-method="customFilterMethod" :clearable="true" :show-all-levels="false" :separator="' > '"
+            :placeholder="placeholder" @change="handleChange" @visible-change="handleVisibleChange" style="width: 100%;"
+            :disabled="disabled" class="tag-cascader">
             <template #default="{ node, data }">
                 <div class="cascader-node">
                     <span class="node-label">{{ data.name }}</span>
-                    <el-tag v-if="data.has_children" size="small" type="info" class="children-tag">
-                        {{ data.children?.length || 0 }}子标签
+                    <el-tag v-if="data.description" size="small" type="info" class="desc-tag">
+                        {{ data.description }}
+                    </el-tag>
+                    <el-tag v-if="data.has_children && data.children && data.children.length > 0" size="small"
+                        type="warning" class="children-tag">
+                        {{ data.children.length }}子标签
                     </el-tag>
                 </div>
             </template>
         </el-cascader>
+
+        <!-- 标签详情预览（单选模式） -->
+        <div v-if="!multiple && selectedTag && showPreview" class="tag-preview">
+            <el-card size="small">
+                <div class="preview-content">
+                    <div class="tag-info">
+                        <h4>{{ selectedTag.full_path || selectedTag.name }}</h4>
+                        <el-tag v-if="selectedTag.description" type="info" size="small">
+                            {{ selectedTag.description }}
+                        </el-tag>
+                    </div>
+                    <div v-if="selectedTag.has_children && selectedTag.children" class="tag-stats">
+                        <span class="label">子标签：</span>
+                        <el-tag type="warning" size="small">{{ selectedTag.children.length }}个</el-tag>
+                    </div>
+                </div>
+            </el-card>
+        </div>
 
         <!-- 已选标签预览（多选模式） -->
         <div v-if="multiple && selectedValues.length > 0 && showPreview" class="selected-tags-preview">
@@ -72,6 +99,7 @@ const emit = defineEmits<{
 const tagTree = ref<Tag[]>([])
 const selectedValue = ref<number | null>(null)
 const selectedValues = ref<number[]>([])
+const selectedTag = ref<Tag | null>(null)
 const loading = ref(false)
 
 // 级联选择器配置
@@ -83,6 +111,19 @@ const cascaderProps = {
     checkStrictly: true,
     expandTrigger: 'hover' as const
 }
+
+// 计算属性：过滤后的标签选项
+const tagOptions = computed(() => {
+    console.log('TagSelector - 原始标签树:', tagTree.value)
+
+    if (props.enabledOnly) {
+        const filtered = filterEnabledTags(tagTree.value)
+        console.log('TagSelector - 过滤后的标签:', filtered)
+        return filtered
+    }
+
+    return tagTree.value
+})
 
 // 扁平化标签列表（用于多选模式）
 const flatTags = computed(() => {
@@ -114,12 +155,7 @@ const loadTagTree = async () => {
         console.log('标签树数据:', response.data)
 
         if (Array.isArray(response.data)) {
-            // 如果设置了只显示启用的标签，过滤树结构
-            if (props.enabledOnly) {
-                tagTree.value = filterEnabledTags(response.data)
-            } else {
-                tagTree.value = response.data
-            }
+            tagTree.value = response.data
         } else {
             console.warn('标签树数据格式异常:', response.data)
             tagTree.value = []
@@ -148,15 +184,52 @@ const filterEnabledTags = (tags: Tag[]): Tag[] => {
     })
 }
 
-// 根据ID查找标签
-const findTagById = (id: number): Tag | null => {
+// 根据ID查找标签（在完整的标签树中查找，包括被禁用的）
+const findTagById = (tags: Tag[], id: number): Tag | null => {
+    for (const tag of tags) {
+        if (tag.id === id) return tag
+        if (tag.children) {
+            const found = findTagById(tag.children, id)
+            if (found) return found
+        }
+    }
+    return null
+}
+
+// 从扁平列表中查找标签（快速查找方法）
+const findTagByIdFlat = (id: number): Tag | null => {
     return flatTags.value.find(tag => tag.id === id) || null
 }
 
 // 获取标签完整路径
 const getTagFullPath = (id: number): string => {
-    const tag = findTagById(id)
+    const tag = findTagByIdFlat(id)
     return tag?.full_path || `标签#${id}`
+}
+
+// 自定义过滤方法 - 不区分大小写搜索
+const customFilterMethod = (node: any, keyword: string) => {
+    if (!keyword) return true
+
+    // 将搜索关键词转换为小写
+    const lowerKeyword = keyword.toLowerCase()
+
+    // 检查标签名称是否包含关键词（不区分大小写）
+    const tagName = node.data.name || ''
+    const lowerTagName = tagName.toLowerCase()
+
+    // 检查完整路径是否包含关键词（不区分大小写）
+    const fullPath = node.data.full_path || ''
+    const lowerFullPath = fullPath.toLowerCase()
+
+    // 检查描述是否包含关键词（不区分大小写）
+    const description = node.data.description || ''
+    const lowerDescription = description.toLowerCase()
+
+    // 返回匹配结果
+    return lowerTagName.includes(lowerKeyword) ||
+        lowerFullPath.includes(lowerKeyword) ||
+        lowerDescription.includes(lowerKeyword)
 }
 
 // 处理选择变化
@@ -164,13 +237,26 @@ const handleChange = () => {
     if (props.multiple) {
         emit('update:modelValue', selectedValues.value)
         const tags = selectedValues.value
-            .map(id => findTagById(id))
+            .map(id => findTagByIdFlat(id))
             .filter(Boolean) as Tag[]
         emit('change', tags)
     } else {
         emit('update:modelValue', selectedValue.value)
-        const tag = selectedValue.value ? findTagById(selectedValue.value) : null
-        emit('change', tag)
+        if (selectedValue.value) {
+            const tag = findTagById(tagTree.value, selectedValue.value)
+            selectedTag.value = tag
+            emit('change', tag)
+        } else {
+            selectedTag.value = null
+            emit('change', null)
+        }
+    }
+}
+
+// 处理下拉框显示状态
+const handleVisibleChange = (visible: boolean) => {
+    if (visible) {
+        loadTagTree()
     }
 }
 
@@ -189,23 +275,35 @@ watch(() => props.modelValue, (newValue) => {
             selectedValues.value = []
         }
     } else {
-        if (typeof newValue === 'number') {
+        if (typeof newValue === 'number' && newValue !== selectedValue.value) {
             selectedValue.value = newValue
-        } else {
+            const tag = findTagById(tagTree.value, newValue)
+            selectedTag.value = tag
+        } else if (!newValue) {
             selectedValue.value = null
+            selectedTag.value = null
         }
     }
 }, { immediate: true })
 
 // 组件挂载时初始化
 onMounted(() => {
-    loadTagTree()
+    if (props.modelValue) {
+        loadTagTree().then(() => {
+            if (!props.multiple && typeof props.modelValue === 'number') {
+                const tag = findTagById(tagTree.value, props.modelValue)
+                if (tag) {
+                    selectedTag.value = tag
+                }
+            }
+        })
+    }
 })
 
 // 暴露方法供外部调用
 defineExpose({
     loadTagTree,
-    findTagById
+    findTagById: (id: number) => findTagById(tagTree.value, id)
 })
 </script>
 
@@ -214,10 +312,14 @@ defineExpose({
     width: 100%;
 }
 
+.tag-cascader {
+    width: 100%;
+}
+
 .tag-option {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 8px;
     width: 100%;
 }
 
@@ -228,7 +330,7 @@ defineExpose({
 }
 
 .tag-desc {
-    margin-left: 8px;
+    margin: 0;
     max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -247,10 +349,49 @@ defineExpose({
     font-weight: 500;
 }
 
+.desc-tag,
 .children-tag {
     margin: 0;
 }
 
+/* 标签详情预览 */
+.tag-preview {
+    margin-top: 12px;
+}
+
+.preview-content {
+    padding: 8px;
+}
+
+.tag-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.tag-info h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #303133;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.tag-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.label {
+    font-size: 12px;
+    color: #909399;
+    min-width: 60px;
+}
+
+/* 已选标签预览 */
 .selected-tags-preview {
     margin-top: 8px;
     display: flex;
@@ -274,7 +415,14 @@ defineExpose({
         max-width: none;
         width: 100%;
     }
+
+    .tag-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .tag-stats {
+        flex-wrap: wrap;
+    }
 }
 </style>
-
-

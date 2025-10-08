@@ -103,7 +103,7 @@
                                             <div class="mapping-info">
                                                 <span class="mapping-key">{{ mapping.key }}</span>
                                                 <span v-if="mapping.payee" class="mapping-payee">{{ mapping.payee
-                                                }}</span>
+                                                    }}</span>
                                                 <span class="mapping-account">→ {{ mapping.account || '未知账户' }}</span>
                                                 <span v-if="mapping.currency" class="mapping-currency">{{
                                                     mapping.currency }}</span>
@@ -142,7 +142,7 @@
                                             <div class="mapping-info">
                                                 <span class="mapping-key">{{ mapping.key }}</span>
                                                 <span v-if="mapping.payer" class="mapping-payer">{{ mapping.payer
-                                                }}</span>
+                                                    }}</span>
                                                 <span class="mapping-account">→ {{ mapping.account || '未知账户' }}</span>
                                             </div>
                                             <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">

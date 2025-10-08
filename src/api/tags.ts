@@ -102,7 +102,7 @@ export const fetchTagDescendants = (id: number) => {
 }
 
 /**
- * 获取映射的关联标签
+ * 获取映射的标签
  */
 export const fetchMappingTags = (mappingType: 'expense' | 'assets' | 'income', mappingId: number) => {
   const typeMap = {

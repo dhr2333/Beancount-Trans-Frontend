@@ -72,6 +72,7 @@ declare module '@vue/runtime-core' {
     Show_log_dates: typeof import('./components/owntracks/show_log_dates.vue')['default']
     TagManagement: typeof import('./components/config/TagManagement.vue')['default']
     TagSelector: typeof import('./components/common/TagSelector.vue')['default']
+    TagSelectorTest: typeof import('./components/debug/TagSelectorTest.vue')['default']
     Templates: typeof import('./components/map/Templates.vue')['default']
     Trans: typeof import('./components/trans/Trans.vue')['default']
   }
