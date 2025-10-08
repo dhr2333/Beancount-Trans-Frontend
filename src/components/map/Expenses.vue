@@ -71,6 +71,38 @@
         </template>
       </el-table-column>
 
+      <el-table-column label="关联标签" min-width="180" width="auto">
+        <template #default="{ row }">
+          <div v-if="row.tags && row.tags.length > 0" class="tags-cell">
+            <el-tag 
+              v-for="tag in row.tags" 
+              :key="tag.id"
+              size="small"
+              style="margin-right: 4px; margin-bottom: 4px;"
+            >
+              {{ tag.full_path }}
+            </el-tag>
+            <el-button 
+              size="small" 
+              text 
+              @click.stop="showTagDialog(row)"
+              style="margin-left: 4px;"
+            >
+              管理
+            </el-button>
+          </div>
+          <div v-else>
+            <el-button 
+              size="small" 
+              text 
+              @click.stop="showTagDialog(row)"
+            >
+              添加标签
+            </el-button>
+          </div>
+        </template>
+      </el-table-column>
+
       <el-table-column label="状态" prop="enable" width="100">
         <template #default="{ row }">
           <el-switch v-model="row.enable" @change="handleSwitchChange(row)" inline-prompt active-text="启用"
@@ -138,6 +170,17 @@
         </el-input>
       </el-form-item>
 
+      <el-form-item label="关联标签" prop="tag_ids">
+        <TagSelector 
+          v-model="ruleForm.tag_ids" 
+          multiple 
+          placeholder="选择标签（可多选）" 
+        />
+        <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+          标签将在交易解析时自动应用
+        </div>
+      </el-form-item>
+
       <el-form-item>
         <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
         <el-button @click="resetForm(ruleFormRef)">重置</el-button>
@@ -168,6 +211,14 @@
         <el-input v-model="ruleForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable>
           <template #prepend>货币</template>
         </el-input>
+      </el-form-item>
+
+      <el-form-item label="关联标签" prop="tag_ids">
+        <TagSelector 
+          v-model="ruleForm.tag_ids" 
+          multiple 
+          placeholder="选择标签（可多选）" 
+        />
       </el-form-item>
 
       <el-form-item>
@@ -307,6 +358,46 @@
     </template>
   </el-dialog>
 
+  <!-- 标签管理对话框 -->
+  <el-dialog v-model="tagDialogVisible" title="管理标签" width="600px">
+    <div v-if="currentMapping" class="tag-management-dialog">
+      <div class="current-tags-section">
+        <h4>当前标签</h4>
+        <div v-if="currentMapping.tags && currentMapping.tags.length > 0" class="current-tags">
+          <el-tag
+            v-for="tag in currentMapping.tags"
+            :key="tag.id"
+            closable
+            @close="removeTagFromMapping(tag.id)"
+            style="margin-right: 8px; margin-bottom: 8px;"
+          >
+            {{ tag.full_path }}
+          </el-tag>
+        </div>
+        <el-empty v-else description="暂无标签" :image-size="80" />
+      </div>
+      
+      <el-divider />
+      
+      <div class="add-tags-section">
+        <h4>添加标签</h4>
+        <TagSelector 
+          v-model="tagsToAdd" 
+          multiple
+          placeholder="选择要添加的标签" 
+        />
+        <el-button 
+          type="primary" 
+          @click="addTagsToMapping"
+          :disabled="tagsToAdd.length === 0"
+          style="margin-top: 12px; width: 100%;"
+        >
+          添加标签
+        </el-button>
+      </div>
+    </div>
+  </el-dialog>
+
   <!-- <el-dialog v-model="dialogError" title="操作失败" width="30%">
     <el-icon>
       <WarningFilled />
@@ -324,6 +415,7 @@ import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
 import { pinyin } from 'pinyin-pro';
 import AccountSelector from '../common/AccountSelector.vue'
+import TagSelector from '../common/TagSelector.vue'
 
 // const apiUrl = import.meta.env.VITE_API_URL;
 const dialogError = ref(false)
@@ -342,6 +434,12 @@ interface Expense {
   } | string
   currency: string | null
   enable: boolean
+  tags?: Array<{
+    id: number
+    name: string
+    full_path: string
+    enable: boolean
+  }>
 }
 
 // 页面增加优先级提示
@@ -418,7 +516,8 @@ const handleAdd = () => {
       key: lastEditedData.value.key || '',
       payee: lastEditedData.value.payee ?? null,
       expend: typeof expendId === 'number' ? expendId : null,
-      currency: lastEditedData.value.currency || null
+      currency: lastEditedData.value.currency || null,
+      tag_ids: []
     };
   } else {
     // 没有编辑记录则重置
@@ -426,7 +525,8 @@ const handleAdd = () => {
       key: '',
       payee: null,
       expend: null,
-      currency: null
+      currency: null,
+      tag_ids: []
     };
     if (ruleFormRef.value) {
       ruleFormRef.value.resetFields();
@@ -442,7 +542,13 @@ const ruleForm = ref({
   payee: null as string | null | undefined,
   expend: null as number | null | undefined,
   currency: null as string | null,
+  tag_ids: [] as number[],
 })
+
+// 标签管理相关
+const tagDialogVisible = ref(false)
+const currentMapping = ref<Expense | null>(null)
+const tagsToAdd = ref<number[]>([])
 
 const rules = ref<FormRules>({
   key: [
@@ -615,6 +721,7 @@ const handleEdit = (index: number, row: Expense) => {
   ruleForm.value.payee = row.payee !== null ? row.payee : null // 为了解决编辑时payee为null时的问题;
   ruleForm.value.expend = typeof row.expend === 'object' ? row.expend?.id : (typeof row.expend === 'number' ? row.expend : null)
   ruleForm.value.currency = row.currency?.id || null
+  ruleForm.value.tag_ids = row.tags?.map(tag => tag.id) || []
   // ruleForm.value.enable = row.enable
   // ruleForm.value.tag = row.tag
   // ruleForm.value.classification = row.classification
@@ -657,7 +764,8 @@ const editForm = async (formEl: FormInstance | undefined) => {
           key: ruleForm.value.key,
           payee: ruleForm.value.payee,
           expend_id: ruleForm.value.expend, // 将 expend 转换为 expend_id
-          currency: ruleForm.value.currency
+          currency: ruleForm.value.currency,
+          tag_ids: ruleForm.value.tag_ids
         }
 
         console.log('编辑提交数据:', submitData)
@@ -1021,6 +1129,57 @@ const sortByAccount = (a: Expense, b: Expense): number => {
   return 0;
 };
 
+// 显示标签管理对话框
+const showTagDialog = (row: Expense) => {
+  currentMapping.value = row
+  tagsToAdd.value = []
+  tagDialogVisible.value = true
+  console.log('管理标签:', row)
+}
+
+// 为映射添加标签
+const addTagsToMapping = async () => {
+  if (!currentMapping.value || tagsToAdd.value.length === 0) return
+
+  try {
+    await axios.post(`/expense/${currentMapping.value.id}/add_tags/`, {
+      tag_ids: tagsToAdd.value
+    })
+    ElMessage.success('标签添加成功')
+    tagsToAdd.value = []
+    // 刷新数据
+    await fetchData()
+  } catch (error) {
+    console.error('添加标签失败:', error)
+    ElMessage.error('添加标签失败')
+  }
+}
+
+// 从映射中移除标签
+const removeTagFromMapping = async (tagId: number) => {
+  if (!currentMapping.value) return
+
+  try {
+    await ElMessageBox.confirm('确定要移除此标签吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+
+    await axios.post(`/expense/${currentMapping.value.id}/remove_tags/`, {
+      tag_ids: [tagId]
+    })
+    ElMessage.success('标签移除成功')
+    // 刷新数据
+    await fetchData()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('移除标签失败:', error)
+      ElMessage.error('移除标签失败')
+    }
+  }
+}
+
 </script>
 
 <style scoped>
@@ -1294,5 +1453,37 @@ const sortByAccount = (a: Expense, b: Expense): number => {
   .currency-cell {
     gap: 2px;
   }
+}
+
+/* 标签相关样式 */
+.tags-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.tag-management-dialog {
+  padding: 10px 0;
+}
+
+.current-tags-section,
+.add-tags-section {
+  margin-bottom: 20px;
+}
+
+.current-tags-section h4,
+.add-tags-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.current-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 32px;
 }
 </style>
