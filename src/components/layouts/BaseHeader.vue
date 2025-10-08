@@ -53,6 +53,9 @@
       <router-link to="/config/accounts" class="no-underline">
         <el-menu-item index="/config/accounts">账户管理</el-menu-item>
       </router-link>
+      <router-link to="/config/tags" class="no-underline">
+        <el-menu-item index="/config/tags">标签管理</el-menu-item>
+      </router-link>
       <router-link to="/format" class="no-underline">
         <el-menu-item index="/format">格式化输出</el-menu-item>
       </router-link>
