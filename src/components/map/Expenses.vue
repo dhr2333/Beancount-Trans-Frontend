@@ -144,9 +144,7 @@
       </el-form-item>
 
       <el-form-item label="货币代码" prop="currency">
-        <el-input v-model="ruleForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable>
-          <template #prepend>货币</template>
-        </el-input>
+        <el-input v-model="ruleForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable />
       </el-form-item>
 
       <el-form-item label="标签" prop="tag_ids">
@@ -180,9 +178,7 @@
       </el-form-item>
 
       <el-form-item label="货币代码" prop="currency">
-        <el-input v-model="ruleForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable>
-          <template #prepend>货币</template>
-        </el-input>
+        <el-input v-model="ruleForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable />
       </el-form-item>
 
       <el-form-item label="标签" prop="tag_ids">
@@ -286,9 +282,7 @@
         </el-form-item>
 
         <el-form-item label="货币代码">
-          <el-input v-model="batchUpdateForm.currency" placeholder="请输入新的货币代码（留空保持不变）" clearable>
-            <template #prepend>货币</template>
-          </el-input>
+          <el-input v-model="batchUpdateForm.currency" placeholder="请输入新的货币代码（留空保持不变）" clearable />
         </el-form-item>
       </el-form>
 
