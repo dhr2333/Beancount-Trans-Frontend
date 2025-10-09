@@ -3,13 +3,18 @@
     <!-- 搜索和操作栏 -->
     <div class="toolbar">
       <div class="search-section">
-        <el-input v-model="search" placeholder="搜索关键字、商家、账户" clearable @input="handleSearch">
+        <el-input v-model="search" placeholder="搜索关键字、商家、账户、标签" clearable @input="handleSearch">
           <template #prefix>
             <el-icon>
               <Search />
             </el-icon>
           </template>
         </el-input>
+        <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 120px;" @change="handleSearch">
+          <el-option label="全部" :value="null" />
+          <el-option label="已启用" :value="true" />
+          <el-option label="已禁用" :value="false" />
+        </el-select>
       </div>
       <div class="action-section">
         <el-button type="primary" @click="handleAdd()">
@@ -376,6 +381,9 @@ const selectedItems = ref<Expense[]>([])
 
 const loading = ref(false)
 
+// 过滤器状态
+const statusFilter = ref<boolean | null>(null)
+
 const fetchData = async () => {
   try {
     loading.value = true
@@ -405,17 +413,31 @@ const search = ref('')
 
 const filterExpenseData = computed(() =>
   ExpenseData.value.filter((data) => {
+    // 搜索词过滤
     const searchTerm = search.value?.toLowerCase() || ''
-    if (!searchTerm) return true
+    if (searchTerm) {
+      const expendAccount = typeof data.expend === 'string' ? data.expend : data.expend?.account || ''
 
-    const expendAccount = typeof data.expend === 'string' ? data.expend : data.expend?.account || ''
+      // 标签搜索
+      const tagNames = data.tags?.map(tag => tag.full_path.toLowerCase()).join(' ') || ''
 
-    return [
-      data.key.toLowerCase(),
-      data.payee?.toLowerCase() ?? '',
-      expendAccount.toLowerCase(),
-      data.currency?.code?.toLowerCase() ?? ''
-    ].some(field => field.includes(searchTerm))
+      const matchesSearch = [
+        data.key.toLowerCase(),
+        data.payee?.toLowerCase() ?? '',
+        expendAccount.toLowerCase(),
+        data.currency?.toLowerCase() ?? '',
+        tagNames
+      ].some(field => field.includes(searchTerm))
+
+      if (!matchesSearch) return false
+    }
+
+    // 状态过滤
+    if (statusFilter.value !== null && data.enable !== statusFilter.value) {
+      return false
+    }
+
+    return true
   })
 )
 
@@ -1063,10 +1085,14 @@ const sortByAccount = (a: Expense, b: Expense): number => {
   align-items: center;
   margin-bottom: 20px;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .search-section {
   flex: 1;
+  display: flex;
+  gap: 8px;
+  min-width: 200px;
   max-width: 400px;
 }
 

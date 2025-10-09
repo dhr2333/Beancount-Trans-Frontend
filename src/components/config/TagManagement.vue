@@ -103,7 +103,7 @@
                                             <div class="mapping-info">
                                                 <span class="mapping-key">{{ mapping.key }}</span>
                                                 <span v-if="mapping.payee" class="mapping-payee">{{ mapping.payee
-                                                    }}</span>
+                                                }}</span>
                                                 <span class="mapping-account">→ {{ mapping.account || '未知账户' }}</span>
                                                 <span v-if="mapping.currency" class="mapping-currency">{{
                                                     mapping.currency }}</span>
@@ -142,7 +142,7 @@
                                             <div class="mapping-info">
                                                 <span class="mapping-key">{{ mapping.key }}</span>
                                                 <span v-if="mapping.payer" class="mapping-payer">{{ mapping.payer
-                                                    }}</span>
+                                                }}</span>
                                                 <span class="mapping-account">→ {{ mapping.account || '未知账户' }}</span>
                                             </div>
                                             <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
@@ -642,11 +642,26 @@ onMounted(() => {
     margin-bottom: 20px;
 }
 
+/* 固定 el-descriptions 列宽 */
+.info-card :deep(.el-descriptions__label) {
+    width: 100px;
+    min-width: 100px;
+    max-width: 100px;
+}
+
+.info-card :deep(.el-descriptions__content) {
+    width: auto;
+    word-break: break-word;
+}
+
 .info-card code {
     background: #f5f7fa;
     padding: 2px 8px;
     border-radius: 4px;
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    word-break: break-all;
+    display: inline-block;
+    max-width: 100%;
 }
 
 .detail-actions {

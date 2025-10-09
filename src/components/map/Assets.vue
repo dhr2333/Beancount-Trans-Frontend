@@ -3,13 +3,19 @@
         <!-- 搜索和操作栏 -->
         <div class="toolbar">
             <div class="search-section">
-                <el-input v-model="search" placeholder="搜索关键字、账户描述、账户" clearable @input="handleSearch">
+                <el-input v-model="search" placeholder="搜索关键字、账户描述、账户、标签" clearable @input="handleSearch">
                     <template #prefix>
                         <el-icon>
                             <Search />
                         </el-icon>
                     </template>
                 </el-input>
+                <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 120px;"
+                    @change="handleSearch">
+                    <el-option label="全部" :value="null" />
+                    <el-option label="已启用" :value="true" />
+                    <el-option label="已禁用" :value="false" />
+                </el-select>
             </div>
             <div class="action-section">
                 <el-button type="primary" @click="handleAdd()">
@@ -56,7 +62,7 @@
                 <template #default="{ row }">
                     <div class="account-cell">
                         <el-text type="primary">{{ typeof row.assets === 'object' ? row.assets?.account : row.assets
-                            }}</el-text>
+                        }}</el-text>
                         <el-tag v-if="typeof row.assets === 'object' && row.assets?.account_type"
                             :type="getAccountTypeColor(row.assets.account_type)" size="small">
                             {{ row.assets.account_type }}
@@ -317,6 +323,9 @@ const loading = ref(false)
 const AssetsData = ref<Assets[]>([])
 const selectedItems = ref<Assets[]>([])
 
+// 过滤器状态
+const statusFilter = ref<boolean | null>(null)
+
 const fetchData = async () => {
     try {
         loading.value = true
@@ -347,14 +356,30 @@ const search = ref('')
 
 const filterAssetsData = computed(() =>
     AssetsData.value.filter((data) => {
+        // 搜索词过滤
         const searchTerm = search.value?.toLowerCase() || ''
-        if (!searchTerm) return true
+        if (searchTerm) {
+            const assetsAccount = typeof data.assets === 'string' ? data.assets.toLowerCase() : data.assets?.account?.toLowerCase() ?? ''
 
-        return [
-            data.key.toLowerCase(),
-            data.full?.toLowerCase() ?? '',
-            typeof data.assets === 'string' ? data.assets.toLowerCase() : data.assets?.account?.toLowerCase() ?? ''
-        ].some(field => field.includes(searchTerm))
+            // 标签搜索
+            const tagNames = data.tags?.map(tag => tag.full_path.toLowerCase()).join(' ') || ''
+
+            const matchesSearch = [
+                data.key.toLowerCase(),
+                data.full?.toLowerCase() ?? '',
+                assetsAccount,
+                tagNames
+            ].some(field => field.includes(searchTerm))
+
+            if (!matchesSearch) return false
+        }
+
+        // 状态过滤
+        if (statusFilter.value !== null && data.enable !== statusFilter.value) {
+            return false
+        }
+
+        return true
     })
 )
 
@@ -888,10 +913,14 @@ const sortByAccount = (a: Assets, b: Assets): number => {
     align-items: center;
     margin-bottom: 20px;
     gap: 16px;
+    flex-wrap: wrap;
 }
 
 .search-section {
     flex: 1;
+    display: flex;
+    gap: 8px;
+    min-width: 200px;
     max-width: 400px;
 }
 

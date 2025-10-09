@@ -112,7 +112,8 @@
                                             <div class="mapping-info">
                                                 <span class="mapping-key">{{ mapping.key }}</span>
                                                 <span class="mapping-account">→ {{ selectedAccount?.account }}</span>
-                                                <span v-if="mapping.currency" class="mapping-currency">{{ mapping.currency }}</span>
+                                                <span v-if="mapping.currency" class="mapping-currency">{{
+                                                    mapping.currency }}</span>
                                             </div>
                                             <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
                                                 {{ mapping.enable ? '启用' : '禁用' }}
@@ -265,10 +266,10 @@
                                             selectedMigrationAccountInfo.mapping_count.expense }}支出</el-tag>
                                         <el-tag type="success" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.assets
-                                            }}资产</el-tag>
+                                        }}资产</el-tag>
                                         <el-tag type="primary" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.income
-                                            }}收入</el-tag>
+                                        }}收入</el-tag>
                                     </div>
                                 </div>
                             </el-card>
@@ -885,6 +886,18 @@ onMounted(() => {
 .info-card,
 .currency-card {
     margin-bottom: 20px;
+}
+
+/* 固定 el-descriptions 列宽 */
+.info-card :deep(.el-descriptions__label) {
+    width: 100px;
+    min-width: 100px;
+    max-width: 100px;
+}
+
+.info-card :deep(.el-descriptions__content) {
+    width: auto;
+    word-break: break-word;
 }
 
 .card-header {
