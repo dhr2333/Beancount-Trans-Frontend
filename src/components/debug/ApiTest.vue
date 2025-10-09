@@ -28,16 +28,6 @@
             </div>
         </div>
 
-        <div class="test-section">
-            <h3>货币列表测试</h3>
-            <el-button @click="testCurrencies" :loading="loading.currencies">
-                测试货币列表 API
-            </el-button>
-            <div v-if="currenciesData.length > 0" class="result">
-                <h4>货币列表数据：</h4>
-                <pre>{{ JSON.stringify(currenciesData, null, 2) }}</pre>
-            </div>
-        </div>
 
         <div class="test-section">
             <h3>支出映射测试</h3>
@@ -69,12 +59,10 @@ import { setAuthTokens, clearAuthTokens, hasAuthTokens } from '../../utils/auth'
 
 const loading = ref({
     accountTree: false,
-    currencies: false,
     expenses: false
 })
 
 const accountTreeData = ref([])
-const currenciesData = ref([])
 const expensesData = ref([])
 const errors = ref([])
 
@@ -109,20 +97,6 @@ const testAccountTree = async () => {
     }
 }
 
-const testCurrencies = async () => {
-    try {
-        loading.value.currencies = true
-        const response = await axios.get('/currencies/')
-        currenciesData.value = response.data
-        ElMessage.success('货币列表 API 调用成功')
-    } catch (error: any) {
-        console.error('货币列表 API 错误:', error)
-        addError('货币列表 API 错误', error.response?.data?.detail || error.message)
-        ElMessage.error('货币列表 API 调用失败')
-    } finally {
-        loading.value.currencies = false
-    }
-}
 
 const testExpenses = async () => {
     try {

@@ -1,8 +1,9 @@
 <template>
     <div class="account-selector">
         <el-cascader v-model="selectedValue" :options="accountOptions" :props="cascaderProps" :placeholder="placeholder"
-            :filterable="true" :clearable="true" :show-all-levels="false" :separator="' > '" @change="handleChange"
-            @visible-change="handleVisibleChange" class="account-cascader" style="width: 100%;">
+            :filterable="true" :filter-method="customFilterMethod" :clearable="true" :show-all-levels="false"
+            :separator="' > '" @change="handleChange" @visible-change="handleVisibleChange" class="account-cascader"
+            style="width: 100%;">
             <template #default="{ node, data }">
                 <div class="cascader-node">
                     <span class="node-label">{{ data.account }}</span>
@@ -28,13 +29,6 @@
                             {{ selectedAccount.account_type }}
                         </el-tag>
                     </div>
-                    <div v-if="selectedAccount.currencies && selectedAccount.currencies.length > 0" class="currencies">
-                        <span class="label">关联货币：</span>
-                        <el-tag v-for="currency in selectedAccount.currencies" :key="currency.id" size="small"
-                            class="currency-tag">
-                            {{ currency.code }} - {{ currency.name }}
-                        </el-tag>
-                    </div>
                     <div v-if="selectedAccount.mapping_count" class="mapping-stats">
                         <span class="label">映射统计：</span>
                         <el-tag type="warning" size="small">{{ selectedAccount.mapping_count.expense }}支出</el-tag>
@@ -53,16 +47,9 @@ import { ElMessage } from 'element-plus'
 import axios from '../../utils/request'
 
 // 接口定义
-interface Currency {
-    id: number
-    code: string
-    name: string
-}
-
 interface Account {
     id: number
     account: string
-    currencies: Currency[]
     parent?: number
     parent_account?: string
     account_type: string
@@ -207,6 +194,25 @@ const getAccountTypeColor = (type: string) => {
         '权益账户': 'info'
     }
     return colorMap[type] || 'info'
+}
+
+// 自定义过滤方法 - 不区分大小写搜索
+const customFilterMethod = (node: any, keyword: string) => {
+    if (!keyword) return true
+
+    // 将搜索关键词转换为小写
+    const lowerKeyword = keyword.toLowerCase()
+
+    // 检查账户名称是否包含关键词（不区分大小写）
+    const accountName = node.data.account || ''
+    const lowerAccountName = accountName.toLowerCase()
+
+    // 检查账户类型是否包含关键词（不区分大小写）
+    const accountType = node.data.account_type || ''
+    const lowerAccountType = accountType.toLowerCase()
+
+    // 返回匹配结果
+    return lowerAccountName.includes(lowerKeyword) || lowerAccountType.includes(lowerKeyword)
 }
 
 // 处理选择变化

@@ -74,10 +74,7 @@
                             </el-table-column>
                             <el-table-column v-if="template.type === 'expense'" label="货币" width="80">
                                 <template #default="{ row }">
-                                    <span v-if="row.currencies && row.currencies.length > 0">
-                                        {{row.currencies.map(c => c.code).join(', ')}}
-                                    </span>
-                                    <span v-else>{{ row.currency || 'CNY' }}</span>
+                                    <span>{{ row.currency || 'CNY' }}</span>
                                 </template>
                             </el-table-column>
 

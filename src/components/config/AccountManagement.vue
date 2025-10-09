@@ -9,12 +9,6 @@
                     </el-icon>
                     新增账户
                 </el-button>
-                <el-button @click="refreshData">
-                    <el-icon>
-                        <Refresh />
-                    </el-icon>
-                    刷新
-                </el-button>
             </div>
         </div>
 
@@ -23,7 +17,8 @@
             <div class="account-tree-panel">
                 <el-tree :data="accountTree" :props="treeProps" node-key="id" :expand-on-click-node="false"
                     :default-expand-all="false" :default-expanded-keys="defaultExpandedKeys"
-                    @node-click="handleNodeClick" class="account-tree" v-loading="loading">
+                    @node-click="handleNodeClick" @node-expand="handleNodeExpand" @node-collapse="handleNodeCollapse"
+                    class="account-tree" v-loading="loading">
                     <template #default="{ node, data }">
                         <div class="tree-node">
                             <span class="node-label">{{ data.account }}</span>
@@ -117,9 +112,8 @@
                                             <div class="mapping-info">
                                                 <span class="mapping-key">{{ mapping.key }}</span>
                                                 <span class="mapping-account">→ {{ selectedAccount?.account }}</span>
-                                                <span v-if="mapping.currency" class="mapping-currency">({{
-                                                    mapping.currency
-                                                }})</span>
+                                                <span v-if="mapping.currency" class="mapping-currency">{{
+                                                    mapping.currency }}</span>
                                             </div>
                                             <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
                                                 {{ mapping.enable ? '启用' : '禁用' }}
@@ -165,28 +159,6 @@
                         </div>
                     </el-card>
 
-                    <!-- 货币管理 -->
-                    <el-card class="currency-card">
-                        <template #header>
-                            <div class="card-header">
-                                <span>关联货币</span>
-                                <el-button size="small" @click="showCurrencyDialog">
-                                    <el-icon>
-                                        <Edit />
-                                    </el-icon>
-                                    管理货币
-                                </el-button>
-                            </div>
-                        </template>
-                        <div class="currency-list">
-                            <el-tag v-for="currency in selectedAccount.currencies" :key="currency.id"
-                                class="currency-tag" closable @close="removeCurrency(currency.id)">
-                                {{ currency.code }} - {{ currency.name }}
-                            </el-tag>
-                            <el-empty v-if="selectedAccount.currencies.length === 0" description="暂无关联货币" />
-                        </div>
-                    </el-card>
-
                     <!-- 操作按钮 -->
                     <div class="action-buttons">
                         <el-button type="primary" @click="editAccount">
@@ -214,12 +186,6 @@
                 <el-form-item label="账户路径" prop="account">
                     <el-input v-model="newAccount.account" placeholder="Assets:Savings:Bank" />
                 </el-form-item>
-                <el-form-item label="关联货币" prop="currency_ids">
-                    <el-select v-model="newAccount.currency_ids" multiple placeholder="选择货币">
-                        <el-option v-for="currency in availableCurrencies" :key="currency.id"
-                            :label="`${currency.code} - ${currency.name}`" :value="currency.id" />
-                    </el-select>
-                </el-form-item>
             </el-form>
             <template #footer>
                 <el-button @click="addAccountDialog = false">取消</el-button>
@@ -233,79 +199,10 @@
                 <el-form-item label="账户路径" prop="account">
                     <el-input v-model="editAccountForm.account" />
                 </el-form-item>
-                <el-form-item label="关联货币" prop="currency_ids">
-                    <el-select v-model="editAccountForm.currency_ids" multiple placeholder="选择货币">
-                        <el-option v-for="currency in availableCurrencies" :key="currency.id"
-                            :label="`${currency.code} - ${currency.name}`" :value="currency.id" />
-                    </el-select>
-                </el-form-item>
             </el-form>
             <template #footer>
                 <el-button @click="editAccountDialog = false">取消</el-button>
                 <el-button type="primary" @click="updateAccount">确定</el-button>
-            </template>
-        </el-dialog>
-
-        <!-- 货币管理对话框 -->
-        <el-dialog v-model="currencyDialog" title="货币管理" width="800px">
-            <el-tabs v-model="activeCurrencyTab" type="card">
-                <!-- 货币列表 -->
-                <el-tab-pane label="货币列表" name="list">
-                    <div class="currency-list-section">
-                        <div class="section-header">
-                            <h4>所有货币</h4>
-                            <el-button type="primary" size="small" @click="showAddCurrencyDialog">
-                                <el-icon>
-                                    <Plus />
-                                </el-icon>
-                                新增货币
-                            </el-button>
-                        </div>
-                        <el-table :data="allCurrencies" style="width: 100%" v-loading="currencyLoading">
-                            <el-table-column prop="code" label="货币代码" width="120" />
-                            <el-table-column prop="name" label="货币名称" />
-                            <el-table-column label="操作" width="150">
-                                <template #default="{ row }">
-                                    <el-button size="small" @click="editCurrency(row)">编辑</el-button>
-                                    <el-button size="small" type="danger" @click="deleteCurrency(row)">删除</el-button>
-                                </template>
-                            </el-table-column>
-                        </el-table>
-                    </div>
-                </el-tab-pane>
-
-                <!-- 账户货币关联 -->
-                <el-tab-pane label="账户关联" name="association">
-                    <div class="currency-association-section">
-                        <h4>为账户 "{{ selectedAccount?.account }}" 关联货币</h4>
-                        <el-select v-model="selectedCurrencies" multiple placeholder="选择货币" style="width: 100%">
-                            <el-option v-for="currency in allCurrencies" :key="currency.id"
-                                :label="`${currency.code} - ${currency.name}`" :value="currency.id" />
-                        </el-select>
-                    </div>
-                </el-tab-pane>
-            </el-tabs>
-
-            <template #footer>
-                <el-button @click="currencyDialog = false">取消</el-button>
-                <el-button v-if="activeCurrencyTab === 'association'" type="primary"
-                    @click="updateAccountCurrencies">确定</el-button>
-            </template>
-        </el-dialog>
-
-        <!-- 新增/编辑货币对话框 -->
-        <el-dialog v-model="currencyFormDialog" :title="isEditingCurrency ? '编辑货币' : '新增货币'" width="400px">
-            <el-form :model="currencyForm" :rules="currencyRules" ref="currencyFormRef" label-width="80px">
-                <el-form-item label="货币代码" prop="code">
-                    <el-input v-model="currencyForm.code" placeholder="如：CNY, USD" />
-                </el-form-item>
-                <el-form-item label="货币名称" prop="name">
-                    <el-input v-model="currencyForm.name" placeholder="如：人民币, 美元" />
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <el-button @click="currencyFormDialog = false">取消</el-button>
-                <el-button type="primary" @click="saveCurrency">确定</el-button>
             </template>
         </el-dialog>
 
@@ -363,24 +260,16 @@
                                             {{ selectedMigrationAccountInfo.account_type }}
                                         </el-tag>
                                     </div>
-                                    <div v-if="selectedMigrationAccountInfo.currencies && selectedMigrationAccountInfo.currencies.length > 0"
-                                        class="currencies">
-                                        <span class="label">关联货币：</span>
-                                        <el-tag v-for="currency in selectedMigrationAccountInfo.currencies"
-                                            :key="currency.id" size="small" class="currency-tag">
-                                            {{ currency.code }} - {{ currency.name }}
-                                        </el-tag>
-                                    </div>
                                     <div v-if="selectedMigrationAccountInfo.mapping_count" class="mapping-stats">
                                         <span class="label">映射统计：</span>
                                         <el-tag type="warning" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.expense }}支出</el-tag>
                                         <el-tag type="success" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.assets
-                                            }}资产</el-tag>
+                                        }}资产</el-tag>
                                         <el-tag type="primary" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.income
-                                            }}收入</el-tag>
+                                        }}收入</el-tag>
                                     </div>
                                 </div>
                             </el-card>
@@ -420,21 +309,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Edit, Delete } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import type { FormInstance, FormRules } from 'element-plus'
 
 // 接口定义
-interface Currency {
-    id: number
-    code: string
-    name: string
-}
-
 interface Account {
     id: number
     account: string
-    currencies: Currency[]
     parent?: number
     parent_account?: string
     account_type: string
@@ -454,22 +336,16 @@ interface Account {
 const loading = ref(false)
 const accountTree = ref<Account[]>([])
 const selectedAccount = ref<Account | null>(null)
-const availableCurrencies = ref<Currency[]>([])
 const defaultExpandedKeys = ref<number[]>([])
+
+// 树形结构状态保持
+const expandedKeys = ref<number[]>([])
+const currentSelectedAccountId = ref<number | null>(null)
 
 // 对话框状态
 const addAccountDialog = ref(false)
 const editAccountDialog = ref(false)
-const currencyDialog = ref(false)
-const currencyFormDialog = ref(false)
 const deleteAccountDialog = ref(false)
-
-// 货币管理相关
-const activeCurrencyTab = ref('list')
-const allCurrencies = ref<Currency[]>([])
-const currencyLoading = ref(false)
-const isEditingCurrency = ref(false)
-const currentCurrencyId = ref<number | null>(null)
 
 // 映射详情相关
 const showMappingDetails = ref(false)
@@ -483,23 +359,12 @@ const activeMappingTab = ref('expense')
 
 // 表单数据
 const newAccount = ref({
-    account: '',
-    currency_ids: [] as number[]
+    account: ''
 })
-
-const currencyForm = ref({
-    code: '',
-    name: ''
-})
-
-const currencyFormRef = ref<FormInstance>()
 
 const editAccountForm = ref({
-    account: '',
-    currency_ids: [] as number[]
+    account: ''
 })
-
-const selectedCurrencies = ref<number[]>([])
 
 // 删除账户相关
 const migrationCandidates = ref<any[]>([])
@@ -536,16 +401,6 @@ const accountRules: FormRules = {
     ]
 }
 
-const currencyRules: FormRules = {
-    code: [
-        { required: true, message: '请输入货币代码', trigger: 'blur' },
-        { pattern: /^[A-Z]{3}$/, message: '货币代码必须是3位大写字母', trigger: 'blur' }
-    ],
-    name: [
-        { required: true, message: '请输入货币名称', trigger: 'blur' },
-        { max: 20, message: '货币名称不能超过20个字符', trigger: 'blur' }
-    ]
-}
 
 // 计算默认展开的节点
 const calculateDefaultExpandedKeys = (accounts: Account[], level: number = 1): number[] => {
@@ -555,7 +410,8 @@ const calculateDefaultExpandedKeys = (accounts: Account[], level: number = 1): n
         const accountType = account.account.split(':')[0]
 
         // 只展开Expenses类型的账户
-        if (accountType === 'Expenses' && level <= 2) {
+        // if (accountType === 'Expenses' && level <= 2) {
+        if (accountType === 'Expenses' && level <= 0) {
             expandedKeys.push(account.id)
 
             // 递归处理子账户
@@ -578,11 +434,27 @@ const hasMappings = computed(() => {
 const fetchAccountTree = async () => {
     try {
         loading.value = true
+
+        // 保存当前状态
+        const previousExpandedKeys = [...expandedKeys.value]
+        const previousSelectedId = currentSelectedAccountId.value
+
         const response = await axios.get('/account/tree/')
         accountTree.value = response.data
 
-        // 计算默认展开的节点
-        defaultExpandedKeys.value = calculateDefaultExpandedKeys(response.data)
+        // 保持之前的展开状态
+        defaultExpandedKeys.value = previousExpandedKeys.length > 0 ? previousExpandedKeys : calculateDefaultExpandedKeys(response.data)
+
+        // 恢复选中的账户
+        if (previousSelectedId) {
+            const selectedAccount = findAccountById(accountTree.value, previousSelectedId)
+            if (selectedAccount) {
+                selectedAccount.value = selectedAccount
+                currentSelectedAccountId.value = previousSelectedId
+                // 重新获取映射数据
+                await fetchAccountMappings()
+            }
+        }
     } catch (error: any) {
         console.error('获取账户树失败:', error)
         if (error.response?.status === 401) {
@@ -595,25 +467,30 @@ const fetchAccountTree = async () => {
     }
 }
 
-// 获取可用货币列表
-const fetchCurrencies = async () => {
-    try {
-        const response = await axios.get('/currencies/')
-        availableCurrencies.value = response.data
-    } catch (error: any) {
-        console.error('获取货币列表失败:', error)
-        ElMessage.error('获取货币列表失败')
-    }
-}
-
 // 节点点击处理
 const handleNodeClick = async (data: Account) => {
     selectedAccount.value = data
+    currentSelectedAccountId.value = data.id
     // 重置映射详情状态
     showMappingDetails.value = false
 
     // 自动获取映射数据
     await fetchAccountMappings()
+}
+
+// 节点展开处理
+const handleNodeExpand = (data: Account) => {
+    if (!expandedKeys.value.includes(data.id)) {
+        expandedKeys.value.push(data.id)
+    }
+}
+
+// 节点折叠处理
+const handleNodeCollapse = (data: Account) => {
+    const index = expandedKeys.value.indexOf(data.id)
+    if (index > -1) {
+        expandedKeys.value.splice(index, 1)
+    }
 }
 
 // 获取账户类型颜色
@@ -655,8 +532,7 @@ const updateAccountStatus = async (account: Account) => {
 // 显示新增账户对话框
 const showAddAccountDialog = () => {
     newAccount.value = {
-        account: '',
-        currency_ids: []
+        account: ''
     }
     addAccountDialog.value = true
 }
@@ -688,8 +564,7 @@ const editAccount = () => {
     if (!selectedAccount.value) return
 
     editAccountForm.value = {
-        account: selectedAccount.value.account,
-        currency_ids: selectedAccount.value.currencies.map(c => c.id)
+        account: selectedAccount.value.account
     }
     editAccountDialog.value = true
 }
@@ -704,13 +579,6 @@ const updateAccount = async () => {
         ElMessage.success('账户更新成功')
         editAccountDialog.value = false
         await fetchAccountTree()
-        // 更新选中账户的信息
-        if (selectedAccount.value) {
-            const updatedAccount = accountTree.value.find(acc => acc.id === selectedAccount.value!.id)
-            if (updatedAccount) {
-                selectedAccount.value = updatedAccount
-            }
-        }
     } catch (error: any) {
         console.error('更新账户失败:', error)
         if (error.response?.status === 401) {
@@ -835,6 +703,7 @@ const confirmDeleteAccount = async () => {
         ElMessage.success('账户删除成功')
         deleteAccountDialog.value = false
         selectedAccount.value = null
+        currentSelectedAccountId.value = null
         await fetchAccountTree()
     } catch (error: any) {
         console.error('删除账户失败:', error)
@@ -851,78 +720,6 @@ const confirmDeleteAccount = async () => {
     }
 }
 
-// 显示货币管理对话框
-const showCurrencyDialog = async () => {
-    if (!selectedAccount.value) return
-
-    selectedCurrencies.value = selectedAccount.value.currencies.map(c => c.id)
-    await fetchAllCurrencies()
-    currencyDialog.value = true
-}
-
-// 更新账户货币关联
-const updateAccountCurrencies = async () => {
-    if (!selectedAccount.value) return
-
-    try {
-        await axios.patch(`/account/${selectedAccount.value.id}/`, {
-            currency_ids: selectedCurrencies.value
-        })
-        ElMessage.success('货币关联更新成功')
-        currencyDialog.value = false
-        await fetchAccountTree()
-        // 更新选中账户的信息
-        const updatedAccount = accountTree.value.find(acc => acc.id === selectedAccount.value!.id)
-        if (updatedAccount) {
-            selectedAccount.value = updatedAccount
-        }
-    } catch (error: any) {
-        console.error('更新货币关联失败:', error)
-        if (error.response?.status === 401) {
-            ElMessage.info('未认证，请登录后重试')
-        } else {
-            ElMessage.error('更新货币关联失败')
-        }
-    }
-}
-
-// 移除货币关联
-const removeCurrency = async (currencyId: number) => {
-    if (!selectedAccount.value) return
-
-    try {
-        const newCurrencyIds = selectedAccount.value.currencies
-            .filter(c => c.id !== currencyId)
-            .map(c => c.id)
-
-        await axios.patch(`/account/${selectedAccount.value.id}/`, {
-            currency_ids: newCurrencyIds
-        })
-        ElMessage.success('货币关联移除成功')
-        await fetchAccountTree()
-        // 更新选中账户的信息
-        const updatedAccount = accountTree.value.find(acc => acc.id === selectedAccount.value!.id)
-        if (updatedAccount) {
-            selectedAccount.value = updatedAccount
-        }
-    } catch (error: any) {
-        console.error('移除货币关联失败:', error)
-        if (error.response?.status === 401) {
-            ElMessage.info('未认证，请登录后重试')
-        } else {
-            ElMessage.error('移除货币关联失败')
-        }
-    }
-}
-
-// 刷新数据
-const refreshData = async () => {
-    await Promise.all([
-        fetchAccountTree(),
-        fetchCurrencies()
-    ])
-}
-
 // 格式化日期时间
 const formatDateTime = (dateString: string): string => {
     if (!dateString) return ''
@@ -934,99 +731,6 @@ const formatDateTime = (dateString: string): string => {
 
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
         `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-}
-
-// 获取所有货币
-const fetchAllCurrencies = async () => {
-    try {
-        currencyLoading.value = true
-        const response = await axios.get('/currencies/')
-        allCurrencies.value = response.data
-    } catch (error: any) {
-        console.error('获取货币列表失败:', error)
-        ElMessage.error('获取货币列表失败')
-    } finally {
-        currencyLoading.value = false
-    }
-}
-
-// 显示新增货币对话框
-const showAddCurrencyDialog = () => {
-    isEditingCurrency.value = false
-    currentCurrencyId.value = null
-    currencyForm.value = { code: '', name: '' }
-    currencyFormDialog.value = true
-}
-
-// 编辑货币
-const editCurrency = (currency: Currency) => {
-    isEditingCurrency.value = true
-    currentCurrencyId.value = currency.id
-    currencyForm.value = { code: currency.code, name: currency.name }
-    currencyFormDialog.value = true
-}
-
-// 保存货币
-const saveCurrency = async () => {
-    if (!currencyFormRef.value) return
-
-    try {
-        await currencyFormRef.value.validate()
-
-        console.log('保存货币数据:', currencyForm.value)
-
-        if (isEditingCurrency.value && currentCurrencyId.value) {
-            // 编辑货币
-            console.log('编辑货币，ID:', currentCurrencyId.value)
-            await axios.put(`/currencies/${currentCurrencyId.value}/`, currencyForm.value)
-            ElMessage.success('货币更新成功')
-        } else {
-            // 新增货币
-            console.log('新增货币')
-            const response = await axios.post('/currencies/', currencyForm.value)
-            console.log('新增货币响应:', response.data)
-            ElMessage.success('货币创建成功')
-        }
-
-        currencyFormDialog.value = false
-        await fetchAllCurrencies()
-    } catch (error: any) {
-        console.error('保存货币失败:', error)
-        console.error('错误详情:', error.response?.data)
-        if (error.response?.status === 400) {
-            ElMessage.error('货币代码已存在或数据格式错误')
-        } else if (error.response?.status === 401) {
-            ElMessage.error('未认证，请登录后重试')
-        } else if (error.response?.status === 403) {
-            ElMessage.error('权限不足，请登录后重试')
-        } else {
-            ElMessage.error('保存货币失败')
-        }
-    }
-}
-
-// 删除货币
-const deleteCurrency = async (currency: Currency) => {
-    try {
-        await ElMessageBox.confirm(
-            `确定要删除货币 "${currency.code} - ${currency.name}" 吗？此操作不可撤销。`,
-            '确认删除',
-            {
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                type: 'warning',
-            }
-        )
-
-        await axios.delete(`/currencies/${currency.id}/`)
-        ElMessage.success('货币删除成功')
-        await fetchAllCurrencies()
-    } catch (error: any) {
-        if (error !== 'cancel') {
-            console.error('删除货币失败:', error)
-            ElMessage.error('删除货币失败')
-        }
-    }
 }
 
 // 切换映射详情显示
@@ -1091,7 +795,7 @@ const getIncomeMappingTooltip = () => {
 
 // 组件挂载时初始化数据
 onMounted(() => {
-    refreshData()
+    fetchAccountTree()
 })
 </script>
 
@@ -1182,6 +886,18 @@ onMounted(() => {
 .info-card,
 .currency-card {
     margin-bottom: 20px;
+}
+
+/* 固定 el-descriptions 列宽 */
+.info-card :deep(.el-descriptions__label) {
+    width: 100px;
+    min-width: 100px;
+    max-width: 100px;
+}
+
+.info-card :deep(.el-descriptions__content) {
+    width: auto;
+    word-break: break-word;
 }
 
 .card-header {

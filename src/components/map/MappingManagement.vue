@@ -1,97 +1,82 @@
 <template>
     <div class="mapping-management">
-        <!-- 顶部统计面板 -->
-        <div class="stats-panel">
-            <el-row :gutter="16">
-                <el-col :xs="24" :sm="8" :md="6">
-                    <el-card class="stat-card">
-                        <el-statistic title="总映射数" :value="statistics.totalMappings"
-                            :value-style="{ color: '#409eff' }">
-                            <template #prefix>
-                                <el-icon>
-                                    <Document />
-                                </el-icon>
-                            </template>
-                        </el-statistic>
-                    </el-card>
-                </el-col>
-                <el-col :xs="24" :sm="8" :md="6">
-                    <el-card class="stat-card">
-                        <el-statistic title="活跃映射" :value="statistics.activeMappings"
-                            :value-style="{ color: '#67c23a' }">
-                            <template #prefix>
-                                <el-icon>
-                                    <Check />
-                                </el-icon>
-                            </template>
-                        </el-statistic>
-                    </el-card>
-                </el-col>
-                <el-col :xs="24" :sm="8" :md="6">
-                    <el-card class="stat-card">
-                        <el-statistic title="本月新增" :value="statistics.monthlyNew" :value-style="{ color: '#e6a23c' }">
-                            <template #prefix>
-                                <el-icon>
-                                    <Plus />
-                                </el-icon>
-                            </template>
-                        </el-statistic>
-                    </el-card>
-                </el-col>
-                <el-col :xs="24" :sm="8" :md="6">
-                    <el-card class="stat-card">
-                        <el-statistic title="映射账户数" :value="statistics.mappedAccounts"
-                            :value-style="{ color: '#f56c6c' }">
-                            <template #prefix>
-                                <el-icon>
-                                    <User />
-                                </el-icon>
-                            </template>
-                        </el-statistic>
-                    </el-card>
-                </el-col>
-            </el-row>
-        </div>
 
-        <!-- 快速操作面板 -->
-        <div class="quick-actions">
+
+        <!-- 快速创建映射 -->
+        <!-- <div class="quick-create-section">
+            <el-button type="primary" size="large" @click="showQuickCreateDialog">
+                <el-icon>
+                    <Plus />
+                </el-icon>
+                快速创建映射
+            </el-button>
+        </div> -->
+
+
+        <!-- 映射分析面板 -->
+        <div class="analytics-panel">
             <el-card>
                 <template #header>
                     <div class="card-header">
-                        <span>快速操作</span>
-                        <el-button type="primary" size="small" @click="showQuickCreateDialog">
+                        <span>映射分析</span>
+                        <el-button size="small" @click="refreshAnalytics">
                             <el-icon>
-                                <Plus />
+                                <Refresh />
                             </el-icon>
-                            快速创建映射
+                            刷新分析
                         </el-button>
                     </div>
                 </template>
-                <div class="action-buttons">
-                    <el-button @click="handleBatchImport">
-                        <el-icon>
-                            <Upload />
-                        </el-icon>
-                        批量导入
-                    </el-button>
-                    <el-button @click="handleBatchExport">
-                        <el-icon>
-                            <Download />
-                        </el-icon>
-                        批量导出
-                    </el-button>
-                    <el-button @click="handleMappingAnalysis">
-                        <el-icon>
-                            <DataAnalysis />
-                        </el-icon>
-                        映射分析
-                    </el-button>
-                    <el-button @click="handleMappingOptimization">
-                        <el-icon>
-                            <MagicStick />
-                        </el-icon>
-                        智能优化
-                    </el-button>
+                <div class="analytics-content">
+                    <el-row :gutter="16">
+                        <el-col :xs="24" :sm="12" :md="8">
+                            <div class="analytics-card">
+                                <div class="analytics-title">映射使用频率</div>
+                                <div class="analytics-chart">
+                                    <div class="chart-placeholder">
+                                        <el-icon>
+                                            <PieChart />
+                                        </el-icon>
+                                        <p>使用频率分析图表</p>
+                                        <small>显示最常用和最少用的映射规则</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </el-col>
+                        <el-col :xs="24" :sm="12" :md="8">
+                            <div class="analytics-card">
+                                <div class="analytics-title">映射效果评估</div>
+                                <div class="analytics-metrics">
+                                    <div class="metric-item">
+                                        <span class="metric-label">高准确率映射</span>
+                                        <span class="metric-value">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">需要优化映射</span>
+                                        <span class="metric-value warning">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">从未使用映射</span>
+                                        <span class="metric-value danger">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </el-col>
+                        <el-col :xs="24" :sm="12" :md="8">
+                            <div class="analytics-card">
+                                <div class="analytics-title">智能建议</div>
+                                <div class="analytics-suggestions">
+                                    <div class="no-suggestions">
+                                        <el-icon>
+                                            <InfoFilled />
+                                        </el-icon>
+                                        <p>等待分析接口接入</p>
+                                        <small>后续将提供智能建议</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </el-col>
+                    </el-row>
                 </div>
             </el-card>
         </div>
@@ -106,7 +91,6 @@
                                 <Money />
                             </el-icon>
                             支出映射
-                            <el-badge :value="statistics.expenseMappings" class="tab-badge" />
                         </span>
                     </template>
                     <ExpenseMapping ref="expenseMappingRef" />
@@ -119,7 +103,6 @@
                                 <TrendCharts />
                             </el-icon>
                             收入映射
-                            <el-badge :value="statistics.incomeMappings" class="tab-badge" />
                         </span>
                     </template>
                     <IncomeMapping ref="incomeMappingRef" />
@@ -132,7 +115,6 @@
                                 <Wallet />
                             </el-icon>
                             资产映射
-                            <el-badge :value="statistics.assetsMappings" class="tab-badge" />
                         </span>
                     </template>
                     <AssetsMapping ref="assetsMappingRef" />
@@ -157,22 +139,23 @@
                 <el-form-item label="关键字" prop="key">
                     <el-input v-model="quickCreateForm.key" placeholder="输入关键字" />
                 </el-form-item>
-                <el-form-item label="映射账户" prop="accountId">
-                    <AccountSelector v-model="quickCreateForm.accountId" placeholder="选择映射账户"
-                        @change="handleAccountChange" />
-                </el-form-item>
-                <el-form-item label="关联货币" prop="currencyId">
-                    <CurrencySelector v-model="quickCreateForm.currencyId" :account-id="quickCreateForm.accountId"
-                        placeholder="选择货币" />
-                </el-form-item>
                 <el-form-item v-if="quickCreateForm.type === 'expense'" label="商家" prop="payee">
                     <el-input v-model="quickCreateForm.payee" placeholder="输入商家名称（可选）" />
+                </el-form-item>
+                <el-form-item v-if="quickCreateForm.type === 'assets'" label="账户描述" prop="full">
+                    <el-input v-model="quickCreateForm.full" placeholder="输入账户描述（可选）" />
                 </el-form-item>
                 <!-- <el-form-item v-if="quickCreateForm.type === 'income'" label="付款方" prop="payer">
                     <el-input v-model="quickCreateForm.payer" placeholder="输入付款方（可选）" />
                 </el-form-item> -->
-                <el-form-item v-if="quickCreateForm.type === 'assets'" label="账户描述" prop="full">
-                    <el-input v-model="quickCreateForm.full" placeholder="输入账户描述（可选）" />
+                <el-form-item label="映射账户" prop="accountId">
+                    <AccountSelector v-model="quickCreateForm.accountId" placeholder="选择映射账户"
+                        @change="handleAccountChange" />
+                </el-form-item>
+                <el-form-item v-if="quickCreateForm.type === 'expense'" label="货币代码" prop="currency">
+                    <el-input v-model="quickCreateForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable>
+                        <template #prepend>货币</template>
+                    </el-input>
                 </el-form-item>
             </el-form>
             <template #footer>
@@ -187,43 +170,21 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-    Document, Check, Plus, User, Upload, Download,
-    DataAnalysis, MagicStick, Money, TrendCharts, Wallet
+    Plus, Money, TrendCharts, Wallet, Refresh, PieChart, InfoFilled
 } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import AccountSelector from '../common/AccountSelector.vue'
-import CurrencySelector from '../common/CurrencySelector.vue'
 import ExpenseMapping from './Expenses.vue'
 import IncomeMapping from './Income.vue'
 import AssetsMapping from './Assets.vue'
 import type { FormInstance, FormRules } from 'element-plus'
 
-// 接口定义
-interface MappingStatistics {
-    totalMappings: number
-    activeMappings: number
-    monthlyNew: number
-    mappedAccounts: number
-    expenseMappings: number
-    incomeMappings: number
-    assetsMappings: number
-}
-
 // 响应式数据
 const activeTab = ref('expense')
-const statistics = ref<MappingStatistics>({
-    totalMappings: 0,
-    activeMappings: 0,
-    monthlyNew: 0,
-    mappedAccounts: 0,
-    expenseMappings: 0,
-    incomeMappings: 0,
-    assetsMappings: 0
-})
 
 // 提示信息
 const showTooltip = ref(true)
-const payeetipContent = ref("若商家存在，优先级 + 50 ,映射账户中每存在一个 ':' ，优先级以 ':' 数量 * 100计算 ")
+const payeetipContent = ref("💡 提示：关键字用于匹配账单中的描述信息，映射账户用于指定该交易应归入的账户。商家信息有助于提高映射的准确性。")
 
 // 快速创建相关
 const quickCreateDialog = ref(false)
@@ -232,7 +193,7 @@ const quickCreateForm = ref({
     type: 'expense',
     key: '',
     accountId: null as number | null,
-    currencyId: null as number | null,
+    currency: null as string | null,
     payee: '',
     payer: '',
     full: ''
@@ -249,45 +210,6 @@ const expenseMappingRef = ref()
 const incomeMappingRef = ref()
 const assetsMappingRef = ref()
 
-// 获取映射统计信息
-const fetchStatistics = async () => {
-    try {
-        // 并行获取各类映射数据
-        const [expenseRes, incomeRes, assetsRes] = await Promise.all([
-            axios.get('/expense/'),
-            axios.get('/income/'),
-            axios.get('/assets/')
-        ])
-
-        const expenseData = expenseRes.data
-        const incomeData = incomeRes.data
-        const assetsData = assetsRes.data
-
-        // 计算统计信息
-        statistics.value = {
-            totalMappings: expenseData.length + incomeData.length + assetsData.length,
-            activeMappings: expenseData.filter((m: any) => m.enable).length +
-                incomeData.filter((m: any) => m.enable).length +
-                assetsData.filter((m: any) => m.enable).length,
-            monthlyNew: 0, // 需要根据创建时间计算
-            mappedAccounts: new Set([
-                ...expenseData.map((m: any) => m.expend),
-                ...incomeData.map((m: any) => m.income),
-                ...assetsData.map((m: any) => m.assets)
-            ]).size,
-            expenseMappings: expenseData.length,
-            incomeMappings: incomeData.length,
-            assetsMappings: assetsData.length
-        }
-    } catch (error: any) {
-        console.error('获取映射统计失败:', error)
-        if (error.response?.status === 401) {
-            ElMessage.info('未认证，请登录后重试')
-        } else {
-            ElMessage.error('获取映射统计失败')
-        }
-    }
-}
 
 // 根据映射类型获取账户类型
 // const getAccountTypeByMappingType = (type: string): string => {
@@ -312,7 +234,7 @@ const showQuickCreateDialog = () => {
         type: 'expense',
         key: '',
         accountId: null,
-        currencyId: null,
+        currency: null,
         payee: '',
         payer: '',
         full: ''
@@ -330,7 +252,7 @@ const handleQuickCreate = async () => {
         // 根据映射类型转换字段名
         let formData: any = {
             key: quickCreateForm.value.key,
-            currency_ids: quickCreateForm.value.currencyId ? [quickCreateForm.value.currencyId] : []
+            currency: quickCreateForm.value.currency
         }
 
         let apiUrl = ''
@@ -358,8 +280,7 @@ const handleQuickCreate = async () => {
         ElMessage.success('映射创建成功')
         quickCreateDialog.value = false
 
-        // 刷新统计和当前标签页数据
-        await fetchStatistics()
+        // 刷新当前标签页数据
         await refreshCurrentTab()
     } catch (error: any) {
         console.error('创建映射失败:', error)
@@ -394,36 +315,24 @@ const refreshCurrentTab = async () => {
     }
 }
 
-// 批量导入
-const handleBatchImport = () => {
-    ElMessage.info('批量导入功能开发中...')
-}
 
-// 批量导出
-const handleBatchExport = () => {
-    ElMessage.info('批量导出功能开发中...')
-}
-
-// 映射分析
-const handleMappingAnalysis = () => {
-    ElMessage.info('映射分析功能开发中...')
-}
-
-// 智能优化
-const handleMappingOptimization = () => {
-    ElMessage.info('智能优化功能开发中...')
+// 刷新分析数据
+const refreshAnalytics = async () => {
+    ElMessage.info('正在刷新分析数据...')
+    // 这里后续会调用您提供的接口
+    ElMessage.success('分析数据已刷新')
 }
 
 // 处理账户选择变化
 const handleAccountChange = (account: any) => {
     console.log('映射管理总览 - 账户选择变化:', account)
-    // 账户选择变化时，清空已选择的货币，让用户重新选择
-    quickCreateForm.value.currencyId = null
+    // 账户选择变化时，清空已选择的货币
+    quickCreateForm.value.currency = null
 }
 
 // 组件挂载时初始化
 onMounted(() => {
-    fetchStatistics()
+    // 页面初始化
 })
 </script>
 
@@ -434,22 +343,146 @@ onMounted(() => {
     min-height: 100vh;
 }
 
-.stats-panel {
+.quick-create-section {
     margin-bottom: 24px;
-}
-
-.stat-card {
     text-align: center;
-    transition: all 0.3s ease;
 }
 
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.quick-actions {
+.analytics-panel {
     margin-bottom: 24px;
+}
+
+.analytics-content {
+    padding: 16px 0;
+}
+
+.analytics-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 16px;
+    height: 100%;
+}
+
+.analytics-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #303133;
+    margin-bottom: 16px;
+}
+
+.analytics-chart {
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-placeholder {
+    text-align: center;
+    color: #909399;
+}
+
+.chart-placeholder .el-icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+}
+
+.chart-placeholder p {
+    margin: 8px 0 4px 0;
+    font-size: 14px;
+}
+
+.chart-placeholder small {
+    font-size: 12px;
+    color: #c0c4cc;
+}
+
+.analytics-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.metric-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 6px;
+    border-left: 3px solid #409eff;
+}
+
+.metric-label {
+    font-size: 14px;
+    color: #606266;
+}
+
+.metric-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: #67c23a;
+}
+
+.metric-value.warning {
+    color: #e6a23c;
+}
+
+.metric-value.danger {
+    color: #f56c6c;
+}
+
+.analytics-suggestions {
+    min-height: 120px;
+}
+
+.no-suggestions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100px;
+    color: #67c23a;
+}
+
+.no-suggestions .el-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+}
+
+.no-suggestions p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.suggestion-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.suggestion-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px;
+    background: white;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.suggestion-item .el-icon {
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.suggestion-item .el-icon.warning {
+    color: #e6a23c;
+}
+
+.suggestion-item .el-icon.info {
+    color: #409eff;
 }
 
 .card-header {
@@ -458,11 +491,6 @@ onMounted(() => {
     align-items: center;
 }
 
-.action-buttons {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-}
 
 .mapping-tabs {
     background: white;
@@ -486,20 +514,10 @@ onMounted(() => {
         padding: 12px;
     }
 
-    .action-buttons {
-        flex-direction: column;
-    }
-
     .card-header {
         flex-direction: column;
         gap: 12px;
         align-items: flex-start;
-    }
-}
-
-@media (max-width: 576px) {
-    .stats-panel .el-col {
-        margin-bottom: 12px;
     }
 }
 </style>

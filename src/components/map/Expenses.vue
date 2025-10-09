@@ -3,13 +3,18 @@
     <!-- 搜索和操作栏 -->
     <div class="toolbar">
       <div class="search-section">
-        <el-input v-model="search" placeholder="搜索关键字、商家、账户" clearable @input="handleSearch">
+        <el-input v-model="search" placeholder="搜索关键字、商家、账户、标签" clearable @input="handleSearch">
           <template #prefix>
             <el-icon>
               <Search />
             </el-icon>
           </template>
         </el-input>
+        <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 120px;" @change="handleSearch">
+          <el-option label="全部" :value="null" />
+          <el-option label="已启用" :value="true" />
+          <el-option label="已禁用" :value="false" />
+        </el-select>
       </div>
       <div class="action-section">
         <el-button type="primary" @click="handleAdd()">
@@ -30,12 +35,6 @@
           </el-icon>
           导出
         </el-button>
-        <el-button @click="fetchData()">
-          <el-icon>
-            <Refresh />
-          </el-icon>
-          刷新
-        </el-button>
       </div>
     </div>
 
@@ -44,20 +43,20 @@
       @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" />
 
-      <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" width="120">
+      <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" min-width="100" width="auto">
         <template #default="{ row }">
           <el-tag type="primary" size="small">{{ row.key }}</el-tag>
         </template>
       </el-table-column>
 
-      <el-table-column label="商家" prop="payee" width="150">
+      <el-table-column label="商家" prop="payee" min-width="120" width="auto">
         <template #default="{ row }">
           <span v-if="row.payee">{{ row.payee }}</span>
           <el-text v-else type="info" size="small">-</el-text>
         </template>
       </el-table-column>
 
-      <el-table-column label="映射账户" prop="expend" sortable min-width="200">
+      <el-table-column label="映射账户" prop="expend" sortable :sort-method="sortByAccount" min-width="180" width="auto">
         <template #default="{ row }">
           <div class="account-cell">
             <el-text type="primary">{{ row.expend?.account || row.expend }}</el-text>
@@ -68,13 +67,21 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="货币" prop="currency" width="150">
+      <el-table-column label="货币" prop="currency" min-width="80" width="auto">
         <template #default="{ row }">
           <div v-if="row.currency" class="currency-cell">
-            <el-text type="primary">{{ row.currency.code }}</el-text>
-            <!-- <el-tag size="small" class="currency-tag">
-              {{ row.currency.code }}
-            </el-tag> -->
+            <el-text type="primary">{{ row.currency }}</el-text>
+          </div>
+          <el-text v-else type="info" size="small">-</el-text>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="标签" min-width="180" width="auto">
+        <template #default="{ row }">
+          <div v-if="row.tags && row.tags.length > 0" class="tags-cell">
+            <el-tag v-for="tag in row.tags" :key="tag.id" size="small" style="margin-right: 4px; margin-bottom: 4px;">
+              {{ tag.full_path }}
+            </el-tag>
           </div>
           <el-text v-else type="info" size="small">-</el-text>
         </template>
@@ -110,6 +117,7 @@
           <div class="batch-buttons">
             <el-button size="small" @click="handleBatchEnable">批量启用</el-button>
             <el-button size="small" @click="handleBatchDisable">批量禁用</el-button>
+            <el-button size="small" type="primary" @click="handleBatchUpdateAccount">批量修改账户</el-button>
             <el-button size="small" type="danger" @click="handleBatchDelete">批量删除</el-button>
           </div>
         </template>
@@ -140,8 +148,12 @@
         <AccountSelector v-model="ruleForm.expend" placeholder="选择账户" @change="handleAccountChange" />
       </el-form-item>
 
-      <el-form-item label="关联货币" prop="currency">
-        <CurrencySelector v-model="ruleForm.currency" :account-id="ruleForm.expend || undefined" placeholder="选择货币" />
+      <el-form-item label="货币代码" prop="currency">
+        <el-input v-model="ruleForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable />
+      </el-form-item>
+
+      <el-form-item label="标签" prop="tag_ids">
+        <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="选择标签（可多选）" />
       </el-form-item>
 
       <el-form-item>
@@ -170,8 +182,12 @@
         <AccountSelector v-model="ruleForm.expend" placeholder="选择账户" @change="handleAccountChange" />
       </el-form-item>
 
-      <el-form-item label="关联货币" prop="currency">
-        <CurrencySelector v-model="ruleForm.currency" :account-id="ruleForm.expend || undefined" placeholder="选择货币" />
+      <el-form-item label="货币代码" prop="currency">
+        <el-input v-model="ruleForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable />
+      </el-form-item>
+
+      <el-form-item label="标签" prop="tag_ids">
+        <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="选择标签（可多选）" />
       </el-form-item>
 
       <el-form-item>
@@ -252,6 +268,63 @@
     </template>
   </el-dialog>
 
+  <!-- 批量修改账户对话框 -->
+  <el-dialog v-model="batchUpdateAccountDialog" title="批量修改支出映射账户" width="600px" :close-on-click-modal="false">
+    <div class="batch-update-content">
+      <!-- 提示信息 -->
+      <el-alert :title="`您即将修改 ${selectedItems.length} 个支出映射的账户设置`" type="info" :closable="false" show-icon
+        style="margin-bottom: 20px;">
+        <template #default>
+          <p>请选择要修改的字段，留空的字段将保持不变。</p>
+        </template>
+      </el-alert>
+
+      <!-- 表单 -->
+      <el-form ref="batchUpdateFormRef" :model="batchUpdateForm" label-width="100px" status-icon>
+        <el-form-item label="映射账户">
+          <AccountSelector v-model="batchUpdateForm.expend" placeholder="选择新的映射账户（留空保持不变）"
+            @change="handleBatchAccountChange" />
+        </el-form-item>
+
+        <el-form-item label="货币代码">
+          <el-input v-model="batchUpdateForm.currency" placeholder="请输入新的货币代码（留空保持不变）" clearable />
+        </el-form-item>
+      </el-form>
+
+      <!-- 进度条 -->
+      <div v-if="batchUpdateLoading" class="update-progress">
+        <el-progress :percentage="batchUpdateProgress" :status="batchUpdateProgress === 100 ? 'success' : undefined"
+          :stroke-width="8" />
+        <p class="progress-text">正在更新映射... {{ batchUpdateProgress }}%</p>
+      </div>
+
+      <!-- 错误信息 -->
+      <div v-if="batchUpdateErrors.length > 0" class="update-errors">
+        <el-alert title="部分更新失败" type="error" :closable="false" show-icon>
+          <template #default>
+            <ul class="error-list">
+              <li v-for="error in batchUpdateErrors" :key="error" class="error-item">
+                {{ error }}
+              </li>
+            </ul>
+          </template>
+        </el-alert>
+      </div>
+    </div>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="cancelBatchUpdateAccount" :disabled="batchUpdateLoading">
+          取消
+        </el-button>
+        <el-button type="primary" @click="confirmBatchUpdateAccount" :loading="batchUpdateLoading"
+          :disabled="batchUpdateLoading || (!batchUpdateForm.expend && !batchUpdateForm.currency)">
+          {{ batchUpdateLoading ? '更新中...' : '确认更新' }}
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
+
   <!-- <el-dialog v-model="dialogError" title="操作失败" width="30%">
     <el-icon>
       <WarningFilled />
@@ -263,24 +336,18 @@
 import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Upload, Download, Refresh, Edit, Delete } from '@element-plus/icons-vue'
+import { Search, Plus, Upload, Download, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
 import { pinyin } from 'pinyin-pro';
 import AccountSelector from '../common/AccountSelector.vue'
-import CurrencySelector from '../common/CurrencySelector.vue'
+import TagSelector from '../common/TagSelector.vue'
 
 // const apiUrl = import.meta.env.VITE_API_URL;
 const dialogError = ref(false)
 const lastEditedData = ref<Partial<Expense> | null>(null)
 // console.log(import.meta.env);
-
-interface Currency {
-  id: number
-  code: string
-  name: string
-}
 
 interface Expense {
   id: number
@@ -292,12 +359,14 @@ interface Expense {
     enable: boolean
     account_type?: string
   } | string
-  currency: {
-    id: number
-    code: string
-    name: string
-  } | null
+  currency: string | null
   enable: boolean
+  tags?: Array<{
+    id: number
+    name: string
+    full_path: string
+    enable: boolean
+  }>
 }
 
 // 页面增加优先级提示
@@ -311,6 +380,9 @@ const ExpenseData = ref<Expense[]>([])
 const selectedItems = ref<Expense[]>([])
 
 const loading = ref(false)
+
+// 过滤器状态
+const statusFilter = ref<boolean | null>(null)
 
 const fetchData = async () => {
   try {
@@ -341,17 +413,31 @@ const search = ref('')
 
 const filterExpenseData = computed(() =>
   ExpenseData.value.filter((data) => {
+    // 搜索词过滤
     const searchTerm = search.value?.toLowerCase() || ''
-    if (!searchTerm) return true
+    if (searchTerm) {
+      const expendAccount = typeof data.expend === 'string' ? data.expend : data.expend?.account || ''
 
-    const expendAccount = typeof data.expend === 'string' ? data.expend : data.expend?.account || ''
+      // 标签搜索
+      const tagNames = data.tags?.map(tag => tag.full_path.toLowerCase()).join(' ') || ''
 
-    return [
-      data.key.toLowerCase(),
-      data.payee?.toLowerCase() ?? '',
-      expendAccount.toLowerCase(),
-      data.currency?.code?.toLowerCase() ?? ''
-    ].some(field => field.includes(searchTerm))
+      const matchesSearch = [
+        data.key.toLowerCase(),
+        data.payee?.toLowerCase() ?? '',
+        expendAccount.toLowerCase(),
+        data.currency?.toLowerCase() ?? '',
+        tagNames
+      ].some(field => field.includes(searchTerm))
+
+      if (!matchesSearch) return false
+    }
+
+    // 状态过滤
+    if (statusFilter.value !== null && data.enable !== statusFilter.value) {
+      return false
+    }
+
+    return true
   })
 )
 
@@ -374,7 +460,8 @@ const handleAdd = () => {
       key: lastEditedData.value.key || '',
       payee: lastEditedData.value.payee ?? null,
       expend: typeof expendId === 'number' ? expendId : null,
-      currency: lastEditedData.value.currency?.id || null
+      currency: lastEditedData.value.currency || null,
+      tag_ids: []
     };
   } else {
     // 没有编辑记录则重置
@@ -382,7 +469,8 @@ const handleAdd = () => {
       key: '',
       payee: null,
       expend: null,
-      currency: null
+      currency: null,
+      tag_ids: []
     };
     if (ruleFormRef.value) {
       ruleFormRef.value.resetFields();
@@ -397,7 +485,8 @@ const ruleForm = ref({
   key: '',
   payee: null as string | null | undefined,
   expend: null as number | null | undefined,
-  currency: null as number | null,
+  currency: null as string | null,
+  tag_ids: [] as number[],
 })
 
 const rules = ref<FormRules>({
@@ -410,7 +499,7 @@ const rules = ref<FormRules>({
     { max: 32, message: '长度应控制在32个字符以内', trigger: 'blur' },
   ],
   expend: [
-    { required: true, message: '请选择映射账户', trigger: 'change' },
+    { required: false, message: '请选择映射账户', trigger: 'change' },
   ],
   currency: [
     { required: false, message: '请选择货币', trigger: 'change' },
@@ -571,6 +660,7 @@ const handleEdit = (index: number, row: Expense) => {
   ruleForm.value.payee = row.payee !== null ? row.payee : null // 为了解决编辑时payee为null时的问题;
   ruleForm.value.expend = typeof row.expend === 'object' ? row.expend?.id : (typeof row.expend === 'number' ? row.expend : null)
   ruleForm.value.currency = row.currency?.id || null
+  ruleForm.value.tag_ids = row.tags?.map(tag => tag.id) || []
   // ruleForm.value.enable = row.enable
   // ruleForm.value.tag = row.tag
   // ruleForm.value.classification = row.classification
@@ -613,7 +703,8 @@ const editForm = async (formEl: FormInstance | undefined) => {
           key: ruleForm.value.key,
           payee: ruleForm.value.payee,
           expend_id: ruleForm.value.expend, // 将 expend 转换为 expend_id
-          currency: ruleForm.value.currency
+          currency: ruleForm.value.currency,
+          tag_ids: ruleForm.value.tag_ids
         }
 
         console.log('编辑提交数据:', submitData)
@@ -759,6 +850,17 @@ const batchDeleteLoading = ref(false)
 const batchDeleteProgress = ref(0)
 const batchDeleteErrors = ref<string[]>([])
 
+// 批量修改账户相关状态
+const batchUpdateAccountDialog = ref(false)
+const batchUpdateLoading = ref(false)
+const batchUpdateProgress = ref(0)
+const batchUpdateErrors = ref<string[]>([])
+const batchUpdateFormRef = ref<FormInstance>()
+const batchUpdateForm = ref({
+  expend: null as number | null,
+  currency: null as string | null
+})
+
 // 批量删除
 const handleBatchDelete = () => {
   if (selectedItems.value.length === 0) return
@@ -825,6 +927,95 @@ const cancelBatchDelete = () => {
   batchDeleteProgress.value = 0
 }
 
+// 批量修改账户
+const handleBatchUpdateAccount = () => {
+  if (selectedItems.value.length === 0) return
+  batchUpdateAccountDialog.value = true
+  batchUpdateErrors.value = []
+  batchUpdateProgress.value = 0
+  // 重置表单
+  batchUpdateForm.value = {
+    expend: null,
+    currency: null
+  }
+}
+
+// 处理批量修改账户选择变化
+const handleBatchAccountChange = (account: any) => {
+  // 账户变化时可以做一些额外处理
+  console.log('批量修改账户选择变化:', account)
+}
+
+// 确认批量修改账户
+const confirmBatchUpdateAccount = async () => {
+  if (selectedItems.value.length === 0) return
+
+  batchUpdateLoading.value = true
+  batchUpdateProgress.value = 0
+  batchUpdateErrors.value = []
+
+  const totalItems = selectedItems.value.length
+  const errors: string[] = []
+  let successCount = 0
+
+  try {
+    // 准备批量更新数据
+    const updateData = {
+      expense_ids: selectedItems.value.map(item => item.id),
+      expend_id: batchUpdateForm.value.expend,
+      currency: batchUpdateForm.value.currency
+    }
+
+    console.log('批量更新数据:', updateData)
+
+    // 发送批量更新请求
+    const response = await axios.post('expense/batch_update_account/', updateData)
+
+    if (response.data && response.data.updated_count) {
+      successCount = response.data.updated_count
+      batchUpdateProgress.value = 100
+
+      if (successCount === totalItems) {
+        ElMessage.success(`成功更新 ${successCount} 个支出映射`)
+        batchUpdateAccountDialog.value = false
+        await fetchData()
+        selectedItems.value = []
+      } else {
+        ElMessage.warning(`成功更新 ${successCount} 个映射，${totalItems - successCount} 个失败`)
+        batchUpdateErrors.value = [`${totalItems - successCount} 个映射更新失败`]
+      }
+    } else {
+      throw new Error('更新响应格式错误')
+    }
+  } catch (error: any) {
+    console.error('批量更新账户失败:', error)
+
+    if (error.response?.data?.error) {
+      errors.push(error.response.data.error)
+    } else if (error.response?.data?.detail) {
+      errors.push(error.response.data.detail)
+    } else {
+      errors.push('批量更新过程中发生未知错误')
+    }
+
+    batchUpdateErrors.value = errors
+    ElMessage.error('批量更新失败')
+  } finally {
+    batchUpdateLoading.value = false
+  }
+}
+
+// 取消批量修改账户
+const cancelBatchUpdateAccount = () => {
+  batchUpdateAccountDialog.value = false
+  batchUpdateErrors.value = []
+  batchUpdateProgress.value = 0
+  batchUpdateForm.value = {
+    expend: null,
+    currency: null
+  }
+}
+
 // 高级排序方法：处理数字、英文和中文混合内容
 const advancedSort = (a: Expense, b: Expense): number => {
   // 提取数字部分（如果有）
@@ -854,6 +1045,30 @@ const advancedSort = (a: Expense, b: Expense): number => {
   return 0;
 };
 
+// 映射账户排序方法：处理中文字符串排序
+const sortByAccount = (a: Expense, b: Expense): number => {
+  const accountA = typeof a.expend === 'string' ? a.expend : a.expend?.account || '';
+  const accountB = typeof b.expend === 'string' ? b.expend : b.expend?.account || '';
+
+  // 按拼音排序
+  const pinyinA = pinyin(accountA, {
+    toneType: 'none',
+    pattern: 'first',
+    type: 'string'
+  }).toLowerCase();
+
+  const pinyinB = pinyin(accountB, {
+    toneType: 'none',
+    pattern: 'first',
+    type: 'string'
+  }).toLowerCase();
+
+  if (pinyinA < pinyinB) return -1;
+  if (pinyinA > pinyinB) return 1;
+  return 0;
+};
+
+
 </script>
 
 <style scoped>
@@ -870,10 +1085,14 @@ const advancedSort = (a: Expense, b: Expense): number => {
   align-items: center;
   margin-bottom: 20px;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .search-section {
   flex: 1;
+  display: flex;
+  gap: 8px;
+  min-width: 200px;
   max-width: 400px;
 }
 
@@ -887,12 +1106,39 @@ const advancedSort = (a: Expense, b: Expense): number => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .currency-cell {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* 表格自适应优化 */
+:deep(.el-table) {
+  table-layout: auto;
+}
+
+:deep(.el-table__body-wrapper) {
+  overflow-x: auto;
+}
+
+/* 确保表格列能够自适应内容 */
+:deep(.el-table th),
+:deep(.el-table td) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 关键字列特殊处理 */
+:deep(.el-table .el-tag) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .currency-tag {
@@ -916,6 +1162,26 @@ const advancedSort = (a: Expense, b: Expense): number => {
 /* 批量删除对话框样式 */
 .batch-delete-content {
   padding: 10px 0;
+}
+
+/* 批量修改账户对话框样式 */
+.batch-update-content {
+  padding: 10px 0;
+}
+
+.update-progress {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.progress-text {
+  margin-top: 8px;
+  color: #606266;
+  font-size: 14px;
+}
+
+.update-errors {
+  margin-top: 20px;
 }
 
 .delete-items-list {
@@ -1016,6 +1282,16 @@ const advancedSort = (a: Expense, b: Expense): number => {
 }
 
 /* 响应式设计 */
+@media (max-width: 1200px) {
+
+  /* 中等屏幕优化 */
+  .account-cell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
 @media (max-width: 768px) {
   .expense-mapping {
     padding: 12px;
@@ -1043,5 +1319,64 @@ const advancedSort = (a: Expense, b: Expense): number => {
   .item-index {
     align-self: flex-end;
   }
+
+  /* 小屏幕表格优化 */
+  :deep(.el-table) {
+    font-size: 12px;
+  }
+
+  :deep(.el-tag) {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  :deep(.el-button--small) {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+
+  /* 超小屏幕进一步优化 */
+  .account-cell {
+    gap: 2px;
+  }
+
+  .currency-cell {
+    gap: 2px;
+  }
+}
+
+/* 标签相关样式 */
+.tags-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.tag-management-dialog {
+  padding: 10px 0;
+}
+
+.current-tags-section,
+.add-tags-section {
+  margin-bottom: 20px;
+}
+
+.current-tags-section h4,
+.add-tags-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.current-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 32px;
 }
 </style>

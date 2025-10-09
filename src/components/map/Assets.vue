@@ -3,13 +3,19 @@
         <!-- 搜索和操作栏 -->
         <div class="toolbar">
             <div class="search-section">
-                <el-input v-model="search" placeholder="搜索关键字、账户描述、账户" clearable @input="handleSearch">
+                <el-input v-model="search" placeholder="搜索关键字、账户描述、账户、标签" clearable @input="handleSearch">
                     <template #prefix>
                         <el-icon>
                             <Search />
                         </el-icon>
                     </template>
                 </el-input>
+                <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 120px;"
+                    @change="handleSearch">
+                    <el-option label="全部" :value="null" />
+                    <el-option label="已启用" :value="true" />
+                    <el-option label="已禁用" :value="false" />
+                </el-select>
             </div>
             <div class="action-section">
                 <el-button type="primary" @click="handleAdd()">
@@ -30,12 +36,6 @@
                     </el-icon>
                     导出
                 </el-button>
-                <el-button @click="fetchData()">
-                    <el-icon>
-                        <Refresh />
-                    </el-icon>
-                    刷新
-                </el-button>
             </div>
         </div>
 
@@ -44,20 +44,21 @@
             @selection-change="handleSelectionChange">
             <el-table-column type="selection" width="55" />
 
-            <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" width="120">
+            <el-table-column label="关键字" prop="key" sortable :sort-method="advancedSort" min-width="100" width="auto">
                 <template #default="{ row }">
                     <el-tag type="primary" size="small">{{ row.key }}</el-tag>
                 </template>
             </el-table-column>
 
-            <el-table-column label="账户描述" prop="full" width="200">
+            <el-table-column label="账户描述" prop="full" min-width="150" width="auto">
                 <template #default="{ row }">
                     <span v-if="row.full">{{ row.full }}</span>
                     <el-text v-else type="info" size="small">-</el-text>
                 </template>
             </el-table-column>
 
-            <el-table-column label="映射账户" prop="assets" sortable min-width="200">
+            <el-table-column label="映射账户" prop="assets" sortable :sort-method="sortByAccount" min-width="180"
+                width="auto">
                 <template #default="{ row }">
                     <div class="account-cell">
                         <el-text type="primary">{{ typeof row.assets === 'object' ? row.assets?.account : row.assets
@@ -80,6 +81,18 @@
                     <el-text v-else type="info" size="small">CNY</el-text>
                 </template>
             </el-table-column> -->
+
+            <el-table-column label="标签" min-width="180" width="auto">
+                <template #default="{ row }">
+                    <div v-if="row.tags && row.tags.length > 0" class="tags-cell">
+                        <el-tag v-for="tag in row.tags" :key="tag.id" size="small"
+                            style="margin-right: 4px; margin-bottom: 4px;">
+                            {{ tag.full_path }}
+                        </el-tag>
+                    </div>
+                    <el-text v-else type="info" size="small">-</el-text>
+                </template>
+            </el-table-column>
 
             <el-table-column label="状态" prop="enable" width="100">
                 <template #default="{ row }">
@@ -141,6 +154,10 @@
                 <CurrencySelector v-model="ruleForm.currency_ids" :account-id="ruleForm.assets" placeholder="选择货币" />
             </el-form-item> -->
 
+            <el-form-item label="标签" prop="tag_ids">
+                <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="选择标签（可多选）" />
+            </el-form-item>
+
             <el-form-item>
                 <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
                 <el-button @click="resetForm(ruleFormRef)">重置</el-button>
@@ -171,12 +188,17 @@
                 <CurrencySelector v-model="ruleForm.currency_ids" :account-id="ruleForm.assets" placeholder="选择货币" />
             </el-form-item> -->
 
+            <el-form-item label="标签" prop="tag_ids">
+                <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="选择标签（可多选）" />
+            </el-form-item>
+
             <el-form-item>
                 <el-button type="primary" @click="editForm(editFormRef)">保存</el-button>
                 <el-button @click="dialogEdit = false">取消</el-button>
             </el-form-item>
         </el-form>
     </el-dialog>
+
     <el-dialog v-model="dialogDel" title="提示" width="30%">
         <el-icon>
             <WarningFilled />
@@ -260,22 +282,17 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { Search, Plus, Upload, Download, Refresh, Edit, Delete } from '@element-plus/icons-vue'
+import { Search, Plus, Upload, Download, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import handleRefresh from '../../utils/commonFunctions'
 import * as XLSX from 'xlsx'
 import { pinyin } from 'pinyin-pro';
 import AccountSelector from '../common/AccountSelector.vue'
+import TagSelector from '../common/TagSelector.vue'
 // import CurrencySelector from '../common/CurrencySelector.vue'
 
 const dialogError = ref(false)
 const lastEditedData = ref<Partial<Assets> | null>(null)
-
-interface Currency {
-    id: number
-    code: string
-    name: string
-}
 
 interface Assets {
     id: number
@@ -283,10 +300,14 @@ interface Assets {
     full: string
     assets: string | { id: number; account: string; enable: boolean; account_type?: string }
     assets_id?: number
-    currencies: Currency[]
-    currency_ids?: number[]
     account_type?: string
     enable: boolean
+    tags?: Array<{
+        id: number
+        name: string
+        full_path: string
+        enable: boolean
+    }>
 }
 
 // 页面增加优先级提示
@@ -301,6 +322,9 @@ const loading = ref(false)
 // 页面获取数据
 const AssetsData = ref<Assets[]>([])
 const selectedItems = ref<Assets[]>([])
+
+// 过滤器状态
+const statusFilter = ref<boolean | null>(null)
 
 const fetchData = async () => {
     try {
@@ -332,15 +356,30 @@ const search = ref('')
 
 const filterAssetsData = computed(() =>
     AssetsData.value.filter((data) => {
+        // 搜索词过滤
         const searchTerm = search.value?.toLowerCase() || ''
-        if (!searchTerm) return true
+        if (searchTerm) {
+            const assetsAccount = typeof data.assets === 'string' ? data.assets.toLowerCase() : data.assets?.account?.toLowerCase() ?? ''
 
-        return [
-            data.key.toLowerCase(),
-            data.full?.toLowerCase() ?? '',
-            typeof data.assets === 'string' ? data.assets.toLowerCase() : data.assets?.account?.toLowerCase() ?? '',
-            ...(data.currencies?.map(c => c.code.toLowerCase()) ?? [])
-        ].some(field => field.includes(searchTerm))
+            // 标签搜索
+            const tagNames = data.tags?.map(tag => tag.full_path.toLowerCase()).join(' ') || ''
+
+            const matchesSearch = [
+                data.key.toLowerCase(),
+                data.full?.toLowerCase() ?? '',
+                assetsAccount,
+                tagNames
+            ].some(field => field.includes(searchTerm))
+
+            if (!matchesSearch) return false
+        }
+
+        // 状态过滤
+        if (statusFilter.value !== null && data.enable !== statusFilter.value) {
+            return false
+        }
+
+        return true
     })
 )
 
@@ -383,6 +422,7 @@ const ruleForm = ref({
     full: '',
     assets: null as number | null | undefined,
     currency_id: null as number | null,
+    tag_ids: [] as number[],
 })
 
 const rules = ref<FormRules>({
@@ -395,7 +435,7 @@ const rules = ref<FormRules>({
         { max: 32, message: '长度应控制在32个字符以内', trigger: 'blur' },
     ],
     assets: [
-        { required: true, message: '请选择映射账户', trigger: 'change' },
+        { required: false, message: '请选择映射账户', trigger: 'change' },
     ],
     currency_id: [
         { required: false, message: '请选择货币', trigger: 'change' },
@@ -420,7 +460,8 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                     key: ruleForm.value.key,
                     full: ruleForm.value.full,
                     assets_id: ruleForm.value.assets, // 将 assets 转换为 assets_id
-                    currency_ids: ruleForm.value.currency_id ? [ruleForm.value.currency_id] : []
+                    currency_ids: ruleForm.value.currency_id ? [ruleForm.value.currency_id] : [],
+                    tag_ids: ruleForm.value.tag_ids
                 }
 
                 console.log('资产映射提交数据:', submitData)
@@ -559,7 +600,7 @@ const handleEdit = (index: number, row: Assets) => {
     ruleForm.value.key = row.key
     ruleForm.value.full = row.full
     ruleForm.value.assets = typeof row.assets === 'object' && row.assets ? row.assets.id : (typeof row.assets === 'number' ? row.assets : null)
-    ruleForm.value.currency_id = row.currencies?.[0]?.id || null
+    ruleForm.value.tag_ids = row.tags?.map(tag => tag.id) || []
     dialogEdit.value = true
     selectedId.value = row.id
     // console.log(index, row)
@@ -596,7 +637,8 @@ const editForm = async (formEl: FormInstance | undefined) => {
                     key: ruleForm.value.key,
                     full: ruleForm.value.full,
                     assets_id: ruleForm.value.assets, // 将 assets 转换为 assets_id
-                    currency_ids: ruleForm.value.currency_id ? [ruleForm.value.currency_id] : []
+                    currency_ids: ruleForm.value.currency_id ? [ruleForm.value.currency_id] : [],
+                    tag_ids: ruleForm.value.tag_ids
                 }
 
                 console.log('资产映射编辑提交数据:', submitData)
@@ -831,6 +873,30 @@ const advancedSort = (a: Assets, b: Assets): number => {
     return 0;
 };
 
+// 映射账户排序方法：处理中文字符串排序
+const sortByAccount = (a: Assets, b: Assets): number => {
+    const accountA = typeof a.assets === 'string' ? a.assets : a.assets?.account || '';
+    const accountB = typeof b.assets === 'string' ? b.assets : b.assets?.account || '';
+
+    // 按拼音排序
+    const pinyinA = pinyin(accountA, {
+        toneType: 'none',
+        pattern: 'first',
+        type: 'string'
+    }).toLowerCase();
+
+    const pinyinB = pinyin(accountB, {
+        toneType: 'none',
+        pattern: 'first',
+        type: 'string'
+    }).toLowerCase();
+
+    if (pinyinA < pinyinB) return -1;
+    if (pinyinA > pinyinB) return 1;
+    return 0;
+};
+
+
 </script>
 
 <style scoped>
@@ -847,10 +913,14 @@ const advancedSort = (a: Assets, b: Assets): number => {
     align-items: center;
     margin-bottom: 20px;
     gap: 16px;
+    flex-wrap: wrap;
 }
 
 .search-section {
     flex: 1;
+    display: flex;
+    gap: 8px;
+    min-width: 200px;
     max-width: 400px;
 }
 
@@ -864,12 +934,39 @@ const advancedSort = (a: Assets, b: Assets): number => {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
 }
 
 .currency-cell {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
+    min-width: 0;
+}
+
+/* 表格自适应优化 */
+:deep(.el-table) {
+    table-layout: auto;
+}
+
+:deep(.el-table__body-wrapper) {
+    overflow-x: auto;
+}
+
+/* 确保表格列能够自适应内容 */
+:deep(.el-table th),
+:deep(.el-table td) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 关键字列特殊处理 */
+:deep(.el-table .el-tag) {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .currency-tag {
@@ -993,6 +1090,16 @@ const advancedSort = (a: Assets, b: Assets): number => {
 }
 
 /* 响应式设计 */
+@media (max-width: 1200px) {
+
+    /* 中等屏幕优化 */
+    .account-cell {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+}
+
 @media (max-width: 768px) {
     .assets-mapping {
         padding: 12px;
@@ -1020,5 +1127,64 @@ const advancedSort = (a: Assets, b: Assets): number => {
     .item-index {
         align-self: flex-end;
     }
+
+    /* 小屏幕表格优化 */
+    :deep(.el-table) {
+        font-size: 12px;
+    }
+
+    :deep(.el-tag) {
+        font-size: 11px;
+        padding: 2px 6px;
+    }
+
+    :deep(.el-button--small) {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+
+    /* 超小屏幕进一步优化 */
+    .account-cell {
+        gap: 2px;
+    }
+
+    .currency-cell {
+        gap: 2px;
+    }
+}
+
+/* 标签相关样式 */
+.tags-cell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+
+.tag-management-dialog {
+    padding: 10px 0;
+}
+
+.current-tags-section,
+.add-tags-section {
+    margin-bottom: 20px;
+}
+
+.current-tags-section h4,
+.add-tags-section h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #303133;
+}
+
+.current-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 32px;
 }
 </style>

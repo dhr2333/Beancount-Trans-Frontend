@@ -9,7 +9,6 @@ export {}
 
 declare module '@vue/runtime-core' {
   export interface GlobalComponents {
-    Account: typeof import('./components/assets/Account.vue')['default']
     AccountManagement: typeof import('./components/config/AccountManagement.vue')['default']
     AccountSelector: typeof import('./components/common/AccountSelector.vue')['default']
     AccountSelectorTest: typeof import('./components/debug/AccountSelectorTest.vue')['default']
@@ -17,11 +16,7 @@ declare module '@vue/runtime-core' {
     Assets: typeof import('./components/map/Assets.vue')['default']
     BaseHeader: typeof import('./components/layouts/BaseHeader.vue')['default']
     BaseSide: typeof import('./components/layouts/BaseSide.vue')['default']
-    BillAccount: typeof import('./components/bill/BillAccount.vue')['default']
-    Commodity: typeof import('./components/bill/Commodity.vue')['default']
-    CurrencySelector: typeof import('./components/common/CurrencySelector.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
-    ElBadge: typeof import('element-plus/es')['ElBadge']
     ElBreadcrumb: typeof import('element-plus/es')['ElBreadcrumb']
     ElBreadcrumbItem: typeof import('element-plus/es')['ElBreadcrumbItem']
     ElButton: typeof import('element-plus/es')['ElButton']
@@ -54,7 +49,6 @@ declare module '@vue/runtime-core' {
     ElProgress: typeof import('element-plus/es')['ElProgress']
     ElRow: typeof import('element-plus/es')['ElRow']
     ElSelect: typeof import('element-plus/es')['ElSelect']
-    ElStatistic: typeof import('element-plus/es')['ElStatistic']
     ElSubMenu: typeof import('element-plus/es')['ElSubMenu']
     ElSwitch: typeof import('element-plus/es')['ElSwitch']
     ElTable: typeof import('element-plus/es')['ElTable']
@@ -66,7 +60,6 @@ declare module '@vue/runtime-core' {
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
     ElTree: typeof import('element-plus/es')['ElTree']
     ElUpload: typeof import('element-plus/es')['ElUpload']
-    Event: typeof import('./components/bill/Event.vue')['default']
     Expenses: typeof import('./components/map/Expenses.vue')['default']
     FileManage: typeof import('./components/file/FileManage.vue')['default']
     Format: typeof import('./components/map/Format.vue')['default']
@@ -77,6 +70,9 @@ declare module '@vue/runtime-core' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     Show_log_dates: typeof import('./components/owntracks/show_log_dates.vue')['default']
+    TagManagement: typeof import('./components/config/TagManagement.vue')['default']
+    TagSelector: typeof import('./components/common/TagSelector.vue')['default']
+    TagSelectorTest: typeof import('./components/debug/TagSelectorTest.vue')['default']
     Templates: typeof import('./components/map/Templates.vue')['default']
     Trans: typeof import('./components/trans/Trans.vue')['default']
   }

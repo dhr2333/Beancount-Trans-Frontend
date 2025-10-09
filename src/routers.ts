@@ -9,6 +9,7 @@ import Expenses from "./components/map/Expenses.vue"
 import Income from "./components/map/Income.vue"
 import FileManage from "./components/file/FileManage.vue"
 import AccountManagement from "./components/config/AccountManagement.vue"
+import TagManagement from "./components/config/TagManagement.vue"
 import MappingManagement from "./components/map/MappingManagement.vue"
 import ApiTest from "./components/debug/ApiTest.vue"
 import AccountSelectorTest from "./components/debug/AccountSelectorTest.vue"
@@ -31,6 +32,7 @@ const router = createRouter({
     { path: '/map/income',name:"income", component: Income },
     { path: '/file',name:"filemanage", component: FileManage },
     { path: '/config/accounts', name: "accountManagement", component: AccountManagement },
+    { path: '/config/tags', name: "tagManagement", component: TagManagement },
     { path: '/mapping', name: "mappingManagement", component: MappingManagement },
     { path: '/debug/api', name: "apiTest", component: ApiTest },
     { path: '/debug/account-selector', name: "accountSelectorTest", component: AccountSelectorTest },
