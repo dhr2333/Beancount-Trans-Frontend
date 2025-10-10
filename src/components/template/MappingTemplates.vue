@@ -1,7 +1,7 @@
 <template>
     <div class="template-container">
         <div class="template-header">
-            <h1>官方模板库</h1>
+            <h1>官方映射模板</h1>
             <el-button type="info" plain disabled>仅限查看</el-button>
         </div>
 
@@ -101,15 +101,79 @@
                 <div v-if="template.update_notes" style="margin-top: 15px;">
                     <el-text type="info" size="small">更新说明: {{ template.update_notes }}</el-text>
                 </div>
+
+                <div class="template-actions">
+                    <el-button type="primary" @click="showApplyDialog(template)">
+                        <el-icon>
+                            <Download />
+                        </el-icon>
+                        应用模板
+                    </el-button>
+                </div>
             </el-card>
         </div>
+
+        <!-- 应用模板对话框 -->
+        <el-dialog v-model="applyDialogVisible" title="应用映射模板" width="500px">
+            <div v-if="selectedTemplate">
+                <el-alert title="注意" type="warning" :closable="false" show-icon style="margin-bottom: 20px;">
+                    <p>应用模板将会影响您的映射规则，请谨慎选择应用策略。</p>
+                </el-alert>
+
+                <el-form :model="applyForm" label-width="120px">
+                    <el-form-item label="模板名称">
+                        <el-text>{{ selectedTemplate.name }}</el-text>
+                    </el-form-item>
+                    <el-form-item label="模板类型">
+                        <el-tag :type="getTypeTag(selectedTemplate.type)">
+                            {{ getTypeText(selectedTemplate.type) }}
+                        </el-tag>
+                    </el-form-item>
+                    <el-form-item label="映射数量">
+                        <el-text>{{ selectedTemplate.items?.length || 0 }} 个</el-text>
+                    </el-form-item>
+                    <el-form-item label="应用策略">
+                        <el-radio-group v-model="applyForm.action">
+                            <el-radio label="merge">合并模式</el-radio>
+                            <el-radio label="overwrite">覆盖模式</el-radio>
+                        </el-radio-group>
+                        <div class="strategy-description">
+                            <el-text v-if="applyForm.action === 'merge'" size="small" type="info">
+                                保留现有映射，只添加不存在的映射
+                            </el-text>
+                            <el-text v-else size="small" type="warning">
+                                清空现有{{ getTypeText(selectedTemplate.type) }}映射，完全替换为模板映射（危险操作！）
+                            </el-text>
+                        </div>
+                    </el-form-item>
+                    <el-form-item v-if="applyForm.action === 'merge'" label="冲突处理">
+                        <el-radio-group v-model="applyForm.conflict_resolution">
+                            <el-radio label="skip">跳过</el-radio>
+                            <el-radio label="overwrite">覆盖</el-radio>
+                        </el-radio-group>
+                        <div class="strategy-description">
+                            <el-text size="small" type="info">
+                                当映射关键字已存在时：跳过保留现有映射，覆盖替换为模板映射
+                            </el-text>
+                        </div>
+                    </el-form-item>
+                </el-form>
+            </div>
+
+            <template #footer>
+                <el-button @click="applyDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="confirmApply" :loading="applyLoading">
+                    确定应用
+                </el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { User, Clock, DocumentDelete, Loading } from '@element-plus/icons-vue'
+import { User, Clock, DocumentDelete, Loading, Download } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 
 interface TemplateItem {
@@ -129,7 +193,15 @@ interface TemplateItem {
 const activeType = ref('expense')
 const templates = ref<TemplateItem[]>([])
 const loading = ref(false)
-const activeNames = ref(['1'])
+const activeNames = ref<string[]>([])
+const applyDialogVisible = ref(false)
+const selectedTemplate = ref<TemplateItem | null>(null)
+const applyLoading = ref(false)
+
+const applyForm = ref({
+    action: 'merge',
+    conflict_resolution: 'skip'
+})
 
 // 获取模板类型文本
 const getTypeText = (type: string) => {
@@ -188,6 +260,46 @@ const fetchTemplates = async () => {
         ElMessage.error('获取模板数据失败')
     } finally {
         loading.value = false
+    }
+}
+
+// 显示应用对话框
+const showApplyDialog = (template: TemplateItem) => {
+    selectedTemplate.value = template
+    applyForm.value = {
+        action: 'merge',
+        conflict_resolution: 'skip'
+    }
+    applyDialogVisible.value = true
+}
+
+// 确认应用模板
+const confirmApply = async () => {
+    if (!selectedTemplate.value) return
+
+    try {
+        applyLoading.value = true
+
+        await axios.post(`/templates/${selectedTemplate.value.id}/apply/`, {
+            action: applyForm.value.action,
+            conflict_resolution: applyForm.value.conflict_resolution
+        })
+
+        ElMessage.success({
+            message: `${getTypeText(selectedTemplate.value.type)}模板应用成功！`,
+            duration: 3000
+        })
+
+        applyDialogVisible.value = false
+    } catch (error: any) {
+        console.error('应用模板失败:', error)
+        if (error.response?.status === 401) {
+            ElMessage.error('未登录，请先登录')
+        } else {
+            ElMessage.error(error.response?.data?.error || '应用模板失败')
+        }
+    } finally {
+        applyLoading.value = false
     }
 }
 
@@ -262,5 +374,36 @@ watch(activeType, () => {
 
 .collapse-content {
     padding: 0;
+}
+
+.template-actions {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #ebeef5;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.strategy-description {
+    margin-top: 8px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .template-container {
+        padding: 12px;
+    }
+
+    .template-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .template-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
 }
 </style>

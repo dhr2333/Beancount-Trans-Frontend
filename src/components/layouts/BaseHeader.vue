@@ -29,27 +29,21 @@
       <el-menu-item index="/file">文件管理</el-menu-item>
     </router-link>
 
-    <el-sub-menu index="map">
-      <template #title>映射管理</template>
-      <router-link to="/mapping" class="no-underline">
-        <el-menu-item index="/mapping">映射总览</el-menu-item>
+    <el-sub-menu index="template">
+      <template #title>模板管理</template>
+      <router-link to="/template/accounts" class="no-underline">
+        <el-menu-item index="/template/accounts">账户模板</el-menu-item>
       </router-link>
-      <router-link to="/map/templates" class="no-underline">
-        <el-menu-item index="/map/templates">映射模板</el-menu-item>
-      </router-link>
-      <router-link to="/map/expenses" class="no-underline">
-        <el-menu-item index="/map/expense">支出映射</el-menu-item>
-      </router-link>
-      <router-link to="/map/income" class="no-underline">
-        <el-menu-item index="/map/income">收入映射</el-menu-item>
-      </router-link>
-      <router-link to="/map/assets" class="no-underline">
-        <el-menu-item index="/map/assets">资产映射</el-menu-item>
+      <router-link to="/template/mappings" class="no-underline">
+        <el-menu-item index="/template/mappings">映射模板</el-menu-item>
       </router-link>
     </el-sub-menu>
 
     <el-sub-menu index="config">
       <template #title>配置管理</template>
+      <router-link to="/config/mappings" class="no-underline">
+        <el-menu-item index="/config/mappings">映射管理</el-menu-item>
+      </router-link>
       <router-link to="/config/accounts" class="no-underline">
         <el-menu-item index="/config/accounts">账户管理</el-menu-item>
       </router-link>
