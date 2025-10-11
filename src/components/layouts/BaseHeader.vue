@@ -41,11 +41,11 @@
 
     <el-sub-menu index="config">
       <template #title>配置管理</template>
-      <router-link to="/config/mappings" class="no-underline">
-        <el-menu-item index="/config/mappings">映射管理</el-menu-item>
-      </router-link>
       <router-link to="/config/accounts" class="no-underline">
         <el-menu-item index="/config/accounts">账户管理</el-menu-item>
+      </router-link>
+      <router-link to="/config/mappings" class="no-underline">
+        <el-menu-item index="/config/mappings">映射管理</el-menu-item>
       </router-link>
       <router-link to="/config/tags" class="no-underline">
         <el-menu-item index="/config/tags">标签管理</el-menu-item>

@@ -280,14 +280,15 @@ const confirmApply = async () => {
     try {
         applyLoading.value = true
 
-        await axios.post(`/templates/${selectedTemplate.value.id}/apply/`, {
+        const response = await axios.post(`/templates/${selectedTemplate.value.id}/apply/`, {
             action: applyForm.value.action,
             conflict_resolution: applyForm.value.conflict_resolution
         })
 
+        const result = response.data.result
         ElMessage.success({
-            message: `${getTypeText(selectedTemplate.value.type)}模板应用成功！`,
-            duration: 3000
+            message: `${getTypeText(selectedTemplate.value.type)}模板应用成功！创建: ${result.created}, 跳过: ${result.skipped}, 覆盖: ${result.overwritten}`,
+            duration: 5000
         })
 
         applyDialogVisible.value = false
