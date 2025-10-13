@@ -17,9 +17,7 @@ declare module '@vue/runtime-core' {
     Assets: typeof import('./components/map/Assets.vue')['default']
     BaseHeader: typeof import('./components/layouts/BaseHeader.vue')['default']
     BaseSide: typeof import('./components/layouts/BaseSide.vue')['default']
-    CurrencySelector: typeof import('./components/common/CurrencySelector.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
-    ElBadge: typeof import('element-plus/es')['ElBadge']
     ElBreadcrumb: typeof import('element-plus/es')['ElBreadcrumb']
     ElBreadcrumbItem: typeof import('element-plus/es')['ElBreadcrumbItem']
     ElButton: typeof import('element-plus/es')['ElButton']
@@ -54,7 +52,6 @@ declare module '@vue/runtime-core' {
     ElRadioGroup: typeof import('element-plus/es')['ElRadioGroup']
     ElRow: typeof import('element-plus/es')['ElRow']
     ElSelect: typeof import('element-plus/es')['ElSelect']
-    ElStatistic: typeof import('element-plus/es')['ElStatistic']
     ElSubMenu: typeof import('element-plus/es')['ElSubMenu']
     ElSwitch: typeof import('element-plus/es')['ElSwitch']
     ElTable: typeof import('element-plus/es')['ElTable']
@@ -80,7 +77,6 @@ declare module '@vue/runtime-core' {
     TagManagement: typeof import('./components/config/TagManagement.vue')['default']
     TagSelector: typeof import('./components/common/TagSelector.vue')['default']
     TagSelectorTest: typeof import('./components/debug/TagSelectorTest.vue')['default']
-    Templates: typeof import('./components/map/Templates.vue')['default']
     Trans: typeof import('./components/trans/Trans.vue')['default']
   }
   export interface ComponentCustomProperties {
