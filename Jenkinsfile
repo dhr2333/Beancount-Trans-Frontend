@@ -47,30 +47,9 @@ pipeline {
             steps {
                 script {
                     docker.build("${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}", "--rm .")
-                }
-            }
-        }
-
-        stage('推送镜像') {
-            when {
-                branch 'main'
-            }
-            steps {
-                script {
-                    echo "📦 推送镜像到Harbor仓库..."
-                    withCredentials([usernamePassword(
-                        credentialsId: 'docker-registry-cred',
-                        usernameVariable: 'REGISTRY_USER',
-                        passwordVariable: 'REGISTRY_PASSWORD'
-                    )]) {
-                        sh "echo \${REGISTRY_PASSWORD} | docker login -u \${REGISTRY_USER} --password-stdin ${env.REGISTRY}"
-                        sh "docker push ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-
-                        // main分支同时推送latest标签
+                    if (env.BRANCH_NAME == 'main') {
                         sh "docker tag ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.REGISTRY}/${env.IMAGE_NAME}:latest"
-                        sh "docker push ${env.REGISTRY}/${env.IMAGE_NAME}:latest"
                     }
-                    echo "✅ 镜像推送成功: ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
                 }
             }
         }
@@ -98,7 +77,6 @@ pipeline {
             script {
                 echo '✅ 构建成功'
                 if (env.BRANCH_NAME == 'main') {
-                    echo "📦 镜像已推送: ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
                     echo "🚀 已部署到生产环境"
                 }
             }
@@ -109,14 +87,6 @@ pipeline {
         }
 
         always {
-            script {
-                echo '🧹 清理工作空间...'
-                // 清理本地镜像
-                if (env.BRANCH_NAME == 'main' && env.IMAGE_TAG) {
-                    sh "docker rmi ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG} || true"
-                    sh "docker rmi ${env.REGISTRY}/${env.IMAGE_NAME}:latest || true"
-                }
-            }
             cleanWs()
         }
     }
