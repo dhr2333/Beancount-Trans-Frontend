@@ -82,14 +82,13 @@ pipeline {
                         usernameVariable: 'REGISTRY_USER',
                         passwordVariable: 'REGISTRY_PASSWORD'
                     )]) {
-                        sh "echo ${REGISTRY_PASSWORD} | docker login -u ${REGISTRY_USER} --password-stdin ${env.REGISTRY}"
+                        sh "echo \${REGISTRY_PASSWORD} | docker login -u \${REGISTRY_USER} --password-stdin ${env.REGISTRY}"
                     }
                     
-                    sh "docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
                     sh "docker push ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
                     
                     if (params.BRANCH == 'main' || params.BRANCH == 'master') {
-                        sh "docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.REGISTRY}/${env.IMAGE_NAME}:latest"
+                        sh "docker tag ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.REGISTRY}/${env.IMAGE_NAME}:latest"
                         sh "docker push ${env.REGISTRY}/${env.IMAGE_NAME}:latest"
                     }
                 }
@@ -97,13 +96,18 @@ pipeline {
         }
 
 		stage('部署到服务器') {
+		    when {
+		        expression { return params.BRANCH == 'main' }
+		    }
 		    steps {
 		        script {
+		            echo "🚀 开始部署到生产服务器..."
 		            sshagent([env.SSH_CREDENTIALS_ID]) {
                         sh """
                             ssh -o StrictHostKeyChecking=no -p ${env.DEPLOY_PORT} root@${env.DEPLOY_SERVER} "cd /root/Manage && docker compose -f docker-compose-beancount-trans-frontend.yaml down && sed -i 's|image:.*|image: ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}|' docker-compose-beancount-trans-frontend.yaml && docker compose -f docker-compose-beancount-trans-frontend.yaml up -d"
                         """
 		            }
+		            echo "✅ 部署完成"
 		        }
 		    }
 		}
