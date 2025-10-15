@@ -1,54 +1,34 @@
 pipeline {
     agent any
-    triggers {
-        pollSCM('')
-    }
+
     options {
         timeout(time: 30, unit: 'MINUTES')
     }
-    parameters {
-        string(name: 'BRANCH', defaultValue: '', description: '要构建的Git分支')
-        string(name: 'VERSION', defaultValue: '', description: '镜像版本标签 (留空则使用Git Commit短哈希)')
-        booleanParam(name: 'SKIP_TESTS', defaultValue: false, description: '跳过测试步骤')
-        booleanParam(name: 'PUSH_TO_REGISTRY', defaultValue: false, description: '是否推送到镜像仓库')
-    }
+
     environment {
         REGISTRY = "harbor.dhr2333.cn/beancount-trans"
         IMAGE_NAME = "beancount-trans-frontend"
     }
+
     stages {
         stage('初始化') {
             steps {
                 script {
-                    echo "开始构建 Beancount-Trans-Frontend 项目"
-                    echo "分支: ${params.BRANCH}"
-                    echo "镜像标签参数: ${params.VERSION}"
-                    echo "工作目录: ${env.WORKSPACE}"
-                }
-            }
-        }
+                    echo "🚀 开始构建 Beancount-Trans-Frontend 项目"
+                    echo "分支: ${env.BRANCH_NAME}"
 
-        stage('代码检出') {
-            steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: "*/${params.BRANCH}"]],
-                    extensions: [],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/dhr2333/Beancount-Trans-Frontend.git',
-                        credentialsId: '8a235621-ec9f-4f59-97c5-225b1c22764e'
-                    ]]
-                ])
-                script {
+                    // 获取Git Commit短哈希
                     env.GIT_COMMIT_SHORT = sh(
                         script: 'git rev-parse --short HEAD',
                         returnStdout: true
                     ).trim()
-                    
-                    env.IMAGE_TAG = params.VERSION ?: "git-${env.GIT_COMMIT_SHORT}"
+
+                    // 设置镜像标签
+                    env.IMAGE_TAG = "git-${env.GIT_COMMIT_SHORT}"
                     
                     echo "Git Commit短哈希: ${env.GIT_COMMIT_SHORT}"
                     echo "最终镜像标签: ${env.IMAGE_TAG}"
+                    echo "工作目录: ${env.WORKSPACE}"
                 }
             }
         }
@@ -73,31 +53,31 @@ pipeline {
 
         stage('推送镜像') {
             when {
-                expression { return params.PUSH_TO_REGISTRY }
+                branch 'main'
             }
             steps {
                 script {
+                    echo "📦 推送镜像到Harbor仓库..."
                     withCredentials([usernamePassword(
                         credentialsId: 'docker-registry-cred',
                         usernameVariable: 'REGISTRY_USER',
                         passwordVariable: 'REGISTRY_PASSWORD'
                     )]) {
                         sh "echo \${REGISTRY_PASSWORD} | docker login -u \${REGISTRY_USER} --password-stdin ${env.REGISTRY}"
-                    }
-                    
-                    sh "docker push ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                    
-                    if (params.BRANCH == 'main' || params.BRANCH == 'master') {
+                        sh "docker push ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+
+                        // main分支同时推送latest标签
                         sh "docker tag ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.REGISTRY}/${env.IMAGE_NAME}:latest"
                         sh "docker push ${env.REGISTRY}/${env.IMAGE_NAME}:latest"
                     }
+                    echo "✅ 镜像推送成功: ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
                 }
             }
         }
 
 		stage('部署到服务器') {
 		    when {
-		        expression { return params.BRANCH == 'main' }
+		        branch 'main'
 		    }
 		    steps {
 		        script {
@@ -112,20 +92,32 @@ pipeline {
 		    }
 		}
     }
+
     post {
-        always {
-            cleanWs()
-        }
         success {
             script {
-                echo "Beancount-Trans-Frontend 项目构建成功!"
-                if (params.PUSH_TO_REGISTRY) {
-                    echo "镜像已推送到: ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                echo '✅ 构建成功'
+                if (env.BRANCH_NAME == 'main') {
+                    echo "📦 镜像已推送: ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                    echo "🚀 已部署到生产环境"
                 }
             }
         }
+
         failure {
-            echo "Beancount-Trans-Frontend 项目构建失败!"
+            echo '❌ 构建失败'
+        }
+
+        always {
+            script {
+                echo '🧹 清理工作空间...'
+                // 清理本地镜像
+                if (env.BRANCH_NAME == 'main' && env.IMAGE_TAG) {
+                    sh "docker rmi ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG} || true"
+                    sh "docker rmi ${env.REGISTRY}/${env.IMAGE_NAME}:latest || true"
+                }
+            }
+            cleanWs()
         }
     }
 }
