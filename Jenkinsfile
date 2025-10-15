@@ -7,7 +7,7 @@ pipeline {
         timeout(time: 30, unit: 'MINUTES')
     }
     parameters {
-        string(name: 'BRANCH', defaultValue: 'main', description: '要构建的Git分支')
+        string(name: 'BRANCH', defaultValue: '', description: '要构建的Git分支')
         string(name: 'VERSION', defaultValue: '', description: '镜像版本标签 (留空则使用Git Commit短哈希)')
         booleanParam(name: 'SKIP_TESTS', defaultValue: false, description: '跳过测试步骤')
         booleanParam(name: 'PUSH_TO_REGISTRY', defaultValue: false, description: '是否推送到镜像仓库')
