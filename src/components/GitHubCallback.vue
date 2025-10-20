@@ -32,7 +32,7 @@ onMounted(async () => {
         storage.setItem('username', data.username);
 
         ElMessage.success("GitHub 登录成功");
-        router.push('/map/expenses/');
+        router.push('/file');
     } catch (error) {
         console.error('GitHub 登录失败', error);
         ElMessage.error("GitHub 登录失败");

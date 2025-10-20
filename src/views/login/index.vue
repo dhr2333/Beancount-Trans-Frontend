@@ -143,7 +143,7 @@ const login = async () => {
     if (!isRegisteredLogin) {
       ElMessage.success("登录成功");
     }
-    router.push('file/')
+    router.push('/file')
 
   } catch (error) {
     console.log(error);
@@ -164,7 +164,7 @@ const register = async () => {
       storage.setItem('access', res.data.meta.access_token);
       storage.setItem('username', res.data.data.user.username);
       ElMessage.success("登录成功");
-      router.push('/map/expenses/');
+      router.push('/file');
     } else {
       ElMessage.error('注册失败，请稍后再试。');
     }
