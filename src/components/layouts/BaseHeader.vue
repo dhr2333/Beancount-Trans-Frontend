@@ -281,7 +281,7 @@ const openFavaInstance = async () => {
     }
   } catch (error: any) {
     if (error.response && error.response.status === 401) {
-      ElMessage.info('未认证，请登录后重试');
+      ElMessage.info('注册查看完整报表');
     }
   } finally {
     loading.close();
