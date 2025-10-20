@@ -31,6 +31,12 @@ onMounted(async () => {
         storage.setItem('refresh', data.refresh);
         storage.setItem('username', data.username);
 
+        // 🔔 关键：为 GitHub 第三方登录也设置引导标记
+        // 检查是否是首次登录（通过后端返回的 is_new_user 字段判断）
+        if (data.is_new_user) {
+            storage.setItem('start_tour', 'true');
+        }
+
         ElMessage.success("GitHub 登录成功");
         router.push('/file');
     } catch (error) {

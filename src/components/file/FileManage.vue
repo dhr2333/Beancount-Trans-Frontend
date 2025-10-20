@@ -89,7 +89,7 @@
 
         <!-- 文件列表 -->
         <el-table :data="filteredItems" style="width: 100%" @selection-change="handleSelectionChange"
-            highlight-current-row class="file-table">
+            highlight-current-row class="file-table" id="tour-file-table">
             <el-table-column type="selection" width="55" />
 
             <el-table-column v-if="isGlobalSearch" prop="path" label="路径">
@@ -130,9 +130,10 @@
             </el-table-column>
 
             <el-table-column label="操作" width="120">
-                <template #default="{ row }">
+                <template #default="{ row, $index }">
 
-                    <el-button icon="Tickets" circle size="small" @click="parseSingleFile(row)" />
+                    <el-button icon="Tickets" circle size="small" :class="{ 'tour-parse-first-file': $index === 0 }"
+                        @click="parseSingleFile(row)" />
 
                     <el-button v-if="row.node_type === 'file'" icon="Download" circle size="small"
                         @click="downloadFile(row.id)" />
@@ -175,10 +176,11 @@
 
 <script setup lang="ts">
 import { Folder, Document, Plus } from '@element-plus/icons-vue'
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import axios from '../../utils/request'
 import { ElMessage } from 'element-plus'
 import { parse } from 'path'
+import { startUserTour, continueUserTour } from '../../utils/userTour'
 
 
 interface FileItem {
@@ -336,6 +338,21 @@ const filteredItems = computed(() => {
 // 初始化加载
 onMounted(async () => {
     await loadDirectoryContent()
+
+    // 检查引导标记
+    const shouldStartTour = localStorage.getItem('start_tour');
+    if (shouldStartTour === 'true') {
+        localStorage.removeItem('start_tour'); // 立即清除标记
+
+        // 等待 DOM 渲染
+        await nextTick();
+
+        // 确保文件列表已加载
+        if (items.value.length > 0) {
+            startUserTour();
+        }
+    }
+
     stopPolling();
 })
 
@@ -754,6 +771,17 @@ function startPollingTaskStatus() {
             if (statusData.status === 'completed') {
                 stopPolling();
                 ElMessage.success('所有文件解析完成');
+
+                // 检查是否在引导中
+                if (sessionStorage.getItem('tour_in_progress') === 'true') {
+                    sessionStorage.removeItem('tour_in_progress');
+
+                    // 延迟继续引导
+                    setTimeout(() => {
+                        continueUserTour(); // 继续到步骤 4
+                    }, 1000);
+                }
+
                 setTimeout(() => {
                     parseDialogVisible.value = false;
                     // 刷新文件列表
@@ -801,7 +829,7 @@ function translateStatus(status: string | undefined): string {
 
 function getStatusColor(status: string | undefined): string {
     if (!status) return 'info';
-    
+
     const statusMap: Record<string, string> = {
         'unprocessed': 'info',
         'pending': 'primary',
@@ -809,7 +837,7 @@ function getStatusColor(status: string | undefined): string {
         'success': 'success',
         'failed': 'danger'
     };
-    
+
     return statusMap[status] || 'info';
 }
 

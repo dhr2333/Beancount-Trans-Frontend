@@ -17,7 +17,7 @@
         </div>
 
         <div class="big-contain" key="bigContainRegister" v-else>
-          
+
           <div class="btitle">创建账户</div>
           <form class="bform" @submit.prevent="register"> <!-- 关键修改：添加表单和 submit 事件 -->
             <input type="text" placeholder="用户名（必填）" v-model="username">
@@ -163,7 +163,11 @@ const register = async () => {
       const storage = localStorage;
       storage.setItem('access', res.data.meta.access_token);
       storage.setItem('username', res.data.data.user.username);
-      ElMessage.success("登录成功");
+
+      // 🔔 关键：设置引导标记（仅新注册用户）
+      storage.setItem('start_tour', 'true');
+
+      ElMessage.success("注册成功");
       router.push('/file');
     } else {
       ElMessage.error('注册失败，请稍后再试。');
