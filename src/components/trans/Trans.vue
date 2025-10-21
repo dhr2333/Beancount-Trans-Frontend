@@ -1,4 +1,7 @@
 <template>
+  <!-- 注册引导弹窗 -->
+  <RegisterPrompt v-model="showRegisterPrompt" :parsed-count="parsedCount" @skip="handleSkipRegister" />
+
   <el-upload class="upload-demo" :drag="true" :action=action method="POST" :data="getUploadData" :multiple="false"
     :headers=headers accept=".csv,.pdf,.xls,.xlsx" show-file-list name="trans" @success="handleUploadSuccess"
     @error="handleUploadError" @change="handleChange">
@@ -106,6 +109,7 @@ import { ElMessage, ElPopover } from 'element-plus';
 import { UploadFilled, DocumentCopy } from '@element-plus/icons-vue'
 import { ref, computed, watch } from 'vue';
 import axios from '../../utils/request';
+import RegisterPrompt from '../common/RegisterPrompt.vue';
 
 
 const input = ref()
@@ -159,6 +163,10 @@ interface BillEntry {
 }
 const responseData = ref('')
 const responseList = ref<BillEntry[]>([]);
+
+// 注册引导相关
+const showRegisterPrompt = ref(false)
+const parsedCount = ref(0)
 
 
 const getUploadData = () => {
@@ -222,8 +230,31 @@ const handleUploadSuccess = (response: any, file: any) => {
   } else {
     responseList.value = response.results; // 存储所有条目
     responseData.value = response.results.map((item: any) => item.formatted).join(''); // 存储所有条目
+
+    // 检查是否需要显示注册引导
+    parsedCount.value = response.results.length
+    checkAndShowRegisterPrompt()
   }
 };
+
+// 检查并显示注册引导
+const checkAndShowRegisterPrompt = () => {
+  // 检查用户是否已登录
+  const isLoggedIn = localStorage.getItem('access') && localStorage.getItem('username')
+
+  if (!isLoggedIn) {
+    // 延迟显示，让用户先看到解析结果
+    setTimeout(() => {
+      showRegisterPrompt.value = true
+    }, 1500)
+  }
+}
+
+// 处理跳过注册
+const handleSkipRegister = () => {
+  showRegisterPrompt.value = false
+  ElMessage.info('您可以随时注册账号保存您的账本数据')
+}
 
 // 函数用于下载CSV文件
 const downloadCSV = (csvData: string) => {
