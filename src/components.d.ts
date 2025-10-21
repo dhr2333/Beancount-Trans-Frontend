@@ -13,6 +13,7 @@ declare module '@vue/runtime-core' {
     AccountSelector: typeof import('./components/common/AccountSelector.vue')['default']
     AccountSelectorTest: typeof import('./components/debug/AccountSelectorTest.vue')['default']
     AccountTemplates: typeof import('./components/template/AccountTemplates.vue')['default']
+    AnonymousPrompt: typeof import('./components/common/AnonymousPrompt.vue')['default']
     ApiTest: typeof import('./components/debug/ApiTest.vue')['default']
     Assets: typeof import('./components/map/Assets.vue')['default']
     BaseHeader: typeof import('./components/layouts/BaseHeader.vue')['default']

@@ -1,6 +1,10 @@
 <template>
     <div class="account-management">
-        <div class="management-header">
+        <!-- 匿名用户提示 -->
+        <AnonymousPrompt v-model="showAnonymousPrompt" @skip="handleSkipAnonymous" />
+
+        <!-- 页面内容，只在非匿名用户或已跳过提示时显示 -->
+        <div v-if="!showAnonymousPrompt" class="management-header">
             <h2>账户管理</h2>
             <div class="header-actions">
                 <el-button type="primary" @click="showAddAccountDialog">
@@ -12,7 +16,7 @@
             </div>
         </div>
 
-        <div class="management-content">
+        <div v-if="!showAnonymousPrompt" class="management-content">
             <!-- 左侧：账户树形结构 -->
             <div class="account-tree-panel">
                 <el-tree :data="accountTree" :props="treeProps" node-key="id" :expand-on-click-node="false"
@@ -312,6 +316,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import type { FormInstance, FormRules } from 'element-plus'
+import AnonymousPrompt from '../common/AnonymousPrompt.vue'
+import { hasAuthTokens } from '../../utils/auth'
 
 // 接口定义
 interface Account {
@@ -346,6 +352,9 @@ const currentSelectedAccountId = ref<number | null>(null)
 const addAccountDialog = ref(false)
 const editAccountDialog = ref(false)
 const deleteAccountDialog = ref(false)
+
+// 匿名用户提示
+const showAnonymousPrompt = ref(false)
 
 // 映射详情相关
 const showMappingDetails = ref(false)
@@ -793,9 +802,23 @@ const getIncomeMappingTooltip = () => {
         .join('\n')
 }
 
+// 处理匿名用户跳过提示
+const handleSkipAnonymous = () => {
+    showAnonymousPrompt.value = false
+    // 继续加载数据，显示admin用户的共享配置
+    fetchAccountTree()
+}
+
 // 组件挂载时初始化数据
 onMounted(() => {
-    fetchAccountTree()
+    // 检查用户是否已登录
+    if (!hasAuthTokens()) {
+        // 未登录用户显示提示
+        showAnonymousPrompt.value = true
+    } else {
+        // 已登录用户直接加载数据
+        fetchAccountTree()
+    }
 })
 </script>
 

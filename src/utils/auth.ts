@@ -20,5 +20,5 @@ export const clearAuthTokens = () => {
 
 // 检查令牌是否存在
 export const hasAuthTokens = () => {
-  return !!(localStorage.getItem('access') && localStorage.getItem('refresh'))
+  return !!(localStorage.getItem('access') && localStorage.getItem('username'))
 }

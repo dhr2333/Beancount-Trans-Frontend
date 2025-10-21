@@ -1,6 +1,7 @@
 <template>
     <div class="mapping-management">
-
+        <!-- 匿名用户提示 -->
+        <AnonymousPrompt v-model="showAnonymousPrompt" @skip="handleSkipAnonymous" />
 
         <!-- 快速创建映射 -->
         <!-- <div class="quick-create-section">
@@ -177,6 +178,8 @@ import AccountSelector from '../common/AccountSelector.vue'
 import ExpenseMapping from './Expenses.vue'
 import IncomeMapping from './Income.vue'
 import AssetsMapping from './Assets.vue'
+import AnonymousPrompt from '../common/AnonymousPrompt.vue'
+import { hasAuthTokens } from '../../utils/auth'
 import type { FormInstance, FormRules } from 'element-plus'
 
 // 响应式数据
@@ -185,6 +188,9 @@ const activeTab = ref('expense')
 // 提示信息
 const showTooltip = ref(true)
 const payeetipContent = ref("💡 提示：关键字用于匹配账单中的描述信息，映射账户用于指定该交易应归入的账户。商家信息有助于提高映射的准确性。")
+
+// 匿名用户提示
+const showAnonymousPrompt = ref(false)
 
 // 快速创建相关
 const quickCreateDialog = ref(false)
@@ -330,8 +336,37 @@ const handleAccountChange = (account: any) => {
     quickCreateForm.value.currency = null
 }
 
+// 处理匿名用户跳过提示
+const handleSkipAnonymous = () => {
+    showAnonymousPrompt.value = false
+    // 继续显示映射管理页面，显示admin用户的共享配置
+    // 加载所有标签页的数据
+    loadAllTabData()
+}
+
+// 加载所有标签页数据
+const loadAllTabData = () => {
+    // 加载支出映射数据
+    if (expenseMappingRef.value?.fetchData) {
+        expenseMappingRef.value.fetchData()
+    }
+    // 加载收入映射数据
+    if (incomeMappingRef.value?.fetchData) {
+        incomeMappingRef.value.fetchData()
+    }
+    // 加载资产映射数据
+    if (assetsMappingRef.value?.fetchData) {
+        assetsMappingRef.value.fetchData()
+    }
+}
+
 // 组件挂载时初始化
 onMounted(() => {
+    // 检查用户是否已登录
+    if (!hasAuthTokens()) {
+        // 未登录用户显示提示
+        showAnonymousPrompt.value = true
+    }
     // 页面初始化
 })
 </script>

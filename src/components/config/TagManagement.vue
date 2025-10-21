@@ -1,6 +1,10 @@
 <template>
     <div class="tag-management">
-        <div class="management-header">
+        <!-- 匿名用户提示 -->
+        <AnonymousPrompt v-model="showAnonymousPrompt" @skip="handleSkipAnonymous" />
+
+        <!-- 页面内容，只在非匿名用户或已跳过提示时显示 -->
+        <div v-if="!showAnonymousPrompt" class="management-header">
             <h2>标签管理</h2>
             <div class="header-actions">
                 <el-button type="primary" @click="showAddDialog">
@@ -12,7 +16,7 @@
             </div>
         </div>
 
-        <div class="management-content">
+        <div v-if="!showAnonymousPrompt" class="management-content">
             <!-- 左侧：标签树 -->
             <div class="tag-tree-panel">
                 <el-tree :data="filteredTagTree" :props="treeProps" node-key="id" :expand-on-click-node="false"
@@ -210,6 +214,8 @@ import {
     fetchTagMappings
 } from '../../api/tags'
 import type { Tag, TagForm } from '../../types/tag'
+import AnonymousPrompt from '../common/AnonymousPrompt.vue'
+import { hasAuthTokens } from '../../utils/auth'
 
 // 响应式数据
 const tagTree = ref<Tag[]>([])
@@ -231,6 +237,9 @@ const tagMappings = ref<any>({
     income_mappings: []
 })
 const activeMappingTab = ref('expense')
+
+// 匿名用户提示
+const showAnonymousPrompt = ref(false)
 
 // 树形配置
 const treeProps = {
@@ -543,9 +552,23 @@ const getIncomeMappingTooltip = () => {
         .join('\n')
 }
 
+// 处理匿名用户跳过提示
+const handleSkipAnonymous = () => {
+    showAnonymousPrompt.value = false
+    // 继续加载数据，显示admin用户的共享配置
+    loadTagTree()
+}
+
 // 组件挂载
 onMounted(() => {
-    loadTagTree()
+    // 检查用户是否已登录
+    if (!hasAuthTokens()) {
+        // 未登录用户显示提示
+        showAnonymousPrompt.value = true
+    } else {
+        // 已登录用户直接加载数据
+        loadTagTree()
+    }
 })
 </script>
 
