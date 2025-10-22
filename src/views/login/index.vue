@@ -136,9 +136,13 @@ const login = async () => {
       password: password.value
     });
 
-    const storage = localStorage;
-    storage.setItem('access', res.data.meta.access_token);
-    storage.setItem('username', res.data.data.user.username);
+    // 使用新的认证函数设置令牌
+    const { setAuthTokens } = await import('@/utils/auth');
+    setAuthTokens(
+      res.data.meta.access_token,
+      res.data.meta.refresh_token,
+      res.data.data.user.username
+    );
 
     if (!isRegisteredLogin) {
       ElMessage.success("登录成功");

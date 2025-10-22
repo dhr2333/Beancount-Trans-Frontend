@@ -1,13 +1,10 @@
 // 设置JWT令牌
-export const setAuthTokens = () => {
-  const tokens = {
-    access: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU4NjgwMjQ0LCJpYXQiOjE3NTg2NzY2NDQsImp0aSI6IjI0ZmQ3NzE5YjE0MTRiNjU4MDcwYTBkNTU5N2YyMDk0IiwidXNlcl9pZCI6M30.UDdBcwxrRv7ANpA8_1CvO7Xvu4L1tchfQt3AItpills",
-    refresh: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc1ODkzNTg0NCwiaWF0IjoxNzU4Njc2NjQ0LCJqdGkiOiIwNDFjOGNhMGM4Yjc0ZjRiOGQ0OTg4MmMzMDcxZDM3NSIsInVzZXJfaWQiOjN9.ZseEVHENwHZe_Ty2fy_BWj0Sms2H6dmMCBe5M2lmpKI"
+export const setAuthTokens = (accessToken: string, refreshToken: string, username?: string) => {
+  localStorage.setItem('access', accessToken)
+  localStorage.setItem('refresh', refreshToken)
+  if (username) {
+    localStorage.setItem('username', username)
   }
-  
-  localStorage.setItem('access', tokens.access)
-  localStorage.setItem('refresh', tokens.refresh)
-  
   console.log('JWT令牌已设置')
 }
 
@@ -15,10 +12,46 @@ export const setAuthTokens = () => {
 export const clearAuthTokens = () => {
   localStorage.removeItem('access')
   localStorage.removeItem('refresh')
+  localStorage.removeItem('username')
   console.log('JWT令牌已清除')
 }
 
 // 检查令牌是否存在
 export const hasAuthTokens = () => {
   return !!(localStorage.getItem('access') && localStorage.getItem('username'))
+}
+
+// 获取访问令牌
+export const getAccessToken = () => {
+  return localStorage.getItem('access')
+}
+
+// 获取刷新令牌
+export const getRefreshToken = () => {
+  return localStorage.getItem('refresh')
+}
+
+// 获取用户名
+export const getUsername = () => {
+  return localStorage.getItem('username')
+}
+
+// 检查令牌是否即将过期（提前5分钟刷新）
+export const isTokenExpiringSoon = () => {
+  const token = getAccessToken()
+  if (!token) return true
+  
+  try {
+    // 解析JWT令牌
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    const currentTime = Math.floor(Date.now() / 1000)
+    const expirationTime = payload.exp
+    const timeUntilExpiry = expirationTime - currentTime
+    
+    // 如果令牌在5分钟内过期，返回true
+    return timeUntilExpiry < 300 // 5分钟 = 300秒
+  } catch (error) {
+    console.error('Error parsing token:', error)
+    return true
+  }
 }
