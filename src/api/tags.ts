@@ -2,7 +2,7 @@
  * 标签 API 服务
  */
 import axios from '../utils/request'
-import type { Tag, TagForm, TagStats, TagBatchUpdate, TagDeleteParams } from '../types/tag'
+import type { Tag, TagForm, TagStats, TagDeleteParams } from '../types/tag'
 
 /**
  * 获取标签树形结构
@@ -68,12 +68,6 @@ export const updateTagEnable = (id: number, enable: boolean) => {
   return axios.patch(`/tags/${id}/`, { enable })
 }
 
-/**
- * 批量操作标签
- */
-export const batchUpdateTags = (data: TagBatchUpdate) => {
-  return axios.post('/tags/batch_update/', data)
-}
 
 
 /**
