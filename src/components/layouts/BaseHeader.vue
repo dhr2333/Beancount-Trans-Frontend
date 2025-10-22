@@ -143,7 +143,7 @@ const apiUrl = import.meta.env.VITE_API_URL;
 // 定义验证令牌的函数
 const verifyToken = async (token: string): Promise<boolean> => {
   try {
-    const res = await axios.post(`${apiUrl}/token/verify/`, { token });
+    const res = await axios.post(`${apiUrl}/auth/token/verify/`, { token });
     return res.status === 200;
   } catch (error) {
     console.error('Token 验证失败:', error);
