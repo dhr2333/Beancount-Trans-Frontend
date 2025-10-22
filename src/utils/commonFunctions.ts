@@ -8,7 +8,7 @@ const handleRefresh = async () => {
     const refresh = localStorage.getItem('refresh');
 
     try {
-        const refreshRes = await axios.post(apiUrl + '/token/refresh/', { "refresh": refresh });
+        const refreshRes = await axios.post(apiUrl + '/api/auth/token/refresh/', { "refresh": refresh });
 
         const newToken = refreshRes.data.access;
         // 更新本地存储中的 Access Token
