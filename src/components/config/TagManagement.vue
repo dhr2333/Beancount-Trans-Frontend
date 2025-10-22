@@ -107,7 +107,7 @@
                                             <div class="mapping-info">
                                                 <span class="mapping-key">{{ mapping.key }}</span>
                                                 <span v-if="mapping.payee" class="mapping-payee">{{ mapping.payee
-                                                }}</span>
+                                                    }}</span>
                                                 <span class="mapping-account">→ {{ mapping.account || '未知账户' }}</span>
                                                 <span v-if="mapping.currency" class="mapping-currency">{{
                                                     mapping.currency }}</span>
@@ -146,7 +146,7 @@
                                             <div class="mapping-info">
                                                 <span class="mapping-key">{{ mapping.key }}</span>
                                                 <span v-if="mapping.payer" class="mapping-payer">{{ mapping.payer
-                                                }}</span>
+                                                    }}</span>
                                                 <span class="mapping-account">→ {{ mapping.account || '未知账户' }}</span>
                                             </div>
                                             <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
@@ -210,7 +210,7 @@ import {
     createTag,
     updateTag,
     deleteTag,
-    toggleTagEnable,
+    updateTagEnable,
     fetchTagMappings
 } from '../../api/tags'
 import type { Tag, TagForm } from '../../types/tag'
@@ -426,7 +426,7 @@ const handleSubmit = async () => {
 // 更新标签状态
 const updateTagStatus = async (tag: Tag) => {
     try {
-        await toggleTagEnable(tag.id)
+        await updateTagEnable(tag.id, tag.enable)
         ElMessage.success(`标签已${tag.enable ? '启用' : '禁用'}`)
         await loadTagTree()
     } catch (error) {
