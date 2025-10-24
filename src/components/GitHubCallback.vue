@@ -26,13 +26,19 @@ onMounted(async () => {
 
         const data = response.data;
         console.log(data);
-        const storage = localStorage;
-        storage.setItem('access', data.access);
-        storage.setItem('refresh', data.refresh);
-        storage.setItem('username', data.username);
+
+        // 使用新的认证函数设置令牌
+        const { setAuthTokens } = await import('@/utils/auth');
+        setAuthTokens(data.access, data.refresh, data.username);
+
+        // 🔔 关键：为 GitHub 第三方登录也设置引导标记
+        // 检查是否是首次登录（通过后端返回的 is_new_user 字段判断）
+        if (data.is_new_user) {
+            storage.setItem('start_tour', 'true');
+        }
 
         ElMessage.success("GitHub 登录成功");
-        router.push('/map/expenses/');
+        router.push('/file');
     } catch (error) {
         console.error('GitHub 登录失败', error);
         ElMessage.error("GitHub 登录失败");

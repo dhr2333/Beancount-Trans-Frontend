@@ -62,13 +62,6 @@ export interface TagSummary {
   enable: boolean
 }
 
-/**
- * 批量更新参数
- */
-export interface TagBatchUpdate {
-  tag_ids: number[]
-  action: 'enable' | 'disable' | 'delete'
-}
 
 /**
  * 标签删除参数

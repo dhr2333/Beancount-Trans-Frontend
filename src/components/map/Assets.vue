@@ -285,6 +285,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { Search, Plus, Upload, Download, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import handleRefresh from '../../utils/commonFunctions'
+import { hasAuthTokens } from '../../utils/auth'
 import * as XLSX from 'xlsx'
 import { pinyin } from 'pinyin-pro';
 import AccountSelector from '../common/AccountSelector.vue'
@@ -348,7 +349,17 @@ const fetchData = async () => {
 
 // 页面数据获取(组件挂载)
 onMounted(() => {
-    fetchData()
+    // 检查用户是否已登录
+    if (hasAuthTokens()) {
+        // 已登录用户直接加载数据
+        fetchData()
+    }
+    // 未登录用户不加载数据，等待父组件的提示处理
+})
+
+// 暴露方法给父组件调用
+defineExpose({
+    fetchData
 })
 
 // 关键字搜索

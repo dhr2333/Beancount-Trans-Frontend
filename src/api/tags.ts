@@ -2,7 +2,7 @@
  * 标签 API 服务
  */
 import axios from '../utils/request'
-import type { Tag, TagForm, TagStats, TagBatchUpdate, TagDeleteParams } from '../types/tag'
+import type { Tag, TagForm, TagStats, TagDeleteParams } from '../types/tag'
 
 /**
  * 获取标签树形结构
@@ -62,84 +62,13 @@ export const deleteTag = (id: number, params?: TagDeleteParams) => {
 }
 
 /**
- * 切换标签启用状态
+ * 更新标签启用状态
  */
-export const toggleTagEnable = (id: number) => {
-  return axios.post(`/tags/${id}/toggle_enable/`)
+export const updateTagEnable = (id: number, enable: boolean) => {
+  return axios.patch(`/tags/${id}/`, { enable })
 }
 
-/**
- * 批量操作标签
- */
-export const batchUpdateTags = (data: TagBatchUpdate) => {
-  return axios.post('/tags/batch_update/', data)
-}
 
-/**
- * 获取标签统计信息
- */
-export const fetchTagStats = () => {
-  return axios.get<TagStats>('/tags/stats/')
-}
-
-/**
- * 获取标签的直接子标签
- */
-export const fetchTagChildren = (id: number) => {
-  return axios.get<Tag[]>(`/tags/${id}/children/`)
-}
-
-/**
- * 获取标签的所有后代标签ID
- */
-export const fetchTagDescendants = (id: number) => {
-  return axios.get<{
-    tag_id: number
-    tag_name: string
-    descendant_ids: number[]
-    count: number
-  }>(`/tags/${id}/descendants/`)
-}
-
-/**
- * 获取映射的标签
- */
-export const fetchMappingTags = (mappingType: 'expense' | 'assets' | 'income', mappingId: number) => {
-  const typeMap = {
-    expense: 'expense',
-    assets: 'assets',
-    income: 'income'
-  }
-  return axios.get(`/${typeMap[mappingType]}/${mappingId}/tags/`)
-}
-
-/**
- * 为映射添加标签
- */
-export const addTagsToMapping = (mappingType: 'expense' | 'assets' | 'income', mappingId: number, tagIds: number[]) => {
-  const typeMap = {
-    expense: 'expense',
-    assets: 'assets',
-    income: 'income'
-  }
-  return axios.post(`/${typeMap[mappingType]}/${mappingId}/add_tags/`, {
-    tag_ids: tagIds
-  })
-}
-
-/**
- * 从映射中移除标签
- */
-export const removeTagsFromMapping = (mappingType: 'expense' | 'assets' | 'income', mappingId: number, tagIds: number[]) => {
-  const typeMap = {
-    expense: 'expense',
-    assets: 'assets',
-    income: 'income'
-  }
-  return axios.post(`/${typeMap[mappingType]}/${mappingId}/remove_tags/`, {
-    tag_ids: tagIds
-  })
-}
 
 /**
  * 获取标签相关的映射

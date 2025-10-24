@@ -1,6 +1,9 @@
 <template>
-    <!-- 格式配置面板 -->
-    <el-form :model="formModel" :rules="formRules" ref="configForm">
+    <!-- 匿名用户提示 -->
+    <AnonymousPrompt v-model="showAnonymousPrompt" @skip="handleSkipAnonymous" />
+
+    <!-- 格式配置面板，只在非匿名用户或已跳过提示时显示 -->
+    <el-form v-if="!showAnonymousPrompt" :model="formModel" :rules="formRules" ref="configForm">
         <el-collapse v-model="activePanels" class="config-panel">
             <!-- 基础字段显示 -->
             <el-collapse-item title="基础字段显示" name="basic" class="config-item">
@@ -93,7 +96,7 @@
     </el-form>
 
     <!-- 操作按钮 -->
-    <div class="action-buttons">
+    <div v-if="!showAnonymousPrompt" class="action-buttons">
         <el-button type="primary" @click="validateAndSubmit" :loading="loading.save">
             应用配置
         </el-button>
@@ -106,6 +109,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from '../../utils/request'
+import AnonymousPrompt from '../common/AnonymousPrompt.vue'
+import { hasAuthTokens } from '../../utils/auth'
 import type { FormInstance } from 'element-plus'
 
 const configForm = ref<FormInstance>()
@@ -163,6 +168,9 @@ const loading = ref({
     reset: false
 })
 
+// 匿名用户提示
+const showAnonymousPrompt = ref(false)
+
 // 转换配置格式：前端 camelCase <-> 后端 snake_case
 const convertToFrontend = (config: Config) => {
     return {
@@ -203,8 +211,24 @@ const loadConfig = async () => {
     }
 }
 
+// 处理匿名用户跳过提示
+const handleSkipAnonymous = () => {
+    showAnonymousPrompt.value = false
+    // 继续加载配置，显示admin用户的共享配置
+    loadConfig()
+}
+
 // 初始化加载配置
-onMounted(loadConfig)
+onMounted(() => {
+    // 检查用户是否已登录
+    if (!hasAuthTokens()) {
+        // 未登录用户显示提示
+        showAnonymousPrompt.value = true
+    } else {
+        // 已登录用户直接加载配置
+        loadConfig()
+    }
+})
 
 // 生成请求体
 const currentConfig = computed(() => {

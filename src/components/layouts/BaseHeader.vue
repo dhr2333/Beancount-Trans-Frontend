@@ -1,6 +1,6 @@
 <template>
   <el-menu class="el-menu-demo" mode="horizontal" :ellipsis="false" @select="handleSelect">
-    <el-sub-menu index="account">
+    <el-sub-menu index="account" id="tour-ledger-menu">
       <template #title>账本管理</template>
       <el-menu-item index="platform-ledger" @click="openFavaInstance">
         平台账本
@@ -143,7 +143,7 @@ const apiUrl = import.meta.env.VITE_API_URL;
 // 定义验证令牌的函数
 const verifyToken = async (token: string): Promise<boolean> => {
   try {
-    const res = await axios.post(`${apiUrl}/token/verify/`, { token });
+    const res = await axios.post(`${apiUrl}/auth/token/verify/`, { token });
     return res.status === 200;
   } catch (error) {
     console.error('Token 验证失败:', error);
@@ -152,13 +152,34 @@ const verifyToken = async (token: string): Promise<boolean> => {
 };
 
 // 定义清除令牌并退出登录的函数
-const cleanToken = () => {
-  localStorage.removeItem("access");
-  localStorage.removeItem("username");
-  document.cookie = 'csrftoken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-  document.cookie = 'sessionid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-  username.value = "未登录";
-  router.push("/login");
+const cleanToken = async () => {
+  try {
+    // 先尝试停止用户的Fava实例
+    const accessToken = localStorage.getItem("access");
+    if (accessToken) {
+      try {
+        await axios.post(`${apiUrl}/fava/stop/`, {}, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        });
+        console.log('Fava实例已停止');
+      } catch (error) {
+        console.warn('停止Fava实例时出错:', error);
+        // 即使停止Fava实例失败，也继续执行退出登录流程
+      }
+    }
+  } catch (error) {
+    console.warn('退出登录时出错:', error);
+  } finally {
+    // 清除本地存储和Cookie
+    localStorage.removeItem("access");
+    localStorage.removeItem("username");
+    document.cookie = 'csrftoken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    document.cookie = 'sessionid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    username.value = "未登录";
+    router.push("/login");
+  }
 };
 
 // 定义用户中心跳转的函数
@@ -237,7 +258,7 @@ announcements.value = [{
 const openFavaInstance = async () => {
   const loading = ElLoading.service({
     lock: true,
-    text: '正在启动您的专属账本...',
+    text: '您即将查看基于您刚上传的账单生成的专业级财务报表。您可以看到月度支出趋势、消费分类饼图等。',
   });
 
   try {
@@ -260,7 +281,7 @@ const openFavaInstance = async () => {
     }
   } catch (error: any) {
     if (error.response && error.response.status === 401) {
-      ElMessage.info('未认证，请登录后重试');
+      ElMessage.info('注册后查看用户专属的财务报表');
     }
   } finally {
     loading.close();
