@@ -140,17 +140,6 @@ const username = ref(localStorage.getItem("username") || "未登录");
 // 获取 API 基础 URL
 const apiUrl = import.meta.env.VITE_API_URL;
 
-// 定义验证令牌的函数
-const verifyToken = async (token: string): Promise<boolean> => {
-  try {
-    const res = await axios.post(`${apiUrl}/auth/token/verify/`, { token });
-    return res.status === 200;
-  } catch (error) {
-    console.error('Token 验证失败:', error);
-    return false;
-  }
-};
-
 // 定义清除令牌并退出登录的函数
 const cleanToken = async () => {
   try {
