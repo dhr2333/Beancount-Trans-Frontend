@@ -303,7 +303,7 @@ function formatFileSize(bytes: number): string {
 
 // 认证头部
 const headers = computed(() => ({
-    Authorization: `Bearer ${localStorage.getItem('access_token')}`
+    Authorization: `Bearer ${localStorage.getItem('access')}`
 }))
 
 watch(searchQuery, async (newQuery) => {

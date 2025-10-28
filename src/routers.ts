@@ -10,7 +10,6 @@ import MappingManagement from "./components/map/MappingManagement.vue"
 import ApiTest from "./components/debug/ApiTest.vue"
 import AccountSelectorTest from "./components/debug/AccountSelectorTest.vue"
 import Login from "./views/login/index.vue"
-import ShowDates from "./components/owntracks/show_log_dates.vue"
 import AuthenticateByGithubToken from './components/GitHubCallback.vue';
 // 模板管理
 import AccountTemplates from "./components/template/AccountTemplates.vue"
@@ -35,7 +34,6 @@ const router = createRouter({
     { path: '/debug/api', name: "apiTest", component: ApiTest },
     { path: '/debug/account-selector', name: "accountSelectorTest", component: AccountSelectorTest },
     { path: '/login', name: "login", component: Login },
-    { path: '/owntracks/show_dates', name: "showdates", component: ShowDates },
   ]
 })
 
