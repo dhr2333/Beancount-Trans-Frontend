@@ -1,337 +1,623 @@
 <template>
-  <div class="login-register">
-    <div class="contain">
-      <div class="big-box" :class="{ active: isLogin }">
-        <div class="big-contain" key="bigContainLogin" v-if="isLogin">
-          <div class="btitle">账户登录</div>
-          <form class="bform" @submit.prevent="login">
-            <input type="text" placeholder="用户名(默认admin)" v-model="username">
-            <span class="errTips" v-if="emailError">* 用户名无效 *</span>
-            <input type="password" placeholder="密码(默认123456)" v-model="password">
-            <span class="errTips" v-if="emailError">* 密码填写错误 *</span>
-            <button type="submit" class="bbutton">登录</button>
-            <button type="button" class="bbutton" @click="loginWithGitHub">使用 GitHub 登录</button>
-            <!-- <button class="bbutton" @click="loginWithGoogle">使用 Google 登录</button> -->
-            <!-- <button class="bbutton" @click="sendPostRequest">使用 Dummy 登录</button> -->
-          </form>
+  <div class="login-container">
+    <el-card class="login-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <h2>{{ isLogin ? '账户登录' : '手机号注册' }}</h2>
+          <el-text type="info" size="small">
+            {{ isLogin ? '请登录继续管理您的财务报告' : '立即注册，AI 帮您 3 分钟生成专业财务报表' }}
+          </el-text>
         </div>
+      </template>
 
-        <div class="big-contain" key="bigContainRegister" v-else>
+      <!-- 登录表单 -->
+      <div v-if="isLogin" class="login-form">
+        <el-tabs v-model="loginMethod" class="login-tabs">
+          <el-tab-pane label="账密登录" name="username">
+            <el-form ref="usernameLoginFormRef" :model="usernameLoginForm" :rules="usernameLoginRules" label-width="0"
+              @submit.prevent="handleUsernameLogin">
+              <el-form-item prop="username">
+                <el-input v-model="usernameLoginForm.username" placeholder="用户名 / 手机号" size="large" clearable>
+                  <template #prefix>
+                    <el-icon>
+                      <User />
+                    </el-icon>
+                  </template>
+                </el-input>
+              </el-form-item>
+              <el-form-item prop="password">
+                <el-input v-model="usernameLoginForm.password" type="password" placeholder="密码" size="large"
+                  show-password clearable @keyup.enter="handleUsernameLogin">
+                  <template #prefix>
+                    <el-icon>
+                      <Lock />
+                    </el-icon>
+                  </template>
+                </el-input>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" size="large" class="login-button" :loading="loginLoading"
+                  @click="handleUsernameLogin">
+                  登录
+                </el-button>
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
 
-          <div class="btitle">创建账户</div>
-          <form class="bform" @submit.prevent="register"> <!-- 关键修改：添加表单和 submit 事件 -->
-            <input type="text" placeholder="用户名（必填）" v-model="username">
-            <span class="errTips" v-if="existed">* 用户名已经存在！ *</span>
-            <input type="email" placeholder="邮箱（选填）" v-model="email">
-            <input type="password" placeholder="密码（必填）" v-model="password">
-            <button type="submit" class="bbutton">注册</button> <!-- 改为 submit 类型 -->
-          </form>
+          <el-tab-pane label="手机号登录" name="phone">
+            <el-form ref="phoneLoginFormRef" :model="phoneLoginForm" :rules="phoneLoginRules" label-width="0">
+              <el-form-item prop="phone_number">
+                <el-input v-model="phoneLoginForm.phone_number" placeholder="手机号" size="large" clearable>
+                  <template #prefix>
+                    <el-icon>
+                      <Phone />
+                    </el-icon>
+                  </template>
+                </el-input>
+              </el-form-item>
+              <el-form-item prop="code">
+                <div class="code-input-group">
+                  <el-input v-model="phoneLoginForm.code" placeholder="验证码" size="large" maxlength="6" clearable
+                    @keyup.enter="handlePhoneLoginByCode">
+                    <template #prefix>
+                      <el-icon>
+                        <Message />
+                      </el-icon>
+                    </template>
+                  </el-input>
+                  <el-button :disabled="!canSendCode || codeSending" :loading="codeSending" @click="sendLoginCode">
+                    {{ codeSending ? `${countdown}s` : '发送验证码' }}
+                  </el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" size="large" class="login-button" :loading="loginLoading"
+                  @click="handlePhoneLoginByCode">
+                  验证码登录
+                </el-button>
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+        </el-tabs>
+
+        <!-- OAuth登录 -->
+        <el-divider>第三方登录</el-divider>
+        <div class="oauth-buttons">
+          <el-button type="default" size="large" class="oauth-button" @click="loginWithGitHub">
+            <el-icon><svg viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+              </svg></el-icon>
+            GitHub 登录
+          </el-button>
         </div>
       </div>
-      <div class="small-box" :class="{ active: isLogin }">
-        <div class="small-contain" key="smallContainRegister" v-if="isLogin">
-          <div class="stitle">还没有账户?</div>
-          <p class="scontent">立即注册，AI 帮您 3 分钟生成专业财务报表
-          </p>
-          <button class="sbutton" @click="changeType">注册</button>
-        </div>
-        <div class="small-contain" key="smallContainLogin" v-else>
-          <div class="stitle">已有账户?</div>
-          <p class="scontent">欢迎回来！请登录继续管理您的财务报告</p>
-          <button class="sbutton" @click="changeType">登录</button>
-        </div>
+
+      <!-- 注册表单 -->
+      <div v-else class="register-form">
+        <el-form ref="registerFormRef" :model="registerForm" :rules="registerRules" label-width="0"
+          @submit.prevent="handleRegister">
+          <el-form-item prop="phone_number">
+            <el-input v-model="registerForm.phone_number" placeholder="手机号" size="large" clearable>
+              <template #prefix>
+                <el-icon>
+                  <Phone />
+                </el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
+          <el-form-item prop="code">
+            <div class="code-input-group">
+              <el-input v-model="registerForm.code" placeholder="验证码" size="large" maxlength="6" clearable>
+                <template #prefix>
+                  <el-icon>
+                    <Message />
+                  </el-icon>
+                </template>
+              </el-input>
+              <el-button :disabled="!canSendRegisterCode || codeSending" :loading="codeSending"
+                @click="sendRegisterCode">
+                {{ codeSending ? `${countdown}s` : '发送验证码' }}
+              </el-button>
+            </div>
+          </el-form-item>
+          <el-form-item prop="username">
+            <el-input v-model="registerForm.username" placeholder="用户名（选填）" size="large" clearable>
+              <template #prefix>
+                <el-icon>
+                  <User />
+                </el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
+          <el-form-item prop="password">
+            <el-input v-model="registerForm.password" type="password" placeholder="密码（选填）" size="large" show-password
+              clearable>
+              <template #prefix>
+                <el-icon>
+                  <Lock />
+                </el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
+          <el-form-item prop="email">
+            <el-input v-model="registerForm.email" type="email" placeholder="邮箱（选填）" size="large" clearable>
+              <template #prefix>
+                <el-icon>
+                  <Message />
+                </el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" size="large" class="register-button" :loading="registerLoading"
+              @click="handleRegister">
+              注册
+            </el-button>
+          </el-form-item>
+        </el-form>
       </div>
-    </div>
+
+      <!-- 切换登录/注册 -->
+      <div class="form-footer">
+        <el-text v-if="isLogin">
+          还没有账户？
+          <el-link type="primary" @click="switchToRegister">立即注册</el-link>
+        </el-text>
+        <el-text v-else>
+          已有账户？
+          <el-link type="primary" @click="switchToLogin">立即登录</el-link>
+        </el-text>
+      </div>
+    </el-card>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue';
-import axios from '../../utils/request';
-import router from '~/routers';
+import { ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
+import { User, Lock, Phone, Message } from '@element-plus/icons-vue'
+import axios from '../../utils/request'
+import router from '~/routers'
 
+const apiUrl = import.meta.env.VITE_API_URL
 
-let isRegisteredLogin = false;
-const apiUrl = import.meta.env.VITE_API_URL;
-const isLogin = ref(true);
-const emailError = ref(false);
-const existed = ref(false);
-const username = ref("");
-const email = ref("");
-const password = ref("");
+// 登录/注册切换
+const isLogin = ref(true)
+const loginMethod = ref('username')
+const loginLoading = ref(false)
+const registerLoading = ref(false)
 
-const loginWithGitHub = () => {
-  const providerId = 'github'; // 指定 GitHub 作为 OAuth 提供商
-  const callbackURL = 'https://trans.dhr2333.cn/auth/github/token'; // 该路由负责获取后端传回的认证令牌和用户名，将其写入浏览器localstorage中
+// 验证码相关
+const codeSending = ref(false)
+const countdown = ref(60)
+let countdownTimer: number | null = null
 
-  // 创建一个隐藏的表单
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = apiUrl + '/_allauth/browser/v1/auth/provider/redirect';
-  form.style.display = 'none';
+// 表单引用
+const usernameLoginFormRef = ref<FormInstance>()
+const phoneLoginFormRef = ref<FormInstance>()
+const registerFormRef = ref<FormInstance>()
 
-  // 添加表单字段
-  const providerInput = document.createElement('input');
-  providerInput.type = 'hidden';
-  providerInput.name = 'provider';
-  providerInput.value = providerId;
-  form.appendChild(providerInput);
+// 用户名登录表单
+const usernameLoginForm = reactive({
+  username: '',
+  password: ''
+})
 
-  const callbackInput = document.createElement('input');
-  callbackInput.type = 'hidden';
-  callbackInput.name = 'callback_url';
-  callbackInput.value = callbackURL;
-  form.appendChild(callbackInput);
+// 手机号登录表单
+const phoneLoginForm = reactive({
+  phone_number: '',
+  code: ''
+})
 
-  const processInput = document.createElement('input');
-  processInput.type = 'hidden';
-  processInput.name = 'process';
-  processInput.value = 'login'; // 或 'connect'
-  form.appendChild(processInput);
+// 注册表单
+const registerForm = reactive({
+  phone_number: '',
+  code: '',
+  username: '',
+  password: '',
+  email: ''
+})
 
-  // 将表单添加到 body 并提交
-  document.body.appendChild(form);
-  form.submit();
-};
-
-// Google OAuth 登录逻辑
-// const loginWithGoogle = () => {
-//   const clientId = '27533849710-0ot3fj14f5vqkinena7is5ms08nfe2kl.apps.googleusercontent.com'; // 替换为你的Google客户端ID
-//   const redirectUri = 'http://127.0.0.1:38001/accounts/google/login/callback/'; // 替换为你的回调URL
-//   const scope = 'openid email profile'; // 请求的权限范围
-
-//   // 生成一个随机的状态值
-//   // const state = "111111111111111111" + Math.random().toString(36).substring(2); // 简单的随机字符串
-//   // console.log(state);
-
-//   // localStorage.setItem('oauth_state', state); // 存储状态值以便后续验证
-
-//   // 构造Google OAuth授权URL
-//   const authUrl = `https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${encodeURIComponent(scope)}`;
-//   // const authUrl = `http://127.0.0.1:8002/accounts/google/login/?process=login`;
-
-//   // 重定向到Google登录页面
-//   window.location.href = authUrl;
-// };
-
-
-
-function changeType() {
-  isLogin.value = !isLogin.value;
-  username.value = "";
-  email.value = "";
-  password.value = "";
-  // password2.value = "!QAZse4rfv";
+// 验证规则
+const usernameLoginRules: FormRules = {
+  username: [
+    { required: true, message: '请输入用户名或手机号', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' }
+  ]
 }
 
-const login = async () => {
-  if (username.value === "" || password.value === "") {
-    ElMessage.error("用户名和密码不能为空");
-    return
-  }
-  try {
-    const res = await axios.post(apiUrl + '/_allauth/app/v1/auth/login', {
-      username: username.value,
-      password: password.value
-    });
+const phoneLoginRules: FormRules = {
+  phone_number: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+  ],
+  code: [
+    { required: true, message: '请输入验证码', trigger: 'blur' },
+    { pattern: /^\d{6}$/, message: '验证码为6位数字', trigger: 'blur' }
+  ]
+}
 
-    // 使用新的认证函数设置令牌
-    const { setAuthTokens } = await import('@/utils/auth');
+const registerRules: FormRules = {
+  phone_number: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+  ],
+  code: [
+    { required: true, message: '请输入验证码', trigger: 'blur' },
+    { pattern: /^\d{6}$/, message: '验证码为6位数字', trigger: 'blur' }
+  ],
+  username: [
+    { min: 3, max: 150, message: '用户名长度为3-150个字符', trigger: 'blur' }
+  ],
+  password: [
+    { min: 8, message: '密码长度至少8个字符', trigger: 'blur' }
+  ],
+  email: [
+    { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+  ]
+}
+
+// 手机号格式化
+const normalizePhone = (phone: string): string => {
+  const trimmed = phone.trim()
+  if (trimmed.startsWith('+')) return trimmed
+  if (trimmed.startsWith('86')) return '+' + trimmed
+  return '+86' + trimmed
+}
+
+// 是否可以发送验证码（登录）
+const canSendCode = computed(() => {
+  return phoneLoginForm.phone_number.length === 11
+})
+
+// 是否可以发送验证码（注册）
+const canSendRegisterCode = computed(() => {
+  return registerForm.phone_number.length === 11
+})
+
+// 开始倒计时
+const startCountdown = () => {
+  codeSending.value = true
+  countdown.value = 60
+  if (countdownTimer) clearInterval(countdownTimer)
+  countdownTimer = window.setInterval(() => {
+    countdown.value--
+    if (countdown.value <= 0) {
+      codeSending.value = false
+      if (countdownTimer) clearInterval(countdownTimer)
+    }
+  }, 1000)
+}
+
+// 发送登录验证码
+const sendLoginCode = async () => {
+  if (!phoneLoginFormRef.value) return
+  await phoneLoginFormRef.value.validateField('phone_number')
+
+  try {
+    const resp = await axios.post(apiUrl + '/auth/phone/send-code/', {
+      phone_number: normalizePhone(phoneLoginForm.phone_number)
+    })
+    if (resp.status === 200) {
+      ElMessage.success('验证码已发送')
+      startCountdown()
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '发送失败')
+  }
+}
+
+// 发送注册验证码
+const sendRegisterCode = async () => {
+  if (!registerFormRef.value) return
+  await registerFormRef.value.validateField('phone_number')
+
+  try {
+    const resp = await axios.post(apiUrl + '/auth/phone/send-code/', {
+      phone_number: normalizePhone(registerForm.phone_number)
+    })
+    if (resp.status === 200) {
+      ElMessage.success('验证码已发送')
+      startCountdown()
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '发送失败')
+  }
+}
+
+// 判断输入是否为手机号
+const isPhoneNumber = (input: string): boolean => {
+  return /^1[3-9]\d{9}$/.test(input.trim())
+}
+
+// 账密登录（支持用户名/手机号+密码）
+const handleUsernameLogin = async () => {
+  if (!usernameLoginFormRef.value) return
+  await usernameLoginFormRef.value.validate()
+
+  loginLoading.value = true
+
+  // 判断输入的是手机号还是用户名
+  const isPhone = isPhoneNumber(usernameLoginForm.username)
+
+  try {
+    let res: any
+
+    if (isPhone) {
+      // 手机号+密码登录
+      res = await axios.post(apiUrl + '/auth/phone/login-by-password/', {
+        phone_number: normalizePhone(usernameLoginForm.username),
+        password: usernameLoginForm.password
+      })
+
+      const { setAuthTokens } = await import('../../utils/auth')
+      setAuthTokens(
+        res.data.access,
+        res.data.refresh,
+        res.data.user.username
+      )
+
+      ElMessage.success('登录成功')
+
+      // 检查是否需要2FA
+      if (res.data.requires_2fa) {
+        ElMessage.info('请完成双因素认证')
+        // TODO: 跳转到2FA验证页面
+      }
+
+      router.push('/file')
+    } else {
+      // 用户名+密码登录
+      res = await axios.post(apiUrl + '/_allauth/app/v1/auth/login', {
+        username: usernameLoginForm.username,
+        password: usernameLoginForm.password
+      })
+
+      const { setAuthTokens } = await import('../../utils/auth')
+      setAuthTokens(
+        res.data.meta.access_token,
+        res.data.meta.refresh_token,
+        res.data.data.user.username
+      )
+
+      ElMessage.success('登录成功')
+
+      // 检查手机号绑定状态
+      try {
+        await axios.get(apiUrl + '/auth/profile/me/', {
+          headers: { Authorization: `Bearer ${res.data.meta.access_token}` }
+        })
+        router.push('/file')
+      } catch (profileError: any) {
+        if (profileError.response?.status === 403 && profileError.response?.data?.code === 'PHONE_NUMBER_REQUIRED') {
+          ElMessage.warning('请先绑定手机号')
+          router.push('/phone-binding')
+        } else {
+          router.push('/file')
+        }
+      }
+    }
+  } catch (error: any) {
+    if (error.response?.status === 403 && error.response?.data?.code === 'PHONE_NUMBER_REQUIRED') {
+      ElMessage.warning('请先绑定手机号')
+      router.push('/phone-binding')
+    } else {
+      ElMessage.error(error.response?.data?.error || error.response?.data?.message || '登录失败')
+    }
+  } finally {
+    loginLoading.value = false
+  }
+}
+
+// 手机号验证码登录
+const handlePhoneLoginByCode = async () => {
+  if (!phoneLoginFormRef.value) return
+  await phoneLoginFormRef.value.validateField('phone_number')
+  await phoneLoginFormRef.value.validateField('code')
+
+  loginLoading.value = true
+  try {
+    const res = await axios.post(apiUrl + '/auth/phone/login-by-code/', {
+      phone_number: normalizePhone(phoneLoginForm.phone_number),
+      code: phoneLoginForm.code
+    })
+
+    const { setAuthTokens } = await import('../../utils/auth')
     setAuthTokens(
-      res.data.meta.access_token,
-      res.data.meta.refresh_token,
-      res.data.data.user.username
-    );
+      res.data.access,
+      res.data.refresh,
+      res.data.user.username
+    )
 
-    if (!isRegisteredLogin) {
-      ElMessage.success("登录成功");
+    ElMessage.success('登录成功')
+
+    // 检查是否需要2FA
+    if (res.data.requires_2fa) {
+      ElMessage.info('请完成双因素认证')
+      // TODO: 跳转到2FA验证页面
     }
+
     router.push('/file')
-
-  } catch (error) {
-    console.log(error);
-
-    ElMessage.error("用户名或密码错误");
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.error || '登录失败')
+  } finally {
+    loginLoading.value = false
   }
 }
 
-const register = async () => {
+// 注册
+const handleRegister = async () => {
+  if (!registerFormRef.value) return
+  await registerFormRef.value.validate()
+
+  registerLoading.value = true
   try {
-    const res = await axios.post(apiUrl + '/_allauth/app/v1/auth/signup', {
-      username: username.value,
-      password: password.value
-    });
+    const res = await axios.post(apiUrl + '/auth/phone/register/', {
+      phone_number: normalizePhone(registerForm.phone_number),
+      code: registerForm.code,
+      username: registerForm.username,
+      password: registerForm.password,
+      email: registerForm.email || ''
+    })
 
-    if (res.status === 200 && res.data) {
-      const storage = localStorage;
-      storage.setItem('access', res.data.meta.access_token);
-      storage.setItem('username', res.data.data.user.username);
+    const { setAuthTokens } = await import('../../utils/auth')
+    setAuthTokens(
+      res.data.access,
+      res.data.refresh,
+      res.data.user.username
+    )
 
-      // 🔔 关键：设置引导标记（仅新注册用户）
-      storage.setItem('start_tour', 'true');
+    ElMessage.success('注册成功')
 
-      ElMessage.success("注册成功");
-      router.push('/file');
-    } else {
-      ElMessage.error('注册失败，请稍后再试。');
-    }
-  } catch (error) {
-    if (error.response) {
-      ElMessage.error(error.response.data.errors[0].message);
-    } else {
-      ElMessage.error('请求出错，请稍后再试。');
-    }
+    // 标记为新用户
+    localStorage.setItem('start_tour', 'true')
+
+    router.push('/file')
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.error || '注册失败')
+  } finally {
+    registerLoading.value = false
   }
-};
+}
 
+// GitHub OAuth登录
+const loginWithGitHub = () => {
+  const providerId = 'github'
+  const callbackURL = window.location.origin + '/auth/github/token'
+
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.action = apiUrl + '/_allauth/browser/v1/auth/provider/redirect'
+  form.style.display = 'none'
+
+  const providerInput = document.createElement('input')
+  providerInput.type = 'hidden'
+  providerInput.name = 'provider'
+  providerInput.value = providerId
+  form.appendChild(providerInput)
+
+  const callbackInput = document.createElement('input')
+  callbackInput.type = 'hidden'
+  callbackInput.name = 'callback_url'
+  callbackInput.value = callbackURL
+  form.appendChild(callbackInput)
+
+  const processInput = document.createElement('input')
+  processInput.type = 'hidden'
+  processInput.name = 'process'
+  processInput.value = 'login'
+  form.appendChild(processInput)
+
+  document.body.appendChild(form)
+  form.submit()
+}
+
+// 切换登录/注册
+const switchToLogin = () => {
+  isLogin.value = true
+  loginMethod.value = 'username'
+  // 清空表单
+  Object.assign(registerForm, {
+    phone_number: '',
+    code: '',
+    username: '',
+    password: '',
+    email: ''
+  })
+}
+
+const switchToRegister = () => {
+  isLogin.value = false
+  // 清空表单
+  Object.assign(usernameLoginForm, { username: '', password: '' })
+  Object.assign(phoneLoginForm, { phone_number: '', code: '' })
+}
 </script>
 
-<style scoped="scoped">
-.login-register {
-  width: 100vw;
-  height: 100vh;
-  box-sizing: border-box;
-}
-
-.contain {
-  width: 60%;
-  height: 60%;
-  position: relative;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: #fff;
-  border-radius: 20px;
-  box-shadow: 0 0 3px #f0f0f0, 0 0 6px #f0f0f0;
-}
-
-.big-box {
-  width: 70%;
-  height: 100%;
-  position: absolute;
-  top: 0;
-  left: 30%;
-  transform: translateX(0%);
-  transition: all 1s;
-}
-
-.big-contain {
-  width: 100%;
-  height: 100%;
+<style scoped>
+.login-container {
   display: flex;
-  flex-direction: column;
   justify-content: center;
   align-items: center;
+  min-height: 100vh;
+  padding: 20px;
 }
 
-.btitle {
-  font-size: 1.5em;
-  font-weight: bold;
-  color: rgb(57, 167, 176);
-}
-
-.bform {
+.login-card {
   width: 100%;
-  height: 40%;
-  padding: 2em 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  align-items: center;
+  max-width: 480px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
 }
 
-.bform .errTips {
-  display: block;
-  width: 50%;
-  text-align: left;
-  color: red;
-  font-size: 0.7em;
-  margin-left: 1em;
-}
-
-.bform input {
-  width: 50%;
-  height: 30px;
-  border: none;
-  outline: none;
-  border-radius: 10px;
-  padding-left: 2em;
-  background-color: #f0f0f0;
-}
-
-.bbutton {
-  width: 20%;
-  height: 40px;
-  border-radius: 24px;
-  border: none;
-  outline: none;
-  background-color: rgb(57, 167, 176);
-  color: #fff;
-  font-size: 0.9em;
-  cursor: pointer;
-}
-
-.small-box {
-  width: 30%;
-  height: 100%;
-  background: linear-gradient(135deg, rgb(57, 167, 176), rgb(56, 183, 145));
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform: translateX(0%);
-  transition: all 1s;
-  border-top-left-radius: inherit;
-  border-bottom-left-radius: inherit;
-}
-
-.small-contain {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-.stitle {
-  font-size: 1.5em;
-  font-weight: bold;
-  color: #fff;
-}
-
-.scontent {
-  font-size: 0.8em;
-  color: #fff;
+.card-header {
   text-align: center;
-  padding: 2em 4em;
-  line-height: 1.7em;
 }
 
-.sbutton {
-  width: 60%;
-  height: 40px;
-  border-radius: 24px;
-  border: 1px solid #fff;
-  outline: none;
-  background-color: transparent;
-  color: #fff;
-  font-size: 0.9em;
-  cursor: pointer;
+.card-header h2 {
+  margin: 0 0 8px 0;
+  color: #303133;
+  font-size: 24px;
 }
 
-.big-box.active {
-  left: 0;
-  transition: all 0.5s;
+.login-tabs {
+  margin-bottom: 20px;
 }
 
-.small-box.active {
-  left: 100%;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-top-right-radius: inherit;
-  border-bottom-right-radius: inherit;
-  transform: translateX(-100%);
-  transition: all 1s;
+.code-input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.code-input-group :deep(.el-input) {
+  flex: 1;
+}
+
+.login-button,
+.register-button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.oauth-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.oauth-button {
+  width: 100%;
+}
+
+.form-footer {
+  text-align: center;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
+}
+
+:deep(.el-tabs__item) {
+  font-size: 16px;
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 20px;
+}
+
+:deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px #dcdfe6 inset;
+}
+
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #c0c4cc inset;
+}
+
+:deep(.el-input.is-focus .el-input__wrapper) {
+  box-shadow: 0 0 0 1px #409eff inset;
 }
 </style>

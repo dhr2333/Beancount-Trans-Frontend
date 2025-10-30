@@ -27,7 +27,7 @@ export const testJWTRefresh = async () => {
   
   // 4. 发送一个需要认证的请求
   try {
-    const response = await instance.get('/api/account/')
+    const response = await instance.get('/account/')
     console.log('请求成功:', response.data)
   } catch (error) {
     console.error('请求失败:', error)
@@ -47,7 +47,7 @@ export const testTokenExpiration = async () => {
   
   try {
     // 这个请求应该会触发自动刷新
-    const response = await instance.get('/api/account/')
+    const response = await instance.get('/account/')
     console.log('自动刷新成功:', response.data)
   } catch (error) {
     console.error('自动刷新失败:', error)

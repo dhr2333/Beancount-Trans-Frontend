@@ -1,5 +1,6 @@
 import axios from "axios";
 import { ref } from 'vue';
+import { ElMessage } from 'element-plus';
 
 export const responseData = ref('');
 const apiUrl = import.meta.env.VITE_API_URL;
@@ -12,7 +13,7 @@ const refreshToken = async () => {
     }
 
     try {
-        const refreshRes = await axios.post(apiUrl + '/api/token/refresh/', { 
+        const refreshRes = await axios.post(apiUrl + '/token/refresh/', { 
             "refresh": refresh 
         });
         
@@ -65,6 +66,22 @@ instance.interceptors.response.use(
     },
     async (error) => {
         const originalRequest = error.config;
+        
+        // 处理403错误：手机号未绑定
+        if (error.response?.status === 403 && error.response?.data?.code === 'PHONE_NUMBER_REQUIRED') {
+            // 检查是否已经在手机号绑定页面
+            if (window.location.pathname !== '/phone-binding') {
+                ElMessage.warning(error.response.data.message || '请先绑定手机号');
+                // 保存当前路径，绑定后可以返回
+                const currentPath = window.location.pathname;
+                if (currentPath !== '/login' && currentPath !== '/phone-binding') {
+                    sessionStorage.setItem('redirectAfterPhoneBinding', currentPath);
+                }
+                // 跳转到手机号绑定页面
+                window.location.href = '/phone-binding';
+            }
+            return Promise.reject(error);
+        }
         
         // 如果是401错误且不是刷新令牌的请求，尝试刷新令牌
         if (error.response?.status === 401 && !originalRequest._retry) {
