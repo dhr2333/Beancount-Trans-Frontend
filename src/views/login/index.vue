@@ -540,11 +540,15 @@ const switchToRegister = () => {
 
 <style scoped>
 .login-container {
+  min-height: calc(100vh - 80px);
+  /* 假定 header 48px，如需具体请调整 */
+  width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
-  padding: 20px;
+  padding: 0;
+  overflow: auto;
+  box-sizing: border-box;
 }
 
 .login-card {

@@ -15,9 +15,14 @@
 #app {
   text-align: center;
   color: var(--ep-text-color-primary);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .main-container {
-  height: calc(100vh - var(--ep-menu-item-height) - 3px);
+  flex: 1;
+  display: flex;
+  min-height: 0;
 }
 </style>
