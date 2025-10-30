@@ -888,7 +888,10 @@ const handleChangePassword = async () => {
 
     changePasswordLoading.value = true
     try {
-        // TODO: 实现修改密码API
+        await axios.post(apiUrl + '/auth/profile/change_password/', {
+            old_password: changePasswordForm.old_password,
+            new_password: changePasswordForm.new_password
+        })
         ElMessage.success('密码修改成功')
         showChangePasswordDialog.value = false
         Object.assign(changePasswordForm, { old_password: '', new_password: '', confirm_password: '' })
@@ -907,7 +910,9 @@ const handleSetPassword = async () => {
 
     setPasswordLoading.value = true
     try {
-        // TODO: 实现设置密码API
+        await axios.post(apiUrl + '/auth/profile/set_password/', {
+            new_password: setPasswordForm.new_password
+        })
         ElMessage.success('密码设置成功')
         showSetPasswordDialog.value = false
         Object.assign(setPasswordForm, { new_password: '', confirm_password: '' })
