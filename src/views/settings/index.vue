@@ -59,8 +59,11 @@
                                 </div>
                             </div>
                             <div class="binding-actions">
-                                <el-button type="default" @click="showUpdateEmailDialog = true">
-                                    {{ bindings.email ? '修改' : '绑定' }}
+                                <el-button v-if="!bindings.email" type="primary" @click="showUpdateEmailDialog = true">
+                                    绑定
+                                </el-button>
+                                <el-button v-else type="danger" plain @click="handleUnbindEmail">
+                                    解绑
                                 </el-button>
                             </div>
                         </div>
@@ -368,16 +371,25 @@
             </template>
         </el-dialog>
 
-        <!-- 修改邮箱对话框 -->
-        <el-dialog v-model="showUpdateEmailDialog" title="修改邮箱" width="400px">
+        <!-- 绑定/修改邮箱对话框（验证码） -->
+        <el-dialog v-model="showUpdateEmailDialog" title="绑定邮箱" width="420px">
             <el-form ref="updateEmailFormRef" :model="updateEmailForm" :rules="updateEmailRules">
-                <el-form-item label="新邮箱" prop="email">
-                    <el-input v-model="updateEmailForm.email" type="email" />
+                <el-form-item label="邮箱" prop="email">
+                    <el-input v-model="updateEmailForm.email" type="email" placeholder="请输入邮箱" />
+                </el-form-item>
+                <el-form-item label="验证码" prop="code">
+                    <div class="code-input-group">
+                        <el-input v-model="updateEmailForm.code" placeholder="请输入验证码" maxlength="6" />
+                        <el-button :disabled="!updateEmailForm.email || codeSending" :loading="codeSending"
+                            @click="sendEmailBindCode">
+                            {{ codeSending ? `${countdown}s` : '发送验证码' }}
+                        </el-button>
+                    </div>
                 </el-form-item>
             </el-form>
             <template #footer>
                 <el-button @click="showUpdateEmailDialog = false">取消</el-button>
-                <el-button type="primary" :loading="updateEmailLoading" @click="handleUpdateEmail">确定</el-button>
+                <el-button type="primary" :loading="updateEmailLoading" @click="handleConfirmBindEmail">确定</el-button>
             </template>
         </el-dialog>
 
@@ -487,7 +499,8 @@ const updateUsernameForm = reactive({
 })
 
 const updateEmailForm = reactive({
-    email: ''
+    email: '',
+    code: ''
 })
 
 const deleteAccountForm = reactive({
@@ -533,6 +546,10 @@ const updateEmailRules: FormRules = {
     email: [
         { required: true, message: '请输入邮箱', trigger: 'blur' },
         { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+    ],
+    code: [
+        { required: true, message: '请输入验证码', trigger: 'blur' },
+        { pattern: /^\d{6}$/, message: '验证码为6位数字', trigger: 'blur' }
     ]
 }
 
@@ -807,24 +824,60 @@ const handleUpdateUsername = async () => {
     }
 }
 
-// 修改邮箱
-const handleUpdateEmail = async () => {
+// 发送邮箱绑定验证码
+const sendEmailBindCode = async () => {
+    if (!updateEmailFormRef.value) return
+    await updateEmailFormRef.value.validateField('email')
+    try {
+        const resp = await axios.post(apiUrl + '/auth/bindings/send-email-code/', {
+            email: updateEmailForm.email
+        })
+        if (resp.status === 200) {
+            ElMessage.success('验证码已发送')
+            startCountdown()
+        }
+    } catch (e: any) {
+        ElMessage.error(e?.response?.data?.error || '发送失败')
+    }
+}
+
+// 确认绑定邮箱
+const handleConfirmBindEmail = async () => {
     if (!updateEmailFormRef.value) return
     await updateEmailFormRef.value.validate()
 
     updateEmailLoading.value = true
     try {
-        await axios.patch(apiUrl + '/auth/profile/update_me/', {
-            email: updateEmailForm.email
+        await axios.post(apiUrl + '/auth/bindings/bind-email/', {
+            email: updateEmailForm.email,
+            code: updateEmailForm.code
         })
-        ElMessage.success('邮箱修改成功')
+        ElMessage.success('邮箱绑定成功')
         showUpdateEmailDialog.value = false
-        Object.assign(updateEmailForm, { email: '' })
+        Object.assign(updateEmailForm, { email: '', code: '' })
         await fetchBindings()
     } catch (error: any) {
-        ElMessage.error(error.response?.data?.error || '修改失败')
+        ElMessage.error(error.response?.data?.error || '绑定失败')
     } finally {
         updateEmailLoading.value = false
+    }
+}
+
+// 解绑邮箱
+const handleUnbindEmail = async () => {
+    try {
+        await ElMessageBox.confirm('确定要解绑邮箱吗？', '提示', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+        })
+        await axios.delete(apiUrl + '/auth/bindings/unbind-email/')
+        ElMessage.success('邮箱解绑成功')
+        await fetchBindings()
+    } catch (error: any) {
+        if (error !== 'cancel') {
+            ElMessage.error(error.response?.data?.error || '解绑失败')
+        }
     }
 }
 
