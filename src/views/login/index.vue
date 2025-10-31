@@ -17,7 +17,7 @@
             <el-form ref="usernameLoginFormRef" :model="usernameLoginForm" :rules="usernameLoginRules" label-width="0"
               @submit.prevent="handleUsernameLogin">
               <el-form-item prop="username">
-                <el-input v-model="usernameLoginForm.username" placeholder="用户名 / 手机号" size="large" clearable>
+                <el-input v-model="usernameLoginForm.username" placeholder="用户名 / 手机号 / 邮箱" size="large" clearable>
                   <template #prefix>
                     <el-icon>
                       <User />
