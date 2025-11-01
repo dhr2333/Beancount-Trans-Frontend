@@ -400,7 +400,8 @@
             </el-dialog>
 
             <!-- 删除账户对话框 -->
-            <el-dialog v-model="showDeleteAccountDialog" title="删除账户" width="500px">
+            <el-dialog v-model="showDeleteAccountDialog" title="删除账户" width="500px" @open="onOpenDeleteAccountDialog"
+                @closed="resetDeleteAccountDialog">
                 <el-alert title="警告" type="error" :closable="false" style="margin-bottom: 20px">
                     <template #default>
                         <p>此操作将永久删除您的账户和所有相关数据，包括：</p>
@@ -411,17 +412,25 @@
                             <li>所有模板</li>
                         </ul>
                         <p><strong>此操作不可恢复！</strong></p>
+                        <el-text type="warning" size="small">建议在删除前导出或备份重要数据。</el-text>
                     </template>
                 </el-alert>
                 <el-form ref="deleteAccountFormRef" :model="deleteAccountForm" :rules="deleteAccountRules">
                     <el-form-item label="确认操作" prop="confirm">
                         <el-input v-model="deleteAccountForm.confirm" placeholder="请输入 'DELETE' 确认删除" />
                     </el-form-item>
+                    <el-form-item>
+                        <el-checkbox v-model="deleteAccountConfirmChecked">
+                            我已了解上述信息，并确认删除后所有数据将立即清空且无法恢复
+                        </el-checkbox>
+                    </el-form-item>
                 </el-form>
                 <template #footer>
-                    <el-button @click="showDeleteAccountDialog = false">取消</el-button>
-                    <el-button type="danger" :loading="deleteAccountLoading"
-                        @click="handleDeleteAccount">删除账户</el-button>
+                    <el-button @click="handleCancelDeleteAccount">取消</el-button>
+                    <el-button type="danger" :disabled="!canSubmitDeleteAccount" :loading="deleteAccountLoading"
+                        @click="handleDeleteAccount">
+                        删除账户
+                    </el-button>
                 </template>
             </el-dialog>
         </div>
@@ -535,6 +544,8 @@ const updateEmailForm = reactive({
 const deleteAccountForm = reactive({
     confirm: ''
 })
+
+const deleteAccountConfirmChecked = ref(false)
 
 const totpQRCode = ref('')
 const totpSecret = ref('')
@@ -668,6 +679,14 @@ const canSendCode = computed(() => {
 
 const canSendSMS2FACode = computed(() => {
     return bindings.value.phone_number && bindings.value.phone_verified
+})
+
+const canSubmitDeleteAccount = computed(() => {
+    return (
+        deleteAccountForm.confirm.trim() === 'DELETE' &&
+        deleteAccountConfirmChecked.value &&
+        !deleteAccountLoading.value
+    )
 })
 
 // 手机号格式化
@@ -982,7 +1001,9 @@ const handleDeleteAccount = async () => {
             localStorage.clear()
             sessionStorage.clear()
             // 跳转到登录页面
+            showDeleteAccountDialog.value = false
             router.push('/login')
+            resetDeleteAccountDialog()
         } catch (error: any) {
             ElMessage.error(error.response?.data?.error || '删除失败')
         } finally {
@@ -993,6 +1014,20 @@ const handleDeleteAccount = async () => {
             ElMessage.error('操作已取消')
         }
     }
+}
+
+const resetDeleteAccountDialog = () => {
+    deleteAccountForm.confirm = ''
+    deleteAccountConfirmChecked.value = false
+}
+
+const onOpenDeleteAccountDialog = () => {
+    resetDeleteAccountDialog()
+}
+
+const handleCancelDeleteAccount = () => {
+    resetDeleteAccountDialog()
+    showDeleteAccountDialog.value = false
 }
 
 // 启用TOTP
