@@ -224,16 +224,22 @@
                                 <h3>危险操作</h3>
                             </template>
 
-                            <el-alert title="删除账户" type="error" :closable="false" show-icon>
-                                <template #default>
-                                    <p>删除账户将永久删除您的所有数据，包括账单文件、账户配置、映射规则等。</p>
-                                    <p><strong>此操作不可恢复！</strong></p>
-                                    <el-button type="danger" @click="showDeleteAccountDialog = true"
-                                        style="margin-top: 10px">
-                                        删除账户
-                                    </el-button>
-                                </template>
-                            </el-alert>
+                            <div class="danger-zone">
+                                <div class="danger-zone__item">
+                                    <div class="danger-zone__content">
+                                        <div class="danger-zone__title">删除账户</div>
+                                        <p>删除账户将永久删除您的所有数据，包括账单文件、账户配置、映射规则等。
+                                            <strong>此操作不可恢复！</strong>
+                                        </p>
+                                    </div>
+                                    <div class="danger-zone__actions">
+                                        <el-button type="danger" plain class="danger-zone__button"
+                                            @click="showDeleteAccountDialog = true">
+                                            删除账户
+                                        </el-button>
+                                    </div>
+                                </div>
+                            </div>
                         </el-card>
                     </el-tab-pane>
                 </el-tabs>
@@ -478,6 +484,16 @@ const showSMS2FADialog = ref(false)
 const showUpdateUsernameDialog = ref(false)
 const showUpdateEmailDialog = ref(false)
 const showDeleteAccountDialog = ref(false)
+
+const defaultConfirmOptions = {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning' as const,
+    center: false,
+    customClass: 'settings-confirm-dialog',
+    confirmButtonClass: 'settings-confirm-primary',
+    cancelButtonClass: 'settings-confirm-cancel'
+}
 
 const bindings = ref<any>({
     username: '',
@@ -792,9 +808,7 @@ const handleBindPhone = async () => {
 const handleUnbindPhone = async () => {
     try {
         await ElMessageBox.confirm('确定要解绑手机号吗？', '提示', {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
-            type: 'warning'
+            ...defaultConfirmOptions
         })
         await axios.delete(apiUrl + '/auth/bindings/unbind-phone/')
         ElMessage.success('手机号解绑成功')
@@ -810,9 +824,7 @@ const handleUnbindPhone = async () => {
 const handleUnbindSocial = async (provider: string) => {
     try {
         await ElMessageBox.confirm(`确定要解绑${provider === 'github' ? 'GitHub' : provider}吗？`, '提示', {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
-            type: 'warning'
+            ...defaultConfirmOptions
         })
         await axios.delete(apiUrl + `/auth/bindings/unbind-social/${provider}/`)
         ElMessage.success('解绑成功')
@@ -923,9 +935,7 @@ const handleConfirmBindEmail = async () => {
 const handleUnbindEmail = async () => {
     try {
         await ElMessageBox.confirm('确定要解绑邮箱吗？', '提示', {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
-            type: 'warning'
+            ...defaultConfirmOptions
         })
         await axios.delete(apiUrl + '/auth/bindings/unbind-email/')
         ElMessage.success('邮箱解绑成功')
@@ -987,10 +997,10 @@ const handleDeleteAccount = async () => {
 
     try {
         await ElMessageBox.confirm('确定要删除账户吗？此操作不可恢复！', '最终确认', {
+            ...defaultConfirmOptions,
             confirmButtonText: '确定删除',
-            cancelButtonText: '取消',
             type: 'error',
-            dangerouslyUseHTMLString: false
+            confirmButtonClass: 'settings-confirm-danger'
         })
 
         deleteAccountLoading.value = true
@@ -1150,9 +1160,7 @@ const handleConfirmSMS2FA = async () => {
 const handleDisableSMS2FA = async () => {
     try {
         await ElMessageBox.confirm('确定要禁用SMS双因素认证吗？', '提示', {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
-            type: 'warning'
+            ...defaultConfirmOptions
         })
         await axios.post(apiUrl + '/auth/2fa/sms/disable/')
         ElMessage.success('SMS 2FA已禁用')
@@ -1204,7 +1212,66 @@ onMounted(() => {
 }
 
 .danger-card {
-    border: 1px solid #f56c6c;
+    border: 1px solid #d8dee4;
+    padding: 0;
+}
+
+.danger-zone {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+}
+
+.danger-zone__item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    border: 1px solid #f0d9dc;
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px 24px;
+    gap: 24px;
+}
+
+.danger-zone__content {
+    flex: 1;
+    color: #57606a;
+    line-height: 1.6;
+}
+
+.danger-zone__title {
+    font-weight: 600;
+    color: #24292f;
+    margin-bottom: 6px;
+    font-size: 16px;
+}
+
+.danger-zone__content p {
+    margin: 0;
+}
+
+.danger-zone__content p strong {
+    color: #cf222e;
+}
+
+.danger-zone__actions {
+    display: flex;
+    align-items: center;
+}
+
+.danger-zone__button {
+    border-color: #cf222e;
+    color: #cf222e;
+    font-weight: 600;
+    padding: 10px 20px;
+}
+
+.danger-zone__button:hover,
+.danger-zone__button:focus {
+    background: rgba(207, 34, 46, 0.08);
+    color: #b6202c;
+    border-color: #b6202c;
 }
 
 .binding-item,
@@ -1277,5 +1344,64 @@ onMounted(() => {
 .auth-required-result {
     margin: 80px auto 0;
     max-width: 420px;
+}
+
+:global(.settings-confirm-dialog) {
+    border-radius: 12px;
+    padding: 20px 24px 24px;
+    max-width: 420px;
+}
+
+:global(.settings-confirm-dialog .ep-message-box__header) {
+    justify-content: flex-start;
+    padding-bottom: 12px;
+}
+
+:global(.settings-confirm-dialog .ep-message-box__title) {
+    font-weight: 600;
+    font-size: 18px;
+    color: #24292f;
+}
+
+:global(.settings-confirm-dialog .ep-message-box__content) {
+    color: #57606a;
+    line-height: 1.6;
+    text-align: left;
+    padding: 12px 0 0;
+}
+
+:global(.settings-confirm-dialog .ep-message-box__btns) {
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 24px;
+}
+
+:global(.settings-confirm-primary) {
+    background-color: #2da44e;
+    border-color: #2da44e;
+    border-radius: 6px;
+    min-width: 96px;
+    font-weight: 600;
+}
+
+:global(.settings-confirm-primary:hover) {
+    filter: brightness(0.95);
+}
+
+:global(.settings-confirm-cancel) {
+    border-radius: 6px;
+    min-width: 96px;
+}
+
+:global(.settings-confirm-danger) {
+    background-color: #d0353a;
+    border-color: #d0353a;
+    border-radius: 6px;
+    min-width: 110px;
+    font-weight: 600;
+}
+
+:global(.settings-confirm-danger:hover) {
+    filter: brightness(0.92);
 }
 </style>
