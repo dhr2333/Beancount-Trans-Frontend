@@ -134,7 +134,7 @@
         <el-form ref="registerFormRef" :model="registerForm" :rules="registerRules" label-width="0"
           @submit.prevent="handleRegister">
           <el-form-item prop="phone_number">
-            <el-input v-model="registerForm.phone_number" placeholder="手机号" size="large" clearable>
+            <el-input v-model="registerForm.phone_number" placeholder="手机号（必填）" size="large" clearable>
               <template #prefix>
                 <el-icon>
                   <Phone />
@@ -176,7 +176,7 @@
               </template>
             </el-input>
           </el-form-item>
-          <el-form-item prop="email">
+          <!-- <el-form-item prop="email">
             <el-input v-model="registerForm.email" type="email" placeholder="邮箱（选填）" size="large" clearable>
               <template #prefix>
                 <el-icon>
@@ -184,7 +184,7 @@
                 </el-icon>
               </template>
             </el-input>
-          </el-form-item>
+          </el-form-item> -->
           <el-form-item>
             <el-button type="primary" size="large" class="register-button" :loading="registerLoading"
               @click="handleRegister">
@@ -308,13 +308,41 @@ const registerRules: FormRules = {
     { pattern: /^\d{6}$/, message: '验证码为6位数字', trigger: 'blur' }
   ],
   username: [
-    { min: 3, max: 150, message: '用户名长度为3-150个字符', trigger: 'blur' }
+    {
+      validator: (_rule, value, callback) => {
+        const trimmed = (value || '').trim()
+        if (!trimmed) {
+          callback()
+          return
+        }
+        if (trimmed.length < 3 || trimmed.length > 150) {
+          callback(new Error('用户名长度为3-150个字符'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur'
+    }
   ],
   password: [
-    { min: 8, message: '密码长度至少8个字符', trigger: 'blur' }
+    {
+      validator: (_rule, value, callback) => {
+        const trimmed = (value || '').trim()
+        if (!trimmed) {
+          callback()
+          return
+        }
+        if (trimmed.length < 8) {
+          callback(new Error('密码长度至少8个字符'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur'
+    }
   ],
   email: [
-    { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+    { type: 'email', message: '请输入正确的邮箱地址', trigger: ['blur', 'change'] }
   ]
 }
 
@@ -583,13 +611,27 @@ const handleRegister = async () => {
 
   registerLoading.value = true
   try {
-    const res = await axios.post(apiUrl + '/auth/phone/register/', {
+    const payload: Record<string, string> = {
       phone_number: normalizePhone(registerForm.phone_number),
-      code: registerForm.code,
-      username: registerForm.username,
-      password: registerForm.password,
-      email: registerForm.email || ''
-    })
+      code: registerForm.code
+    }
+
+    const username = registerForm.username.trim()
+    if (username) {
+      payload.username = username
+    }
+
+    const password = registerForm.password.trim()
+    if (password) {
+      payload.password = password
+    }
+
+    const email = registerForm.email.trim()
+    if (email) {
+      payload.email = email
+    }
+
+    const res = await axios.post(apiUrl + '/auth/phone/register/', payload)
 
     const { setAuthTokens } = await import('../../utils/auth')
     setAuthTokens(
@@ -664,6 +706,7 @@ const switchToRegister = () => {
   Object.assign(usernameLoginForm, { username: '', password: '' })
   Object.assign(phoneLoginForm, { phone_number: '', code: '' })
   Object.assign(emailLoginForm, { email: '', code: '' })
+  Object.assign(registerForm, { phone_number: '', code: '', username: '', password: '', email: '' })
 }
 </script>
 
