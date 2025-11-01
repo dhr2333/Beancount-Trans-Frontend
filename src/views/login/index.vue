@@ -78,6 +78,42 @@
               </el-form-item>
             </el-form>
           </el-tab-pane>
+
+          <el-tab-pane label="邮箱登录" name="email">
+            <el-form ref="emailLoginFormRef" :model="emailLoginForm" :rules="emailLoginRules" label-width="0">
+              <el-form-item prop="email">
+                <el-input v-model="emailLoginForm.email" placeholder="邮箱地址" size="large" clearable>
+                  <template #prefix>
+                    <el-icon>
+                      <Message />
+                    </el-icon>
+                  </template>
+                </el-input>
+              </el-form-item>
+              <el-form-item prop="code">
+                <div class="code-input-group">
+                  <el-input v-model="emailLoginForm.code" placeholder="验证码" size="large" maxlength="6" clearable
+                    @keyup.enter="handleEmailLogin">
+                    <template #prefix>
+                      <el-icon>
+                        <Message />
+                      </el-icon>
+                    </template>
+                  </el-input>
+                  <el-button :disabled="!canSendEmailCode || emailCodeSending" :loading="emailCodeSending"
+                    @click="sendEmailLoginCode">
+                    {{ emailCodeSending ? `${emailCountdown}s` : '发送验证码' }}
+                  </el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" size="large" class="login-button" :loading="loginLoading"
+                  @click="handleEmailLogin">
+                  验证码登录
+                </el-button>
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
         </el-tabs>
 
         <!-- OAuth登录 -->
@@ -193,10 +229,14 @@ const registerLoading = ref(false)
 const codeSending = ref(false)
 const countdown = ref(60)
 let countdownTimer: number | null = null
+const emailCodeSending = ref(false)
+const emailCountdown = ref(60)
+let emailCountdownTimer: number | null = null
 
 // 表单引用
 const usernameLoginFormRef = ref<FormInstance>()
 const phoneLoginFormRef = ref<FormInstance>()
+const emailLoginFormRef = ref<FormInstance>()
 const registerFormRef = ref<FormInstance>()
 
 // 用户名登录表单
@@ -208,6 +248,12 @@ const usernameLoginForm = reactive({
 // 手机号登录表单
 const phoneLoginForm = reactive({
   phone_number: '',
+  code: ''
+})
+
+// 邮箱登录表单
+const emailLoginForm = reactive({
+  email: '',
   code: ''
 })
 
@@ -234,6 +280,17 @@ const phoneLoginRules: FormRules = {
   phone_number: [
     { required: true, message: '请输入手机号', trigger: 'blur' },
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+  ],
+  code: [
+    { required: true, message: '请输入验证码', trigger: 'blur' },
+    { pattern: /^\d{6}$/, message: '验证码为6位数字', trigger: 'blur' }
+  ]
+}
+
+const emailLoginRules: FormRules = {
+  email: [
+    { required: true, message: '请输入邮箱地址', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱地址', trigger: ['blur', 'change'] }
   ],
   code: [
     { required: true, message: '请输入验证码', trigger: 'blur' },
@@ -279,6 +336,11 @@ const canSendRegisterCode = computed(() => {
   return registerForm.phone_number.length === 11
 })
 
+// 是否可以发送邮箱验证码
+const canSendEmailCode = computed(() => {
+  return emailLoginForm.email.trim().length > 0
+})
+
 // 开始倒计时
 const startCountdown = () => {
   codeSending.value = true
@@ -289,6 +351,19 @@ const startCountdown = () => {
     if (countdown.value <= 0) {
       codeSending.value = false
       if (countdownTimer) clearInterval(countdownTimer)
+    }
+  }, 1000)
+}
+
+const startEmailCountdown = () => {
+  emailCodeSending.value = true
+  emailCountdown.value = 60
+  if (emailCountdownTimer) clearInterval(emailCountdownTimer)
+  emailCountdownTimer = window.setInterval(() => {
+    emailCountdown.value--
+    if (emailCountdown.value <= 0) {
+      emailCodeSending.value = false
+      if (emailCountdownTimer) clearInterval(emailCountdownTimer)
     }
   }, 1000)
 }
@@ -323,6 +398,24 @@ const sendRegisterCode = async () => {
     if (resp.status === 200) {
       ElMessage.success('验证码已发送')
       startCountdown()
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || '发送失败')
+  }
+}
+
+// 发送邮箱登录验证码
+const sendEmailLoginCode = async () => {
+  if (!emailLoginFormRef.value) return
+  await emailLoginFormRef.value.validateField('email')
+
+  try {
+    const resp = await axios.post(apiUrl + '/auth/email/send-code/', {
+      email: emailLoginForm.email.trim()
+    })
+    if (resp.status === 200) {
+      ElMessage.success('验证码已发送')
+      startEmailCountdown()
     }
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.error || '发送失败')
@@ -449,6 +542,40 @@ const handlePhoneLoginByCode = async () => {
   }
 }
 
+// 邮箱验证码登录
+const handleEmailLogin = async () => {
+  if (!emailLoginFormRef.value) return
+  await emailLoginFormRef.value.validate()
+
+  loginLoading.value = true
+  try {
+    const res = await axios.post(apiUrl + '/auth/email/login-by-code/', {
+      email: emailLoginForm.email.trim(),
+      code: emailLoginForm.code
+    })
+
+    const { setAuthTokens } = await import('../../utils/auth')
+    setAuthTokens(
+      res.data.access,
+      res.data.refresh,
+      res.data.user.username
+    )
+
+    ElMessage.success('登录成功')
+
+    if (res.data.requires_2fa) {
+      ElMessage.info('请完成双因素认证')
+      // TODO: 跳转到2FA验证页面
+    }
+
+    router.push('/file')
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.error || '登录失败')
+  } finally {
+    loginLoading.value = false
+  }
+}
+
 // 注册
 const handleRegister = async () => {
   if (!registerFormRef.value) return
@@ -528,6 +655,7 @@ const switchToLogin = () => {
     password: '',
     email: ''
   })
+  Object.assign(emailLoginForm, { email: '', code: '' })
 }
 
 const switchToRegister = () => {
@@ -535,6 +663,7 @@ const switchToRegister = () => {
   // 清空表单
   Object.assign(usernameLoginForm, { username: '', password: '' })
   Object.assign(phoneLoginForm, { phone_number: '', code: '' })
+  Object.assign(emailLoginForm, { email: '', code: '' })
 }
 </script>
 
