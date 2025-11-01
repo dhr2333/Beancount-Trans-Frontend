@@ -1,422 +1,435 @@
 <template>
     <div class="settings-container">
-        <el-card class="settings-card" shadow="hover">
-            <template #header>
-                <div class="card-header">
-                    <h2>个人设置</h2>
-                    <el-text type="info" size="small">管理您的账户和安全设置</el-text>
-                </div>
-            </template>
-
-            <el-tabs v-model="activeTab" class="settings-tabs">
-                <!-- 账户绑定 -->
-                <el-tab-pane label="账户绑定" name="bindings">
-                    <el-card shadow="never" class="section-card">
-                        <template #header>
-                            <h3>账户绑定</h3>
-                            <el-text type="info" size="small">绑定多种登录方式，提高账户安全性</el-text>
-                        </template>
-
-                        <!-- 手机号绑定 -->
-                        <div class="binding-item">
-                            <div class="binding-info">
-                                <el-icon class="binding-icon">
-                                    <Phone />
-                                </el-icon>
-                                <div class="binding-details">
-                                    <div class="binding-label">手机号</div>
-                                    <div class="binding-value">
-                                        {{ bindings.phone_number || '未绑定' }}
-                                        <el-tag v-if="bindings.phone_verified" type="success" size="small"
-                                            style="margin-left: 8px">
-                                            已验证
-                                        </el-tag>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="binding-actions">
-                                <el-button v-if="!bindings.phone_number" type="primary"
-                                    @click="showBindPhoneDialog = true">
-                                    绑定
-                                </el-button>
-                                <el-button v-else type="danger" plain @click="handleUnbindPhone">
-                                    解绑
-                                </el-button>
-                            </div>
-                        </div>
-
-                        <!-- 邮箱绑定 -->
-                        <div class="binding-item">
-                            <div class="binding-info">
-                                <el-icon class="binding-icon">
-                                    <Message />
-                                </el-icon>
-                                <div class="binding-details">
-                                    <div class="binding-label">邮箱</div>
-                                    <div class="binding-value">
-                                        {{ bindings.email || '未绑定' }}
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="binding-actions">
-                                <el-button v-if="!bindings.email" type="primary" @click="showUpdateEmailDialog = true">
-                                    绑定
-                                </el-button>
-                                <el-button v-else type="danger" plain @click="handleUnbindEmail">
-                                    解绑
-                                </el-button>
-                            </div>
-                        </div>
-
-                        <!-- GitHub OAuth绑定 -->
-                        <div class="binding-item">
-                            <div class="binding-info">
-                                <el-icon class="binding-icon">
-                                    <svg viewBox="0 0 24 24" fill="currentColor">
-                                        <path
-                                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                                    </svg>
-                                </el-icon>
-                                <div class="binding-details">
-                                    <div class="binding-label">GitHub</div>
-                                    <div class="binding-value">
-                                        {{ getGitHubAccount() || '未绑定' }}
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="binding-actions">
-                                <el-button v-if="!getGitHubAccount()" type="primary" @click="bindGitHub">
-                                    绑定
-                                </el-button>
-                                <el-button v-else type="danger" plain @click="handleUnbindSocial('github')">
-                                    解绑
-                                </el-button>
-                            </div>
-                        </div>
-                    </el-card>
-                </el-tab-pane>
-
-                <!-- 安全设置 -->
-                <el-tab-pane label="安全设置" name="security">
-                    <!-- 用户名和密码 -->
-                    <el-card shadow="never" class="section-card">
-                        <template #header>
-                            <h3>账户安全</h3>
-                        </template>
-
-                        <div class="security-item">
-                            <div class="security-info">
-                                <el-icon class="security-icon">
-                                    <User />
-                                </el-icon>
-                                <div class="security-details">
-                                    <div class="security-label">用户名</div>
-                                    <div class="security-value">{{ bindings.username }}</div>
-                                </div>
-                            </div>
-                            <div class="security-actions">
-                                <el-button type="default" @click="showUpdateUsernameDialog = true">
-                                    修改
-                                </el-button>
-                            </div>
-                        </div>
-
-                        <div class="security-item">
-                            <div class="security-info">
-                                <el-icon class="security-icon">
-                                    <Lock />
-                                </el-icon>
-                                <div class="security-details">
-                                    <div class="security-label">密码</div>
-                                    <div class="security-value">
-                                        <el-text v-if="bindings.has_password" type="success">已设置</el-text>
-                                        <el-text v-else type="info">未设置</el-text>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="security-actions">
-                                <el-button v-if="bindings.has_password" type="default"
-                                    @click="showChangePasswordDialog = true">
-                                    修改密码
-                                </el-button>
-                                <el-button v-else type="primary" @click="showSetPasswordDialog = true">
-                                    设置密码
-                                </el-button>
-                            </div>
-                        </div>
-                    </el-card>
-
-                    <!-- 双因素认证 -->
-                    <el-card shadow="never" class="section-card">
-                        <template #header>
-                            <h3>双因素认证 (2FA)</h3>
-                            <!-- <el-text type="info" size="small">为您的账户添加额外的安全保护</el-text> -->
-                        </template>
-
-                        <!-- TOTP 2FA -->
-                        <div class="security-item">
-                            <div class="security-info">
-                                <el-icon class="security-icon">
-                                    <Lock />
-                                </el-icon>
-                                <div class="security-details">
-                                    <div class="security-label">
-                                        <strong>TOTP 认证</strong>
-                                        <el-text type="info" size="small" style="margin-left: 8px">
-                                            （使用 Google Authenticator 等应用）
-                                        </el-text>
-                                    </div>
-                                    <div class="security-value">
-                                        <el-text v-if="twoFactorStatus.totp_enabled" type="success"
-                                            size="small">已启用</el-text>
-                                        <el-text v-else type="info" size="small">未启用</el-text>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="security-actions">
-                                <el-button v-if="!twoFactorStatus.totp_enabled" type="primary"
-                                    @click="handleEnableTOTP">
-                                    启用
-                                </el-button>
-                                <el-button v-else type="danger" plain @click="handleDisableTOTP">
-                                    禁用
-                                </el-button>
-                            </div>
-                        </div>
-
-                        <!-- SMS 2FA -->
-                        <div class="security-item">
-                            <div class="security-info">
-                                <el-icon class="security-icon">
-                                    <Message />
-                                </el-icon>
-                                <div class="security-details">
-                                    <div class="security-label">
-                                        <strong>SMS 认证</strong>
-                                        <el-text type="info" size="small" style="margin-left: 8px">
-                                            （使用手机短信验证码）
-                                        </el-text>
-                                    </div>
-                                    <div class="security-value">
-                                        <el-text v-if="twoFactorStatus.sms_2fa_enabled" type="success"
-                                            size="small">已启用</el-text>
-                                        <el-text v-else type="info" size="small">未启用</el-text>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="security-actions">
-                                <el-button v-if="!twoFactorStatus.sms_2fa_enabled" type="primary"
-                                    @click="handleEnableSMS2FA">
-                                    启用
-                                </el-button>
-                                <el-button v-else type="danger" plain @click="handleDisableSMS2FA">
-                                    禁用
-                                </el-button>
-                            </div>
-                        </div>
-                    </el-card>
-
-                    <!-- 危险操作 -->
-                    <el-card shadow="never" class="section-card danger-card">
-                        <template #header>
-                            <h3>危险操作</h3>
-                        </template>
-
-                        <el-alert title="删除账户" type="error" :closable="false" show-icon>
-                            <template #default>
-                                <p>删除账户将永久删除您的所有数据，包括账单文件、账户配置、映射规则等。</p>
-                                <p><strong>此操作不可恢复！</strong></p>
-                                <el-button type="danger" @click="showDeleteAccountDialog = true"
-                                    style="margin-top: 10px">
-                                    删除账户
-                                </el-button>
-                            </template>
-                        </el-alert>
-                    </el-card>
-                </el-tab-pane>
-            </el-tabs>
-        </el-card>
-
-        <!-- 绑定手机号对话框 -->
-        <el-dialog v-model="showBindPhoneDialog" title="绑定手机号" width="400px">
-            <el-form ref="bindPhoneFormRef" :model="bindPhoneForm" :rules="bindPhoneRules">
-                <el-form-item label="手机号" prop="phone_number">
-                    <el-input v-model="bindPhoneForm.phone_number" placeholder="请输入手机号" />
-                </el-form-item>
-                <el-form-item label="验证码" prop="code">
-                    <div class="code-input-group">
-                        <el-input v-model="bindPhoneForm.code" placeholder="请输入验证码" maxlength="6" />
-                        <el-button :disabled="!canSendCode || codeSending" :loading="codeSending" @click="sendBindCode">
-                            {{ codeSending ? `${countdown}s` : '发送验证码' }}
-                        </el-button>
+        <div v-if="isAuthenticated">
+            <el-card class="settings-card" shadow="hover">
+                <template #header>
+                    <div class="card-header">
+                        <h2>个人设置</h2>
+                        <el-text type="info" size="small">管理您的账户和安全设置</el-text>
                     </div>
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <el-button @click="showBindPhoneDialog = false">取消</el-button>
-                <el-button type="primary" :loading="bindPhoneLoading" @click="handleBindPhone">确定</el-button>
-            </template>
-        </el-dialog>
+                </template>
 
-        <!-- TOTP启用对话框 -->
-        <el-dialog v-model="showTOTPDialog" title="启用TOTP双因素认证" width="500px">
-            <div v-if="totpQRCode">
-                <el-text>请使用手机应用扫描以下二维码，或手动输入密钥：</el-text>
-                <div style="text-align: center; margin: 20px 0">
-                    <img :src="totpQRCode" alt="TOTP QR Code" style="max-width: 300px" />
-                </div>
-                <el-form-item label="密钥（Secret）">
-                    <el-input v-model="totpSecret" readonly>
-                        <template #append>
-                            <el-button @click="copySecret">
-                                <el-icon>
-                                    <DocumentCopy />
-                                </el-icon>
-                                复制
-                            </el-button>
-                        </template>
-                    </el-input>
-                    <el-text type="info" size="small">如果无法扫描二维码，请手动输入此密钥</el-text>
-                </el-form-item>
-                <el-form ref="totpFormRef" :model="totpForm" :rules="totpRules">
+                <el-tabs v-model="activeTab" class="settings-tabs">
+                    <!-- 账户绑定 -->
+                    <el-tab-pane label="账户绑定" name="bindings">
+                        <el-card shadow="never" class="section-card">
+                            <template #header>
+                                <h3>账户绑定</h3>
+                                <el-text type="info" size="small">绑定多种登录方式，提高账户安全性</el-text>
+                            </template>
+
+                            <!-- 手机号绑定 -->
+                            <div class="binding-item">
+                                <div class="binding-info">
+                                    <el-icon class="binding-icon">
+                                        <Phone />
+                                    </el-icon>
+                                    <div class="binding-details">
+                                        <div class="binding-label">手机号</div>
+                                        <div class="binding-value">
+                                            {{ bindings.phone_number || '未绑定' }}
+                                            <el-tag v-if="bindings.phone_verified" type="success" size="small"
+                                                style="margin-left: 8px">
+                                                已验证
+                                            </el-tag>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="binding-actions">
+                                    <el-button v-if="!bindings.phone_number" type="primary"
+                                        @click="showBindPhoneDialog = true">
+                                        绑定
+                                    </el-button>
+                                    <el-button v-else type="danger" plain @click="handleUnbindPhone">
+                                        解绑
+                                    </el-button>
+                                </div>
+                            </div>
+
+                            <!-- 邮箱绑定 -->
+                            <div class="binding-item">
+                                <div class="binding-info">
+                                    <el-icon class="binding-icon">
+                                        <Message />
+                                    </el-icon>
+                                    <div class="binding-details">
+                                        <div class="binding-label">邮箱</div>
+                                        <div class="binding-value">
+                                            {{ bindings.email || '未绑定' }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="binding-actions">
+                                    <el-button v-if="!bindings.email" type="primary"
+                                        @click="showUpdateEmailDialog = true">
+                                        绑定
+                                    </el-button>
+                                    <el-button v-else type="danger" plain @click="handleUnbindEmail">
+                                        解绑
+                                    </el-button>
+                                </div>
+                            </div>
+
+                            <!-- GitHub OAuth绑定 -->
+                            <div class="binding-item">
+                                <div class="binding-info">
+                                    <el-icon class="binding-icon">
+                                        <svg viewBox="0 0 24 24" fill="currentColor">
+                                            <path
+                                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                                        </svg>
+                                    </el-icon>
+                                    <div class="binding-details">
+                                        <div class="binding-label">GitHub</div>
+                                        <div class="binding-value">
+                                            {{ getGitHubAccount() || '未绑定' }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="binding-actions">
+                                    <el-button v-if="!getGitHubAccount()" type="primary" @click="bindGitHub">
+                                        绑定
+                                    </el-button>
+                                    <el-button v-else type="danger" plain @click="handleUnbindSocial('github')">
+                                        解绑
+                                    </el-button>
+                                </div>
+                            </div>
+                        </el-card>
+                    </el-tab-pane>
+
+                    <!-- 安全设置 -->
+                    <el-tab-pane label="安全设置" name="security">
+                        <!-- 用户名和密码 -->
+                        <el-card shadow="never" class="section-card">
+                            <template #header>
+                                <h3>账户安全</h3>
+                            </template>
+
+                            <div class="security-item">
+                                <div class="security-info">
+                                    <el-icon class="security-icon">
+                                        <User />
+                                    </el-icon>
+                                    <div class="security-details">
+                                        <div class="security-label">用户名</div>
+                                        <div class="security-value">{{ bindings.username }}</div>
+                                    </div>
+                                </div>
+                                <div class="security-actions">
+                                    <el-button type="default" @click="showUpdateUsernameDialog = true">
+                                        修改
+                                    </el-button>
+                                </div>
+                            </div>
+
+                            <div class="security-item">
+                                <div class="security-info">
+                                    <el-icon class="security-icon">
+                                        <Lock />
+                                    </el-icon>
+                                    <div class="security-details">
+                                        <div class="security-label">密码</div>
+                                        <div class="security-value">
+                                            <el-text v-if="bindings.has_password" type="success">已设置</el-text>
+                                            <el-text v-else type="info">未设置</el-text>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="security-actions">
+                                    <el-button v-if="bindings.has_password" type="default"
+                                        @click="showChangePasswordDialog = true">
+                                        修改密码
+                                    </el-button>
+                                    <el-button v-else type="primary" @click="showSetPasswordDialog = true">
+                                        设置密码
+                                    </el-button>
+                                </div>
+                            </div>
+                        </el-card>
+
+                        <!-- 双因素认证 -->
+                        <el-card shadow="never" class="section-card">
+                            <template #header>
+                                <h3>双因素认证 (2FA)</h3>
+                                <!-- <el-text type="info" size="small">为您的账户添加额外的安全保护</el-text> -->
+                            </template>
+
+                            <!-- TOTP 2FA -->
+                            <div class="security-item">
+                                <div class="security-info">
+                                    <el-icon class="security-icon">
+                                        <Lock />
+                                    </el-icon>
+                                    <div class="security-details">
+                                        <div class="security-label">
+                                            <strong>TOTP 认证</strong>
+                                            <el-text type="info" size="small" style="margin-left: 8px">
+                                                （使用 Google Authenticator 等应用）
+                                            </el-text>
+                                        </div>
+                                        <div class="security-value">
+                                            <el-text v-if="twoFactorStatus.totp_enabled" type="success"
+                                                size="small">已启用</el-text>
+                                            <el-text v-else type="info" size="small">未启用</el-text>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="security-actions">
+                                    <el-button v-if="!twoFactorStatus.totp_enabled" type="primary"
+                                        @click="handleEnableTOTP">
+                                        启用
+                                    </el-button>
+                                    <el-button v-else type="danger" plain @click="handleDisableTOTP">
+                                        禁用
+                                    </el-button>
+                                </div>
+                            </div>
+
+                            <!-- SMS 2FA -->
+                            <div class="security-item">
+                                <div class="security-info">
+                                    <el-icon class="security-icon">
+                                        <Message />
+                                    </el-icon>
+                                    <div class="security-details">
+                                        <div class="security-label">
+                                            <strong>SMS 认证</strong>
+                                            <el-text type="info" size="small" style="margin-left: 8px">
+                                                （使用手机短信验证码）
+                                            </el-text>
+                                        </div>
+                                        <div class="security-value">
+                                            <el-text v-if="twoFactorStatus.sms_2fa_enabled" type="success"
+                                                size="small">已启用</el-text>
+                                            <el-text v-else type="info" size="small">未启用</el-text>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="security-actions">
+                                    <el-button v-if="!twoFactorStatus.sms_2fa_enabled" type="primary"
+                                        @click="handleEnableSMS2FA">
+                                        启用
+                                    </el-button>
+                                    <el-button v-else type="danger" plain @click="handleDisableSMS2FA">
+                                        禁用
+                                    </el-button>
+                                </div>
+                            </div>
+                        </el-card>
+
+                        <!-- 危险操作 -->
+                        <el-card shadow="never" class="section-card danger-card">
+                            <template #header>
+                                <h3>危险操作</h3>
+                            </template>
+
+                            <el-alert title="删除账户" type="error" :closable="false" show-icon>
+                                <template #default>
+                                    <p>删除账户将永久删除您的所有数据，包括账单文件、账户配置、映射规则等。</p>
+                                    <p><strong>此操作不可恢复！</strong></p>
+                                    <el-button type="danger" @click="showDeleteAccountDialog = true"
+                                        style="margin-top: 10px">
+                                        删除账户
+                                    </el-button>
+                                </template>
+                            </el-alert>
+                        </el-card>
+                    </el-tab-pane>
+                </el-tabs>
+            </el-card>
+
+            <!-- 绑定手机号对话框 -->
+            <el-dialog v-model="showBindPhoneDialog" title="绑定手机号" width="400px">
+                <el-form ref="bindPhoneFormRef" :model="bindPhoneForm" :rules="bindPhoneRules">
+                    <el-form-item label="手机号" prop="phone_number">
+                        <el-input v-model="bindPhoneForm.phone_number" placeholder="请输入手机号" />
+                    </el-form-item>
                     <el-form-item label="验证码" prop="code">
-                        <el-input v-model="totpForm.code" placeholder="请输入6位验证码" maxlength="6" />
+                        <div class="code-input-group">
+                            <el-input v-model="bindPhoneForm.code" placeholder="请输入验证码" maxlength="6" />
+                            <el-button :disabled="!canSendCode || codeSending" :loading="codeSending"
+                                @click="sendBindCode">
+                                {{ codeSending ? `${countdown}s` : '发送验证码' }}
+                            </el-button>
+                        </div>
                     </el-form-item>
                 </el-form>
-            </div>
-            <template #footer>
-                <el-button @click="showTOTPDialog = false">取消</el-button>
-                <el-button type="primary" :loading="totpLoading" @click="handleConfirmTOTP">确认启用</el-button>
-            </template>
-        </el-dialog>
-
-        <!-- 禁用TOTP对话框 -->
-        <el-dialog v-model="showDisableTOTPDialog" title="禁用TOTP双因素认证" width="400px">
-            <el-form ref="disableTOTPFormRef" :model="disableTOTPForm" :rules="disableTOTPRules">
-                <el-form-item label="验证码" prop="code">
-                    <el-input v-model="disableTOTPForm.code" placeholder="请输入6位验证码确认" maxlength="6" />
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <el-button @click="showDisableTOTPDialog = false">取消</el-button>
-                <el-button type="danger" :loading="disableTOTPLoading"
-                    @click="handleConfirmDisableTOTP">确认禁用</el-button>
-            </template>
-        </el-dialog>
-
-        <!-- SMS 2FA启用对话框 -->
-        <el-dialog v-model="showSMS2FADialog" title="启用SMS双因素认证" width="400px">
-            <el-form ref="sms2faFormRef" :model="sms2faForm" :rules="sms2faRules">
-                <el-form-item label="验证码" prop="code">
-                    <div class="code-input-group">
-                        <el-input v-model="sms2faForm.code" placeholder="请输入验证码" maxlength="6" />
-                        <el-button :disabled="!canSendSMS2FACode || codeSending" :loading="codeSending"
-                            @click="sendSMS2FACode">
-                            {{ codeSending ? `${countdown}s` : '发送验证码' }}
-                        </el-button>
-                    </div>
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <el-button @click="showSMS2FADialog = false">取消</el-button>
-                <el-button type="primary" :loading="sms2faLoading" @click="handleConfirmSMS2FA">确认启用</el-button>
-            </template>
-        </el-dialog>
-
-        <!-- 修改密码对话框 -->
-        <el-dialog v-model="showChangePasswordDialog" title="修改密码" width="400px">
-            <el-form ref="changePasswordFormRef" :model="changePasswordForm" :rules="changePasswordRules">
-                <el-form-item label="当前密码" prop="old_password">
-                    <el-input v-model="changePasswordForm.old_password" type="password" show-password />
-                </el-form-item>
-                <el-form-item label="新密码" prop="new_password">
-                    <el-input v-model="changePasswordForm.new_password" type="password" show-password />
-                </el-form-item>
-                <el-form-item label="确认密码" prop="confirm_password">
-                    <el-input v-model="changePasswordForm.confirm_password" type="password" show-password />
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <el-button @click="showChangePasswordDialog = false">取消</el-button>
-                <el-button type="primary" :loading="changePasswordLoading" @click="handleChangePassword">确定</el-button>
-            </template>
-        </el-dialog>
-
-        <!-- 设置密码对话框 -->
-        <el-dialog v-model="showSetPasswordDialog" title="设置密码" width="400px">
-            <el-form ref="setPasswordFormRef" :model="setPasswordForm" :rules="setPasswordRules">
-                <el-form-item label="新密码" prop="new_password">
-                    <el-input v-model="setPasswordForm.new_password" type="password" show-password />
-                </el-form-item>
-                <el-form-item label="确认密码" prop="confirm_password">
-                    <el-input v-model="setPasswordForm.confirm_password" type="password" show-password />
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <el-button @click="showSetPasswordDialog = false">取消</el-button>
-                <el-button type="primary" :loading="setPasswordLoading" @click="handleSetPassword">确定</el-button>
-            </template>
-        </el-dialog>
-
-        <!-- 修改用户名对话框 -->
-        <el-dialog v-model="showUpdateUsernameDialog" title="修改用户名" width="400px">
-            <el-form ref="updateUsernameFormRef" :model="updateUsernameForm" :rules="updateUsernameRules">
-                <el-form-item label="新用户名" prop="username">
-                    <el-input v-model="updateUsernameForm.username" />
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <el-button @click="showUpdateUsernameDialog = false">取消</el-button>
-                <el-button type="primary" :loading="updateUsernameLoading" @click="handleUpdateUsername">确定</el-button>
-            </template>
-        </el-dialog>
-
-        <!-- 绑定/修改邮箱对话框（验证码） -->
-        <el-dialog v-model="showUpdateEmailDialog" title="绑定邮箱" width="420px">
-            <el-form ref="updateEmailFormRef" :model="updateEmailForm" :rules="updateEmailRules">
-                <el-form-item label="邮箱" prop="email">
-                    <el-input v-model="updateEmailForm.email" type="email" placeholder="请输入邮箱" />
-                </el-form-item>
-                <el-form-item label="验证码" prop="code">
-                    <div class="code-input-group">
-                        <el-input v-model="updateEmailForm.code" placeholder="请输入验证码" maxlength="6" />
-                        <el-button :disabled="!updateEmailForm.email || codeSending" :loading="codeSending"
-                            @click="sendEmailBindCode">
-                            {{ codeSending ? `${countdown}s` : '发送验证码' }}
-                        </el-button>
-                    </div>
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <el-button @click="showUpdateEmailDialog = false">取消</el-button>
-                <el-button type="primary" :loading="updateEmailLoading" @click="handleConfirmBindEmail">确定</el-button>
-            </template>
-        </el-dialog>
-
-        <!-- 删除账户对话框 -->
-        <el-dialog v-model="showDeleteAccountDialog" title="删除账户" width="500px">
-            <el-alert title="警告" type="error" :closable="false" style="margin-bottom: 20px">
-                <template #default>
-                    <p>此操作将永久删除您的账户和所有相关数据，包括：</p>
-                    <ul>
-                        <li>所有账单文件</li>
-                        <li>所有账户配置</li>
-                        <li>所有映射规则</li>
-                        <li>所有模板</li>
-                    </ul>
-                    <p><strong>此操作不可恢复！</strong></p>
+                <template #footer>
+                    <el-button @click="showBindPhoneDialog = false">取消</el-button>
+                    <el-button type="primary" :loading="bindPhoneLoading" @click="handleBindPhone">确定</el-button>
                 </template>
-            </el-alert>
-            <el-form ref="deleteAccountFormRef" :model="deleteAccountForm" :rules="deleteAccountRules">
-                <el-form-item label="确认操作" prop="confirm">
-                    <el-input v-model="deleteAccountForm.confirm" placeholder="请输入 'DELETE' 确认删除" />
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <el-button @click="showDeleteAccountDialog = false">取消</el-button>
-                <el-button type="danger" :loading="deleteAccountLoading" @click="handleDeleteAccount">删除账户</el-button>
+            </el-dialog>
+
+            <!-- TOTP启用对话框 -->
+            <el-dialog v-model="showTOTPDialog" title="启用TOTP双因素认证" width="500px">
+                <div v-if="totpQRCode">
+                    <el-text>请使用手机应用扫描以下二维码，或手动输入密钥：</el-text>
+                    <div style="text-align: center; margin: 20px 0">
+                        <img :src="totpQRCode" alt="TOTP QR Code" style="max-width: 300px" />
+                    </div>
+                    <el-form-item label="密钥（Secret）">
+                        <el-input v-model="totpSecret" readonly>
+                            <template #append>
+                                <el-button @click="copySecret">
+                                    <el-icon>
+                                        <DocumentCopy />
+                                    </el-icon>
+                                    复制
+                                </el-button>
+                            </template>
+                        </el-input>
+                        <el-text type="info" size="small">如果无法扫描二维码，请手动输入此密钥</el-text>
+                    </el-form-item>
+                    <el-form ref="totpFormRef" :model="totpForm" :rules="totpRules">
+                        <el-form-item label="验证码" prop="code">
+                            <el-input v-model="totpForm.code" placeholder="请输入6位验证码" maxlength="6" />
+                        </el-form-item>
+                    </el-form>
+                </div>
+                <template #footer>
+                    <el-button @click="showTOTPDialog = false">取消</el-button>
+                    <el-button type="primary" :loading="totpLoading" @click="handleConfirmTOTP">确认启用</el-button>
+                </template>
+            </el-dialog>
+
+            <!-- 禁用TOTP对话框 -->
+            <el-dialog v-model="showDisableTOTPDialog" title="禁用TOTP双因素认证" width="400px">
+                <el-form ref="disableTOTPFormRef" :model="disableTOTPForm" :rules="disableTOTPRules">
+                    <el-form-item label="验证码" prop="code">
+                        <el-input v-model="disableTOTPForm.code" placeholder="请输入6位验证码确认" maxlength="6" />
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <el-button @click="showDisableTOTPDialog = false">取消</el-button>
+                    <el-button type="danger" :loading="disableTOTPLoading"
+                        @click="handleConfirmDisableTOTP">确认禁用</el-button>
+                </template>
+            </el-dialog>
+
+            <!-- SMS 2FA启用对话框 -->
+            <el-dialog v-model="showSMS2FADialog" title="启用SMS双因素认证" width="400px">
+                <el-form ref="sms2faFormRef" :model="sms2faForm" :rules="sms2faRules">
+                    <el-form-item label="验证码" prop="code">
+                        <div class="code-input-group">
+                            <el-input v-model="sms2faForm.code" placeholder="请输入验证码" maxlength="6" />
+                            <el-button :disabled="!canSendSMS2FACode || codeSending" :loading="codeSending"
+                                @click="sendSMS2FACode">
+                                {{ codeSending ? `${countdown}s` : '发送验证码' }}
+                            </el-button>
+                        </div>
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <el-button @click="showSMS2FADialog = false">取消</el-button>
+                    <el-button type="primary" :loading="sms2faLoading" @click="handleConfirmSMS2FA">确认启用</el-button>
+                </template>
+            </el-dialog>
+
+            <!-- 修改密码对话框 -->
+            <el-dialog v-model="showChangePasswordDialog" title="修改密码" width="400px">
+                <el-form ref="changePasswordFormRef" :model="changePasswordForm" :rules="changePasswordRules">
+                    <el-form-item label="当前密码" prop="old_password">
+                        <el-input v-model="changePasswordForm.old_password" type="password" show-password />
+                    </el-form-item>
+                    <el-form-item label="新密码" prop="new_password">
+                        <el-input v-model="changePasswordForm.new_password" type="password" show-password />
+                    </el-form-item>
+                    <el-form-item label="确认密码" prop="confirm_password">
+                        <el-input v-model="changePasswordForm.confirm_password" type="password" show-password />
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <el-button @click="showChangePasswordDialog = false">取消</el-button>
+                    <el-button type="primary" :loading="changePasswordLoading"
+                        @click="handleChangePassword">确定</el-button>
+                </template>
+            </el-dialog>
+
+            <!-- 设置密码对话框 -->
+            <el-dialog v-model="showSetPasswordDialog" title="设置密码" width="400px">
+                <el-form ref="setPasswordFormRef" :model="setPasswordForm" :rules="setPasswordRules">
+                    <el-form-item label="新密码" prop="new_password">
+                        <el-input v-model="setPasswordForm.new_password" type="password" show-password />
+                    </el-form-item>
+                    <el-form-item label="确认密码" prop="confirm_password">
+                        <el-input v-model="setPasswordForm.confirm_password" type="password" show-password />
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <el-button @click="showSetPasswordDialog = false">取消</el-button>
+                    <el-button type="primary" :loading="setPasswordLoading" @click="handleSetPassword">确定</el-button>
+                </template>
+            </el-dialog>
+
+            <!-- 修改用户名对话框 -->
+            <el-dialog v-model="showUpdateUsernameDialog" title="修改用户名" width="400px">
+                <el-form ref="updateUsernameFormRef" :model="updateUsernameForm" :rules="updateUsernameRules">
+                    <el-form-item label="新用户名" prop="username">
+                        <el-input v-model="updateUsernameForm.username" />
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <el-button @click="showUpdateUsernameDialog = false">取消</el-button>
+                    <el-button type="primary" :loading="updateUsernameLoading"
+                        @click="handleUpdateUsername">确定</el-button>
+                </template>
+            </el-dialog>
+
+            <!-- 绑定/修改邮箱对话框（验证码） -->
+            <el-dialog v-model="showUpdateEmailDialog" title="绑定邮箱" width="420px">
+                <el-form ref="updateEmailFormRef" :model="updateEmailForm" :rules="updateEmailRules">
+                    <el-form-item label="邮箱" prop="email">
+                        <el-input v-model="updateEmailForm.email" type="email" placeholder="请输入邮箱" />
+                    </el-form-item>
+                    <el-form-item label="验证码" prop="code">
+                        <div class="code-input-group">
+                            <el-input v-model="updateEmailForm.code" placeholder="请输入验证码" maxlength="6" />
+                            <el-button :disabled="!updateEmailForm.email || codeSending" :loading="codeSending"
+                                @click="sendEmailBindCode">
+                                {{ codeSending ? `${countdown}s` : '发送验证码' }}
+                            </el-button>
+                        </div>
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <el-button @click="showUpdateEmailDialog = false">取消</el-button>
+                    <el-button type="primary" :loading="updateEmailLoading"
+                        @click="handleConfirmBindEmail">确定</el-button>
+                </template>
+            </el-dialog>
+
+            <!-- 删除账户对话框 -->
+            <el-dialog v-model="showDeleteAccountDialog" title="删除账户" width="500px">
+                <el-alert title="警告" type="error" :closable="false" style="margin-bottom: 20px">
+                    <template #default>
+                        <p>此操作将永久删除您的账户和所有相关数据，包括：</p>
+                        <ul>
+                            <li>所有账单文件</li>
+                            <li>所有账户配置</li>
+                            <li>所有映射规则</li>
+                            <li>所有模板</li>
+                        </ul>
+                        <p><strong>此操作不可恢复！</strong></p>
+                    </template>
+                </el-alert>
+                <el-form ref="deleteAccountFormRef" :model="deleteAccountForm" :rules="deleteAccountRules">
+                    <el-form-item label="确认操作" prop="confirm">
+                        <el-input v-model="deleteAccountForm.confirm" placeholder="请输入 'DELETE' 确认删除" />
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <el-button @click="showDeleteAccountDialog = false">取消</el-button>
+                    <el-button type="danger" :loading="deleteAccountLoading"
+                        @click="handleDeleteAccount">删除账户</el-button>
+                </template>
+            </el-dialog>
+        </div>
+        <el-result v-else icon="warning" title="请先登录" sub-title="登录后即可查看和调整个人设置" class="auth-required-result">
+            <template #extra>
+                <el-button type="primary" @click="goToLogin">前往登录</el-button>
             </template>
-        </el-dialog>
+        </el-result>
     </div>
 </template>
 
@@ -426,9 +439,25 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { User, Phone, Message, Lock, DocumentCopy } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
+import { hasAuthTokens } from '../../utils/auth'
 import router from '~/routers'
 
 const apiUrl = import.meta.env.VITE_API_URL
+
+const isAuthenticated = ref(hasAuthTokens())
+const unauthorizedNotified = ref(false)
+
+const handleUnauthorized = () => {
+    if (!unauthorizedNotified.value) {
+        ElMessage.warning('请登录后访问个人设置')
+        unauthorizedNotified.value = true
+    }
+    isAuthenticated.value = false
+}
+
+const goToLogin = () => {
+    router.push('/login')
+}
 
 const activeTab = ref('bindings')
 const showBindPhoneDialog = ref(false)
@@ -672,7 +701,11 @@ const fetchBindings = async () => {
         updateUsernameForm.username = res.data.username || ''
         updateEmailForm.email = res.data.email || ''
     } catch (error: any) {
-        ElMessage.error('获取绑定信息失败')
+        if (error?.response?.status === 401) {
+            handleUnauthorized()
+        } else {
+            ElMessage.error('获取绑定信息失败')
+        }
     }
 }
 
@@ -682,7 +715,11 @@ const fetch2FAStatus = async () => {
         const res = await axios.get(apiUrl + '/auth/2fa/status/')
         twoFactorStatus.value = res.data
     } catch (error: any) {
-        ElMessage.error('获取2FA状态失败')
+        if (error?.response?.status === 401) {
+            handleUnauthorized()
+        } else {
+            ElMessage.error('获取2FA状态失败')
+        }
     }
 }
 
@@ -1093,6 +1130,10 @@ const handleDisableSMS2FA = async () => {
 }
 
 onMounted(() => {
+    if (!isAuthenticated.value) {
+        handleUnauthorized()
+        return
+    }
     fetchBindings()
     fetch2FAStatus()
 })
@@ -1196,5 +1237,10 @@ onMounted(() => {
 
 :deep(.el-form-item) {
     margin-bottom: 20px;
+}
+
+.auth-required-result {
+    margin: 80px auto 0;
+    max-width: 420px;
 }
 </style>
