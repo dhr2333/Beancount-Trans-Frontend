@@ -19,6 +19,8 @@ import "uno.css";
 
 // If you want to use ElMessage, import it.
 import "element-plus/theme-chalk/src/message.scss";
+import "element-plus/theme-chalk/src/message-box.scss";
+import "element-plus/theme-chalk/src/overlay.scss";
 
 const app = createApp(App);
 // app.config.globalProperties.$baseUrl = 'http://127.0.0.1:38001'
