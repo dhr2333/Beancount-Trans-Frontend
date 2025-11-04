@@ -294,22 +294,6 @@
                 </template>
             </el-dialog>
 
-            <!-- 设置密码对话框 -->
-            <el-dialog v-model="showSetPasswordDialog" title="设置密码" width="400px">
-                <el-form ref="setPasswordFormRef" :model="setPasswordForm" :rules="setPasswordRules">
-                    <el-form-item label="新密码" prop="new_password">
-                        <el-input v-model="setPasswordForm.new_password" type="password" show-password />
-                    </el-form-item>
-                    <el-form-item label="确认密码" prop="confirm_password">
-                        <el-input v-model="setPasswordForm.confirm_password" type="password" show-password />
-                    </el-form-item>
-                </el-form>
-                <template #footer>
-                    <el-button @click="showSetPasswordDialog = false">取消</el-button>
-                    <el-button type="primary" :loading="setPasswordLoading" @click="handleSetPassword">确定</el-button>
-                </template>
-            </el-dialog>
-
             <!-- 修改用户名对话框 -->
             <el-dialog v-model="showUpdateUsernameDialog" title="修改用户名" width="400px">
                 <el-form ref="updateUsernameFormRef" :model="updateUsernameForm" :rules="updateUsernameRules">
@@ -889,27 +873,6 @@ const handleChangePassword = async () => {
         ElMessage.error(error.response?.data?.error || '修改失败')
     } finally {
         changePasswordLoading.value = false
-    }
-}
-
-// 设置密码
-const handleSetPassword = async () => {
-    if (!setPasswordFormRef.value) return
-    await setPasswordFormRef.value.validate()
-
-    setPasswordLoading.value = true
-    try {
-        await axios.post(apiUrl + '/auth/profile/set_password/', {
-            new_password: setPasswordForm.new_password
-        })
-        ElMessage.success('密码设置成功')
-        showSetPasswordDialog.value = false
-        Object.assign(setPasswordForm, { new_password: '', confirm_password: '' })
-        await fetchBindings()
-    } catch (error: any) {
-        ElMessage.error(error.response?.data?.error || '设置失败')
-    } finally {
-        setPasswordLoading.value = false
     }
 }
 
