@@ -15,7 +15,7 @@
                         <el-card shadow="never" class="section-card">
                             <template #header>
                                 <h3>账户绑定</h3>
-                                <el-text type="info" size="small">绑定多种登录方式，提高账户安全性</el-text>
+                                <!-- <el-text type="info" size="small">绑定多种登录方式，提高账户安全性</el-text> -->
                             </template>
 
                             <!-- 手机号绑定 -->

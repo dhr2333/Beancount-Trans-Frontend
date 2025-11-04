@@ -528,18 +528,12 @@ const handleUsernameLogin = async () => {
       ElMessage.success('登录成功')
 
       // 检查手机号绑定状态
-      try {
-        await axios.get(apiUrl + '/auth/profile/me/', {
-          headers: { Authorization: `Bearer ${res.data.access}` }
-        })
+      if (!res.data.user.phone_number) {
+        // 未绑定手机号，跳转到手机号绑定页面
+        ElMessage.warning('请先绑定手机号')
+        router.push('/phone-binding')
+      } else {
         router.push('/file')
-      } catch (profileError: any) {
-        if (profileError.response?.status === 403 && profileError.response?.data?.code === 'PHONE_NUMBER_REQUIRED') {
-          ElMessage.warning('请先绑定手机号')
-          router.push('/phone-binding')
-        } else {
-          router.push('/file')
-        }
       }
     }
   } catch (error: any) {
