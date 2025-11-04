@@ -92,7 +92,7 @@
           <el-tab-pane label="邮箱登录" name="email">
             <el-form ref="emailLoginFormRef" :model="emailLoginForm" :rules="emailLoginRules" label-width="0">
               <el-form-item prop="email">
-                <el-input v-model="emailLoginForm.email" placeholder="邮箱地址" size="large" clearable>
+                <el-input v-model="emailLoginForm.email" placeholder="邮箱" size="large" clearable>
                   <template #prefix>
                     <el-icon>
                       <Message />

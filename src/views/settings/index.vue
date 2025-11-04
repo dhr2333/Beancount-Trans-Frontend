@@ -146,16 +146,8 @@
                                     </el-button>
                                 </div>
                             </div>
-                        </el-card>
 
-                        <!-- 双因素认证 -->
-                        <el-card shadow="never" class="section-card">
-                            <template #header>
-                                <h3>双因素认证 (2FA)</h3>
-                                <!-- <el-text type="info" size="small">为您的账户添加额外的安全保护</el-text> -->
-                            </template>
-
-                            <!-- TOTP 2FA -->
+                            <!-- TOTP 认证 -->
                             <div class="security-item">
                                 <div class="security-info">
                                     <el-icon class="security-icon">
@@ -181,37 +173,6 @@
                                         启用
                                     </el-button>
                                     <el-button v-else type="danger" plain @click="handleDisableTOTP">
-                                        禁用
-                                    </el-button>
-                                </div>
-                            </div>
-
-                            <!-- SMS 2FA -->
-                            <div class="security-item">
-                                <div class="security-info">
-                                    <el-icon class="security-icon">
-                                        <Message />
-                                    </el-icon>
-                                    <div class="security-details">
-                                        <div class="security-label">
-                                            <strong>SMS 认证</strong>
-                                            <el-text type="info" size="small" style="margin-left: 8px">
-                                                （使用手机短信验证码）
-                                            </el-text>
-                                        </div>
-                                        <div class="security-value">
-                                            <el-text v-if="twoFactorStatus.sms_2fa_enabled" type="success"
-                                                size="small">已启用</el-text>
-                                            <el-text v-else type="info" size="small">未启用</el-text>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="security-actions">
-                                    <el-button v-if="!twoFactorStatus.sms_2fa_enabled" type="primary"
-                                        @click="handleEnableSMS2FA">
-                                        启用
-                                    </el-button>
-                                    <el-button v-else type="danger" plain @click="handleDisableSMS2FA">
                                         禁用
                                     </el-button>
                                 </div>
@@ -310,25 +271,6 @@
                     <el-button @click="showDisableTOTPDialog = false">取消</el-button>
                     <el-button type="danger" :loading="disableTOTPLoading"
                         @click="handleConfirmDisableTOTP">确认禁用</el-button>
-                </template>
-            </el-dialog>
-
-            <!-- SMS 2FA启用对话框 -->
-            <el-dialog v-model="showSMS2FADialog" title="启用SMS双因素认证" width="400px">
-                <el-form ref="sms2faFormRef" :model="sms2faForm" :rules="sms2faRules">
-                    <el-form-item label="验证码" prop="code">
-                        <div class="code-input-group">
-                            <el-input v-model="sms2faForm.code" placeholder="请输入验证码" maxlength="6" />
-                            <el-button :disabled="!canSendSMS2FACode || codeSending" :loading="codeSending"
-                                @click="sendSMS2FACode">
-                                {{ codeSending ? `${countdown}s` : '发送验证码' }}
-                            </el-button>
-                        </div>
-                    </el-form-item>
-                </el-form>
-                <template #footer>
-                    <el-button @click="showSMS2FADialog = false">取消</el-button>
-                    <el-button type="primary" :loading="sms2faLoading" @click="handleConfirmSMS2FA">确认启用</el-button>
                 </template>
             </el-dialog>
 
@@ -480,7 +422,6 @@ const showChangePasswordDialog = ref(false)
 const showSetPasswordDialog = ref(false)
 const showTOTPDialog = ref(false)
 const showDisableTOTPDialog = ref(false)
-const showSMS2FADialog = ref(false)
 const showUpdateUsernameDialog = ref(false)
 const showUpdateEmailDialog = ref(false)
 const showDeleteAccountDialog = ref(false)
@@ -506,14 +447,12 @@ const bindings = ref<any>({
 
 const twoFactorStatus = ref({
     totp_enabled: false,
-    sms_2fa_enabled: false,
     has_2fa: false
 })
 
 const bindPhoneFormRef = ref<FormInstance>()
 const totpFormRef = ref<FormInstance>()
 const disableTOTPFormRef = ref<FormInstance>()
-const sms2faFormRef = ref<FormInstance>()
 const changePasswordFormRef = ref<FormInstance>()
 const setPasswordFormRef = ref<FormInstance>()
 const updateUsernameFormRef = ref<FormInstance>()
@@ -530,10 +469,6 @@ const totpForm = reactive({
 })
 
 const disableTOTPForm = reactive({
-    code: ''
-})
-
-const sms2faForm = reactive({
     code: ''
 })
 
@@ -572,7 +507,6 @@ let countdownTimer: number | null = null
 const bindPhoneLoading = ref(false)
 const totpLoading = ref(false)
 const disableTOTPLoading = ref(false)
-const sms2faLoading = ref(false)
 const changePasswordLoading = ref(false)
 const setPasswordLoading = ref(false)
 const updateUsernameLoading = ref(false)
@@ -639,13 +573,6 @@ const disableTOTPRules: FormRules = {
     ]
 }
 
-const sms2faRules: FormRules = {
-    code: [
-        { required: true, message: '请输入验证码', trigger: 'blur' },
-        { pattern: /^\d{6}$/, message: '验证码为6位数字', trigger: 'blur' }
-    ]
-}
-
 const changePasswordRules: FormRules = {
     old_password: [
         { required: true, message: '请输入当前密码', trigger: 'blur' }
@@ -691,10 +618,6 @@ const setPasswordRules: FormRules = {
 
 const canSendCode = computed(() => {
     return bindPhoneForm.phone_number.length === 11
-})
-
-const canSendSMS2FACode = computed(() => {
-    return bindings.value.phone_number && bindings.value.phone_verified
 })
 
 const canSubmitDeleteAccount = computed(() => {
@@ -1108,67 +1031,6 @@ const handleConfirmDisableTOTP = async () => {
         ElMessage.error(error.response?.data?.error || '禁用失败')
     } finally {
         disableTOTPLoading.value = false
-    }
-}
-
-// 启用SMS 2FA
-const handleEnableSMS2FA = () => {
-    if (!bindings.value.phone_number || !bindings.value.phone_verified) {
-        ElMessage.warning('请先绑定并验证手机号')
-        return
-    }
-    showSMS2FADialog.value = true
-}
-
-// 发送SMS 2FA验证码
-const sendSMS2FACode = async () => {
-    try {
-        const resp = await axios.post(apiUrl + '/auth/phone/send-code/', {
-            phone_number: normalizePhone(bindings.value.phone_number)
-        })
-        if (resp.status === 200) {
-            ElMessage.success('验证码已发送')
-            startCountdown()
-        }
-    } catch (e: any) {
-        ElMessage.error(e?.response?.data?.error || '发送失败')
-    }
-}
-
-// 确认启用SMS 2FA
-const handleConfirmSMS2FA = async () => {
-    if (!sms2faFormRef.value) return
-    await sms2faFormRef.value.validate()
-
-    sms2faLoading.value = true
-    try {
-        await axios.post(apiUrl + '/auth/2fa/sms/enable/', {
-            code: sms2faForm.code
-        })
-        ElMessage.success('SMS 2FA已启用')
-        showSMS2FADialog.value = false
-        Object.assign(sms2faForm, { code: '' })
-        await fetch2FAStatus()
-    } catch (error: any) {
-        ElMessage.error(error.response?.data?.error || '启用失败')
-    } finally {
-        sms2faLoading.value = false
-    }
-}
-
-// 禁用SMS 2FA
-const handleDisableSMS2FA = async () => {
-    try {
-        await ElMessageBox.confirm('确定要禁用SMS双因素认证吗？', '提示', {
-            ...defaultConfirmOptions
-        })
-        await axios.post(apiUrl + '/auth/2fa/sms/disable/')
-        ElMessage.success('SMS 2FA已禁用')
-        await fetch2FAStatus()
-    } catch (error: any) {
-        if (error !== 'cancel') {
-            ElMessage.error(error.response?.data?.error || '禁用失败')
-        }
     }
 }
 
