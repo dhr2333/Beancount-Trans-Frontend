@@ -13,7 +13,7 @@ const refreshToken = async () => {
     }
 
     try {
-        const refreshRes = await axios.post(apiUrl + '/token/refresh/', { 
+        const refreshRes = await axios.post(apiUrl + '/auth/token/refresh/', { 
             "refresh": refresh 
         });
         
