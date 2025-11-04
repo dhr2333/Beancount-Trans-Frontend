@@ -36,6 +36,16 @@
                 </el-input>
               </el-form-item>
               <el-form-item>
+                <el-input v-model="usernameLoginForm.totp_code" placeholder="TOTP验证码（未设置可忽略）" size="large" maxlength="6"
+                  clearable @keyup.enter="handleUsernameLogin">
+                  <template #prefix>
+                    <el-icon>
+                      <Message />
+                    </el-icon>
+                  </template>
+                </el-input>
+              </el-form-item>
+              <el-form-item>
                 <el-button type="primary" size="large" class="login-button" :loading="loginLoading"
                   @click="handleUsernameLogin">
                   登录
@@ -242,7 +252,8 @@ const registerFormRef = ref<FormInstance>()
 // 用户名登录表单
 const usernameLoginForm = reactive({
   username: '',
-  password: ''
+  password: '',
+  totp_code: ''
 })
 
 // 手机号登录表单
@@ -455,25 +466,57 @@ const isPhoneNumber = (input: string): boolean => {
   return /^1[3-9]\d{9}$/.test(input.trim())
 }
 
-// 账密登录（支持用户名/手机号+密码）
+// 判断输入是否为邮箱
+const isEmail = (input: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.trim())
+}
+
+// 账密登录（支持用户名/手机号/邮箱+密码+TOTP）
 const handleUsernameLogin = async () => {
   if (!usernameLoginFormRef.value) return
   await usernameLoginFormRef.value.validate()
 
   loginLoading.value = true
 
-  // 判断输入的是手机号还是用户名
+  // 判断输入的是手机号、邮箱还是用户名
   const isPhone = isPhoneNumber(usernameLoginForm.username)
+  const isEmailAddr = isEmail(usernameLoginForm.username)
 
   try {
     let res: any
 
     if (isPhone) {
-      // 手机号+密码登录
-      res = await axios.post(apiUrl + '/auth/phone/login-by-password/', {
+      // 手机号+密码登录（支持TOTP）
+      const payload: any = {
         phone_number: normalizePhone(usernameLoginForm.username),
         password: usernameLoginForm.password
-      })
+      }
+      if (usernameLoginForm.totp_code) {
+        payload.totp_code = usernameLoginForm.totp_code
+      }
+
+      res = await axios.post(apiUrl + '/auth/phone/login-by-password/', payload)
+
+      const { setAuthTokens } = await import('../../utils/auth')
+      setAuthTokens(
+        res.data.access,
+        res.data.refresh,
+        res.data.user.username
+      )
+
+      ElMessage.success('登录成功')
+      router.push('/file')
+    } else {
+      // 用户名/邮箱+密码登录（支持TOTP）
+      const payload: any = {
+        username: usernameLoginForm.username,
+        password: usernameLoginForm.password
+      }
+      if (usernameLoginForm.totp_code) {
+        payload.totp_code = usernameLoginForm.totp_code
+      }
+
+      res = await axios.post(apiUrl + '/auth/username/login-by-password/', payload)
 
       const { setAuthTokens } = await import('../../utils/auth')
       setAuthTokens(
@@ -484,33 +527,10 @@ const handleUsernameLogin = async () => {
 
       ElMessage.success('登录成功')
 
-      // 检查是否需要2FA
-      if (res.data.requires_2fa) {
-        ElMessage.info('请完成双因素认证')
-        // TODO: 跳转到2FA验证页面
-      }
-
-      router.push('/file')
-    } else {
-      // 用户名+密码登录
-      res = await axios.post(apiUrl + '/_allauth/app/v1/auth/login', {
-        username: usernameLoginForm.username,
-        password: usernameLoginForm.password
-      })
-
-      const { setAuthTokens } = await import('../../utils/auth')
-      setAuthTokens(
-        res.data.meta.access_token,
-        res.data.meta.refresh_token,
-        res.data.data.user.username
-      )
-
-      ElMessage.success('登录成功')
-
       // 检查手机号绑定状态
       try {
         await axios.get(apiUrl + '/auth/profile/me/', {
-          headers: { Authorization: `Bearer ${res.data.meta.access_token}` }
+          headers: { Authorization: `Bearer ${res.data.access}` }
         })
         router.push('/file')
       } catch (profileError: any) {
@@ -526,6 +546,8 @@ const handleUsernameLogin = async () => {
     if (error.response?.status === 403 && error.response?.data?.code === 'PHONE_NUMBER_REQUIRED') {
       ElMessage.warning('请先绑定手机号')
       router.push('/phone-binding')
+    } else if (error.response?.data?.requires_totp) {
+      ElMessage.warning(error.response?.data?.error || '该账户已启用TOTP二次验证，请输入TOTP验证码')
     } else {
       ElMessage.error(error.response?.data?.error || error.response?.data?.message || '登录失败')
     }
@@ -557,10 +579,10 @@ const handlePhoneLoginByCode = async () => {
     ElMessage.success('登录成功')
 
     // 检查是否需要2FA
-    if (res.data.requires_2fa) {
-      ElMessage.info('请完成双因素认证')
-      // TODO: 跳转到2FA验证页面
-    }
+    // if (res.data.requires_2fa) {
+    //   ElMessage.info('请完成双因素认证')
+    //   // TODO: 跳转到2FA验证页面
+    // }
 
     router.push('/file')
   } catch (error: any) {
@@ -591,10 +613,10 @@ const handleEmailLogin = async () => {
 
     ElMessage.success('登录成功')
 
-    if (res.data.requires_2fa) {
-      ElMessage.info('请完成双因素认证')
-      // TODO: 跳转到2FA验证页面
-    }
+    // if (res.data.requires_2fa) {
+    //   ElMessage.info('请完成双因素认证')
+    //   // TODO: 跳转到2FA验证页面
+    // }
 
     router.push('/file')
   } catch (error: any) {
@@ -697,13 +719,14 @@ const switchToLogin = () => {
     password: '',
     email: ''
   })
+  Object.assign(usernameLoginForm, { username: '', password: '', totp_code: '' })
   Object.assign(emailLoginForm, { email: '', code: '' })
 }
 
 const switchToRegister = () => {
   isLogin.value = false
   // 清空表单
-  Object.assign(usernameLoginForm, { username: '', password: '' })
+  Object.assign(usernameLoginForm, { username: '', password: '', totp_code: '' })
   Object.assign(phoneLoginForm, { phone_number: '', code: '' })
   Object.assign(emailLoginForm, { email: '', code: '' })
   Object.assign(registerForm, { phone_number: '', code: '', username: '', password: '', email: '' })
