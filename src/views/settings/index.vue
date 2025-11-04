@@ -137,12 +137,9 @@
                                     </div>
                                 </div>
                                 <div class="security-actions">
-                                    <el-button v-if="bindings.has_password" type="default"
-                                        @click="showChangePasswordDialog = true">
-                                        修改密码
-                                    </el-button>
-                                    <el-button v-else type="primary" @click="showSetPasswordDialog = true">
-                                        设置密码
+                                    <el-button :type="bindings.has_password ? 'default' : 'primary'"
+                                        @click="showSetPasswordDialog = true">
+                                        重置
                                     </el-button>
                                 </div>
                             </div>
@@ -274,23 +271,19 @@
                 </template>
             </el-dialog>
 
-            <!-- 修改密码对话框 -->
-            <el-dialog v-model="showChangePasswordDialog" title="修改密码" width="400px">
-                <el-form ref="changePasswordFormRef" :model="changePasswordForm" :rules="changePasswordRules">
-                    <el-form-item label="当前密码" prop="old_password">
-                        <el-input v-model="changePasswordForm.old_password" type="password" show-password />
-                    </el-form-item>
+            <!-- 设置密码对话框 -->
+            <el-dialog v-model="showSetPasswordDialog" title="设置密码" width="400px">
+                <el-form ref="setPasswordFormRef" :model="setPasswordForm" :rules="setPasswordRules">
                     <el-form-item label="新密码" prop="new_password">
-                        <el-input v-model="changePasswordForm.new_password" type="password" show-password />
+                        <el-input v-model="setPasswordForm.new_password" type="password" show-password />
                     </el-form-item>
                     <el-form-item label="确认密码" prop="confirm_password">
-                        <el-input v-model="changePasswordForm.confirm_password" type="password" show-password />
+                        <el-input v-model="setPasswordForm.confirm_password" type="password" show-password />
                     </el-form-item>
                 </el-form>
                 <template #footer>
-                    <el-button @click="showChangePasswordDialog = false">取消</el-button>
-                    <el-button type="primary" :loading="changePasswordLoading"
-                        @click="handleChangePassword">确定</el-button>
+                    <el-button @click="showSetPasswordDialog = false">取消</el-button>
+                    <el-button type="primary" :loading="setPasswordLoading" @click="handleSetPassword">确定</el-button>
                 </template>
             </el-dialog>
 
@@ -402,7 +395,6 @@ const goToLogin = () => {
 
 const activeTab = ref('bindings')
 const showBindPhoneDialog = ref(false)
-const showChangePasswordDialog = ref(false)
 const showSetPasswordDialog = ref(false)
 const showTOTPDialog = ref(false)
 const showDisableTOTPDialog = ref(false)
@@ -437,7 +429,6 @@ const twoFactorStatus = ref({
 const bindPhoneFormRef = ref<FormInstance>()
 const totpFormRef = ref<FormInstance>()
 const disableTOTPFormRef = ref<FormInstance>()
-const changePasswordFormRef = ref<FormInstance>()
 const setPasswordFormRef = ref<FormInstance>()
 const updateUsernameFormRef = ref<FormInstance>()
 const updateEmailFormRef = ref<FormInstance>()
@@ -454,12 +445,6 @@ const totpForm = reactive({
 
 const disableTOTPForm = reactive({
     code: ''
-})
-
-const changePasswordForm = reactive({
-    old_password: '',
-    new_password: '',
-    confirm_password: ''
 })
 
 const setPasswordForm = reactive({
@@ -491,7 +476,6 @@ let countdownTimer: number | null = null
 const bindPhoneLoading = ref(false)
 const totpLoading = ref(false)
 const disableTOTPLoading = ref(false)
-const changePasswordLoading = ref(false)
 const setPasswordLoading = ref(false)
 const updateUsernameLoading = ref(false)
 const updateEmailLoading = ref(false)
@@ -554,29 +538,6 @@ const disableTOTPRules: FormRules = {
     code: [
         { required: true, message: '请输入验证码', trigger: 'blur' },
         { pattern: /^\d{6}$/, message: '验证码为6位数字', trigger: 'blur' }
-    ]
-}
-
-const changePasswordRules: FormRules = {
-    old_password: [
-        { required: true, message: '请输入当前密码', trigger: 'blur' }
-    ],
-    new_password: [
-        { required: true, message: '请输入新密码', trigger: 'blur' },
-        { min: 8, message: '密码长度至少8个字符', trigger: 'blur' }
-    ],
-    confirm_password: [
-        { required: true, message: '请确认密码', trigger: 'blur' },
-        {
-            validator: (rule, value, callback) => {
-                if (value !== changePasswordForm.new_password) {
-                    callback(new Error('两次输入的密码不一致'))
-                } else {
-                    callback()
-                }
-            },
-            trigger: 'blur'
-        }
     ]
 }
 
@@ -854,25 +815,24 @@ const handleUnbindEmail = async () => {
     }
 }
 
-// 修改密码
-const handleChangePassword = async () => {
-    if (!changePasswordFormRef.value) return
-    await changePasswordFormRef.value.validate()
+// 设置密码
+const handleSetPassword = async () => {
+    if (!setPasswordFormRef.value) return
+    await setPasswordFormRef.value.validate()
 
-    changePasswordLoading.value = true
+    setPasswordLoading.value = true
     try {
-        await axios.post(apiUrl + '/auth/profile/change_password/', {
-            old_password: changePasswordForm.old_password,
-            new_password: changePasswordForm.new_password
+        await axios.post(apiUrl + '/auth/profile/set_password/', {
+            new_password: setPasswordForm.new_password
         })
-        ElMessage.success('密码修改成功')
-        showChangePasswordDialog.value = false
-        Object.assign(changePasswordForm, { old_password: '', new_password: '', confirm_password: '' })
+        ElMessage.success('密码设置成功')
+        showSetPasswordDialog.value = false
+        Object.assign(setPasswordForm, { new_password: '', confirm_password: '' })
         await fetchBindings()
     } catch (error: any) {
-        ElMessage.error(error.response?.data?.error || '修改失败')
+        ElMessage.error(error.response?.data?.error || '设置失败')
     } finally {
-        changePasswordLoading.value = false
+        setPasswordLoading.value = false
     }
 }
 
