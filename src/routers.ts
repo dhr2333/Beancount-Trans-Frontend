@@ -7,8 +7,6 @@ import FileManage from "./components/file/FileManage.vue"
 import AccountManagement from "./components/config/AccountManagement.vue"
 import TagManagement from "./components/config/TagManagement.vue"
 import MappingManagement from "./components/map/MappingManagement.vue"
-import ApiTest from "./components/debug/ApiTest.vue"
-import AccountSelectorTest from "./components/debug/AccountSelectorTest.vue"
 import Login from "./views/login/index.vue"
 import PhoneBinding from "./views/phone-binding/index.vue"
 import Settings from "./views/settings/index.vue"
@@ -34,8 +32,6 @@ const router = createRouter({
     // 模板管理
     { path: '/template/accounts', name: "accountTemplates", component: AccountTemplates },
     { path: '/template/mappings', name: "mappingTemplates", component: MappingTemplates },
-    { path: '/debug/api', name: "apiTest", component: ApiTest },
-    { path: '/debug/account-selector', name: "accountSelectorTest", component: AccountSelectorTest },
     { path: '/login', name: "login", component: Login },
     { path: '/phone-binding', name: "phoneBinding", component: PhoneBinding },
     { path: '/oauth/phone-register', name: 'oauthPhoneRegister', component: OAuthPhoneRegister },
