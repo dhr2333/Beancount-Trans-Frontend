@@ -10,7 +10,7 @@ const handleRefresh = async () => {
     }
 
     try {
-        const refreshRes = await axios.post(apiUrl + '/api/auth/token/refresh/', { 
+        const refreshRes = await axios.post(apiUrl + '/auth/token/refresh/', { 
             "refresh": refresh 
         });
 

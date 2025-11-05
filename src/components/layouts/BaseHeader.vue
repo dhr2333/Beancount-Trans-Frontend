@@ -123,6 +123,9 @@
       <el-menu-item>
         <a href="https://trans.dhr2333.cn/docs/quick-start" class="help-link" target="_blank">用户手册</a>
       </el-menu-item>
+      <router-link to="/settings" class="no-underline">
+        <el-menu-item index="/settings">个人设置</el-menu-item>
+      </router-link>
       <el-menu-item index="logout" @click="cleanToken">退出登录</el-menu-item>
     </el-sub-menu>
   </el-menu>
@@ -139,17 +142,6 @@ const username = ref(localStorage.getItem("username") || "未登录");
 
 // 获取 API 基础 URL
 const apiUrl = import.meta.env.VITE_API_URL;
-
-// 定义验证令牌的函数
-const verifyToken = async (token: string): Promise<boolean> => {
-  try {
-    const res = await axios.post(`${apiUrl}/auth/token/verify/`, { token });
-    return res.status === 200;
-  } catch (error) {
-    console.error('Token 验证失败:', error);
-    return false;
-  }
-};
 
 // 定义清除令牌并退出登录的函数
 const cleanToken = async () => {
@@ -213,17 +205,13 @@ const openExternal = (url: string) => {
   window.open(url, '_blank', 'noopener,noreferrer');
 };
 
-// 在组件挂载时验证令牌
+// 在组件挂载时检查令牌
 onMounted(async () => {
   const accessToken = localStorage.getItem("access");
   if (accessToken) {
-    const isValid = await verifyToken(accessToken);
-    if (!isValid) {
-      cleanToken();
-    } else {
-      // 如果令牌有效，确保用户名显示正确
-      username.value = localStorage.getItem("username") || "未登录";
-    }
+    // 简单检查令牌是否存在，不再验证有效性
+    // JWT 令牌的有效性会在 API 调用时自动验证
+    username.value = localStorage.getItem("username") || "未登录";
   } else {
     username.value = "未登录";
   }
@@ -263,7 +251,7 @@ const openFavaInstance = async () => {
 
   try {
     const response = await axios.get('fava/', {
-      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem('access')}` },
       withCredentials: true,
       // maxRedirects: 5,
     });
