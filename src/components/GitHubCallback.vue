@@ -24,7 +24,7 @@ onMounted(async () => {
         const data = response.data;
 
         if (data.access) {
-            const { setAuthTokens } = await import('@/utils/auth');
+            const { setAuthTokens } = await import('../utils/auth');
             setAuthTokens(data.access, data.refresh || '', data.username || '');
         }
 
