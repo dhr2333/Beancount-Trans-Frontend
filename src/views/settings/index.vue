@@ -56,6 +56,10 @@
                                         <div class="binding-label">邮箱</div>
                                         <div class="binding-value">
                                             {{ bindings.email || '未绑定' }}
+                                            <el-tag v-if="bindings.email" type="success" size="small"
+                                                style="margin-left: 8px">
+                                                已验证
+                                            </el-tag>
                                         </div>
                                     </div>
                                 </div>
@@ -83,6 +87,10 @@
                                         <div class="binding-label">GitHub</div>
                                         <div class="binding-value">
                                             {{ getGitHubAccount() || '未绑定' }}
+                                            <el-tag v-if="getGitHubAccount()" type="success" size="small"
+                                                style="margin-left: 8px">
+                                                已验证
+                                            </el-tag>
                                         </div>
                                     </div>
                                 </div>
