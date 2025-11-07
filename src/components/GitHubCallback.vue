@@ -23,37 +23,27 @@ onMounted(async () => {
 
         const data = response.data;
 
-        // 检查是否需要进行手机号注册
-        if (data.requires_phone_registration || data.code === 'PHONE_REGISTRATION_REQUIRED') {
-            sessionStorage.setItem('oauthProvider', data.provider || 'github');
-            sessionStorage.setItem('oauthAccount', JSON.stringify(data.account || {}));
-            ElMessage.info('请先完成手机号注册以绑定 GitHub 账户');
-            router.push('/oauth/phone-register');
-            return;
+        if (data.access) {
+            const { setAuthTokens } = await import('@/utils/auth');
+            setAuthTokens(data.access, data.refresh || '', data.username || '');
         }
 
-        // 检查是否需要绑定手机号
-        if (data.requires_phone_binding || data.code === 'PHONE_NUMBER_REQUIRED') {
-            if (data.access) {
-                const { setAuthTokens } = await import('@/utils/auth');
-                setAuthTokens(data.access, data.refresh || '', data.username);
-            }
+        if (Array.isArray(data.warnings)) {
+            data.warnings.forEach((msg: string) => {
+                if (msg) {
+                    ElMessage.warning(msg);
+                }
+            });
+        }
 
-            ElMessage.warning('请先绑定手机号');
+        if (data.is_new_user) {
+            localStorage.setItem('start_tour', 'true');
+        }
+
+        if (data.phone_binding_required) {
+            ElMessage.warning('您还未绑定手机号，绑定后可使用更多登录方式。');
             router.push('/phone-binding');
             return;
-        }
-
-        if (data.access && data.refresh) {
-            const { setAuthTokens } = await import('@/utils/auth');
-            setAuthTokens(data.access, data.refresh, data.username);
-        }
-
-        // 🔔 关键：为 GitHub 第三方登录也设置引导标记
-        // 检查是否是首次登录（通过后端返回的 is_new_user 字段判断）
-        if (data.is_new_user) {
-            const storage = localStorage;
-            storage.setItem('start_tour', 'true');
         }
 
         ElMessage.success("GitHub 登录成功");
@@ -69,17 +59,8 @@ onMounted(async () => {
     } catch (error: any) {
         console.error('GitHub 登录失败', error);
 
-        if (error.response?.status === 403 && error.response?.data?.code === 'PHONE_NUMBER_REQUIRED') {
-            ElMessage.warning('请先绑定手机号');
-            router.push('/phone-binding');
-        } else if (error.response?.status === 401 && error.response?.data?.code === 'PHONE_REGISTRATION_REQUIRED') {
-            sessionStorage.setItem('oauthProvider', error.response?.data?.provider || 'github');
-            sessionStorage.setItem('oauthAccount', JSON.stringify(error.response?.data?.account || {}));
-            router.push('/oauth/phone-register');
-        } else {
-            ElMessage.error(error.response?.data?.message || "GitHub 登录失败");
-            router.push('/');
-        }
+        ElMessage.error(error.response?.data?.message || 'GitHub 登录失败');
+        router.push('/');
     }
 });
 </script>
