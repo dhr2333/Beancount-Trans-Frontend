@@ -42,9 +42,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from '../../utils/request'
+import { subscribeAccountTreeUpdated } from '~/utils/accountEvents'
 
 // 接口定义
 interface Account {
@@ -60,6 +61,7 @@ interface Account {
         income: number
         total: number
     }
+    children?: Account[]
 }
 
 // Props
@@ -88,6 +90,7 @@ const accountTree = ref<Account[]>([])
 const selectedValue = ref<number[]>([])
 const selectedAccount = ref<Account | null>(null)
 const loading = ref(false)
+let unsubscribeAccountTreeUpdated: (() => void) | null = null
 
 // 级联选择器配置
 const cascaderProps = {
@@ -250,6 +253,10 @@ watch(() => props.modelValue, (newValue) => {
 
 // 组件挂载时初始化
 onMounted(() => {
+    unsubscribeAccountTreeUpdated = subscribeAccountTreeUpdated(() => {
+        fetchAccountTree()
+    })
+
     if (props.modelValue) {
         fetchAccountTree().then(() => {
             const account = findAccountById(accountTree.value, props.modelValue!)
@@ -257,6 +264,13 @@ onMounted(() => {
                 selectedAccount.value = account
             }
         })
+    }
+})
+
+onBeforeUnmount(() => {
+    if (unsubscribeAccountTreeUpdated) {
+        unsubscribeAccountTreeUpdated()
+        unsubscribeAccountTreeUpdated = null
     }
 })
 </script>

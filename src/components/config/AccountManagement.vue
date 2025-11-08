@@ -315,6 +315,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
+import { emitAccountTreeUpdated } from '~/utils/accountEvents'
 import type { FormInstance, FormRules } from 'element-plus'
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
 import { hasAuthTokens } from '../../utils/auth'
@@ -526,6 +527,7 @@ const updateAccountStatus = async (account: Account) => {
             enable: account.enable
         })
         ElMessage.success('账户状态更新成功')
+        emitAccountTreeUpdated()
     } catch (error: any) {
         // 回滚状态
         account.enable = !account.enable
@@ -556,6 +558,7 @@ const createAccount = async () => {
         ElMessage.success('账户创建成功')
         addAccountDialog.value = false
         await fetchAccountTree()
+        emitAccountTreeUpdated()
     } catch (error: any) {
         console.error('创建账户失败:', error)
         if (error.response?.status === 401) {
@@ -588,6 +591,7 @@ const updateAccount = async () => {
         ElMessage.success('账户更新成功')
         editAccountDialog.value = false
         await fetchAccountTree()
+        emitAccountTreeUpdated()
     } catch (error: any) {
         console.error('更新账户失败:', error)
         if (error.response?.status === 401) {
@@ -714,6 +718,7 @@ const confirmDeleteAccount = async () => {
         selectedAccount.value = null
         currentSelectedAccountId.value = null
         await fetchAccountTree()
+        emitAccountTreeUpdated()
     } catch (error: any) {
         console.error('删除账户失败:', error)
         if (error.response?.status === 401) {
