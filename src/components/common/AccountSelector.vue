@@ -1,6 +1,6 @@
 <template>
     <div class="account-selector">
-        <el-cascader v-model="selectedValue" :options="accountOptions" :props="cascaderProps" :placeholder="placeholder"
+        <el-cascader v-model="cascaderValue" :options="accountOptions" :props="cascaderProps" :placeholder="placeholder"
             :filterable="true" :filter-method="customFilterMethod" :clearable="true" :show-all-levels="false"
             :separator="' > '" @change="handleChange" @visible-change="handleVisibleChange" class="account-cascader"
             style="width: 100%;">
@@ -44,11 +44,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
+import type { CascaderProps, CascaderValue, CascaderOption } from 'element-plus'
 import axios from '../../utils/request'
 import { subscribeAccountTreeUpdated } from '~/utils/accountEvents'
+import { getAccountTypeColor } from '~/utils/accountTypeColor'
 
 // 接口定义
-interface Account {
+interface AccountBase {
     id: number
     account: string
     parent?: number
@@ -61,8 +63,10 @@ interface Account {
         income: number
         total: number
     }
-    children?: Account[]
+    children?: AccountOption[]
 }
+
+type AccountOption = AccountBase & CascaderOption
 
 // Props
 interface Props {
@@ -82,18 +86,26 @@ const props = withDefaults(defineProps<Props>(), {
 // Emits
 const emit = defineEmits<{
     'update:modelValue': [value: number | null]
-    'change': [account: Account | null]
+    'change': [account: AccountOption | null]
 }>()
 
 // 响应式数据
-const accountTree = ref<Account[]>([])
-const selectedValue = ref<number | null>(props.modelValue ?? null)
-const selectedAccount = ref<Account | null>(null)
+const accountTree = ref<AccountOption[]>([])
+type InternalCascaderValue = CascaderValue | CascaderValue[] | null
+const selectedValue = ref<InternalCascaderValue>(props.modelValue ?? null)
+
+const cascaderValue = computed<CascaderValue | undefined>({
+    get: () => selectedValue.value === null ? undefined : selectedValue.value as unknown as CascaderValue,
+    set: (value) => {
+        selectedValue.value = (value ?? null) as InternalCascaderValue
+    }
+})
+const selectedAccount = ref<AccountOption | null>(null)
 const loading = ref(false)
 let unsubscribeAccountTreeUpdated: (() => void) | null = null
 
 // 级联选择器配置
-const cascaderProps = {
+const cascaderProps: CascaderProps = {
     value: 'id',
     label: 'account',
     children: 'children',
@@ -103,7 +115,7 @@ const cascaderProps = {
 }
 
 // 计算属性：过滤后的账户选项
-const accountOptions = computed(() => {
+const accountOptions = computed<AccountOption[]>(() => {
     console.log('AccountSelector - 原始账户树:', accountTree.value)
     console.log('AccountSelector - 账户类型过滤:', props.accountType)
 
@@ -126,16 +138,17 @@ const fetchAccountTree = async () => {
 
         // 确保数据是数组格式
         if (Array.isArray(response.data)) {
-            accountTree.value = response.data
+            accountTree.value = response.data as AccountOption[]
         } else if (response.data && Array.isArray(response.data.results)) {
-            accountTree.value = response.data.results
+            accountTree.value = response.data.results as AccountOption[]
         } else {
             console.warn('账户树数据格式异常:', response.data)
             accountTree.value = []
         }
 
-        if (selectedValue.value) {
-            const account = findAccountById(accountTree.value, selectedValue.value)
+        const normalized = normalizeCascaderValue(selectedValue.value)
+        if (normalized !== null) {
+            const account = findAccountById(accountTree.value, normalized)
             selectedAccount.value = account
         }
     } catch (error: any) {
@@ -152,7 +165,7 @@ const fetchAccountTree = async () => {
 }
 
 // 根据账户类型过滤账户
-const filterAccountsByType = (accounts: Account[], type: string): Account[] => {
+const filterAccountsByType = (accounts: AccountOption[], type: string): AccountOption[] => {
     // 账户类型映射：英文 -> 中文
     const typeMapping: Record<string, string> = {
         'Assets': '资产账户',
@@ -175,7 +188,7 @@ const filterAccountsByType = (accounts: Account[], type: string): Account[] => {
 }
 
 // 查找账户对象
-const findAccountById = (accounts: Account[], id: number): Account | null => {
+const findAccountById = (accounts: AccountOption[], id: number): AccountOption | null => {
     for (const account of accounts) {
         if (account.id === id) return account
         if (account.children) {
@@ -187,23 +200,6 @@ const findAccountById = (accounts: Account[], id: number): Account | null => {
 }
 
 // 获取账户类型颜色
-const getAccountTypeColor = (type: string) => {
-    const colorMap: Record<string, string> = {
-        'Assets': 'success',
-        'Expenses': 'warning',
-        'Income': 'primary',
-        'Liabilities': 'danger',
-        'Equity': 'info',
-        // 中文类型映射
-        '资产账户': 'success',
-        '支出账户': 'warning',
-        '收入账户': 'primary',
-        '负债账户': 'danger',
-        '权益账户': 'info'
-    }
-    return colorMap[type] || 'info'
-}
-
 // 自定义过滤方法 - 不区分大小写搜索
 const customFilterMethod = (node: any, keyword: string) => {
     if (!keyword) return true
@@ -224,12 +220,25 @@ const customFilterMethod = (node: any, keyword: string) => {
 }
 
 // 处理选择变化
-const handleChange = (value: number | null) => {
-    const normalizedValue = value ?? null
-    selectedValue.value = normalizedValue
+const normalizeCascaderValue = (value: InternalCascaderValue): number | null => {
+    if (typeof value === 'number') return value
+    if (Array.isArray(value)) {
+        const latest = value[value.length - 1]
+        if (Array.isArray(latest)) {
+            const nested = latest[latest.length - 1]
+            return typeof nested === 'number' ? nested : null
+        }
+        return typeof latest === 'number' ? latest : null
+    }
+    return null
+}
+
+const handleChange = (value: CascaderValue | CascaderValue[] | null) => {
+    const normalizedValue = normalizeCascaderValue(value)
+    selectedValue.value = (value ?? null) as InternalCascaderValue
     emit('update:modelValue', normalizedValue)
 
-    if (normalizedValue) {
+    if (normalizedValue !== null) {
         const account = findAccountById(accountTree.value, normalizedValue)
         selectedAccount.value = account
         emit('change', account)
@@ -248,7 +257,7 @@ const handleVisibleChange = (visible: boolean) => {
 
 // 监听外部值变化
 watch(() => props.modelValue, (newValue) => {
-    if (newValue !== selectedValue.value) {
+    if (normalizeCascaderValue(selectedValue.value) !== (newValue ?? null)) {
         selectedValue.value = newValue ?? null
     }
 
@@ -275,8 +284,9 @@ onMounted(() => {
         })
     }
 
-    if (selectedValue.value) {
-        const account = findAccountById(accountTree.value, selectedValue.value)
+    const normalized = normalizeCascaderValue(selectedValue.value)
+    if (normalized !== null) {
+        const account = findAccountById(accountTree.value, normalized)
         selectedAccount.value = account
     }
 })

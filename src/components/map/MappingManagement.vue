@@ -180,7 +180,7 @@ import IncomeMapping from './Income.vue'
 import AssetsMapping from './Assets.vue'
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
 import { hasAuthTokens } from '../../utils/auth'
-import type { FormInstance, FormRules } from 'element-plus'
+import type { FormInstance, FormRules, TabPaneName } from 'element-plus'
 
 // 响应式数据
 const activeTab = ref('expense')
@@ -230,8 +230,8 @@ const assetsMappingRef = ref()
 // }
 
 // 处理标签页切换
-const handleTabChange = (tabName: string) => {
-    activeTab.value = tabName
+const handleTabChange = (tabName: TabPaneName) => {
+    activeTab.value = typeof tabName === 'string' ? tabName : String(tabName)
 }
 
 // 显示快速创建对话框

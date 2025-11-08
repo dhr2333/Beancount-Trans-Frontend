@@ -18,7 +18,7 @@
         </el-select>
 
         <!-- 单选模式：使用级联选择器 -->
-        <el-cascader v-else v-model="selectedValue" :options="tagOptions" :props="cascaderProps" :filterable="true"
+        <el-cascader v-else v-model="cascaderValue" :options="cascaderOptions" :props="cascaderProps" :filterable="true"
             :filter-method="customFilterMethod" :clearable="true" :show-all-levels="false" :separator="' > '"
             :placeholder="placeholder" @change="handleChange" @visible-change="handleVisibleChange" style="width: 100%;"
             :disabled="disabled" class="tag-cascader">
@@ -67,6 +67,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import type { CascaderProps, CascaderValue, CascaderOption } from 'element-plus'
 import { fetchTagTree } from '../../api/tags'
 import type { Tag } from '../../types/tag'
 
@@ -97,23 +98,31 @@ const emit = defineEmits<{
 
 // 响应式数据
 const tagTree = ref<Tag[]>([])
-const selectedValue = ref<number | null>(null)
+type SingleTagValue = CascaderValue | CascaderValue[] | null
+const selectedValue = ref<SingleTagValue>(null)
 const selectedValues = ref<number[]>([])
 const selectedTag = ref<Tag | null>(null)
 const loading = ref(false)
 
+const cascaderValue = computed<CascaderValue | undefined>({
+    get: () => selectedValue.value === null ? undefined : selectedValue.value as unknown as CascaderValue,
+    set: (value) => {
+        selectedValue.value = (value ?? null) as SingleTagValue
+    }
+})
+
 // 级联选择器配置
-const cascaderProps = {
+const cascaderProps: CascaderProps = {
     value: 'id',
     label: 'name',
     children: 'children',
     emitPath: false,
     checkStrictly: true,
-    expandTrigger: 'hover' as const
+    expandTrigger: 'hover'
 }
 
 // 计算属性：过滤后的标签选项
-const tagOptions = computed(() => {
+const tagOptions = computed<Tag[]>(() => {
     console.log('TagSelector - 原始标签树:', tagTree.value)
 
     if (props.enabledOnly) {
@@ -124,6 +133,8 @@ const tagOptions = computed(() => {
 
     return tagTree.value
 })
+
+const cascaderOptions = computed<CascaderOption[]>(() => tagOptions.value as unknown as CascaderOption[])
 
 // 扁平化标签列表（用于多选模式）
 const flatTags = computed(() => {
@@ -155,7 +166,7 @@ const loadTagTree = async () => {
         console.log('标签树数据:', response.data)
 
         if (Array.isArray(response.data)) {
-            tagTree.value = response.data
+            tagTree.value = response.data as Tag[]
         } else {
             console.warn('标签树数据格式异常:', response.data)
             tagTree.value = []
@@ -233,6 +244,19 @@ const customFilterMethod = (node: any, keyword: string) => {
 }
 
 // 处理选择变化
+const normalizeSelectedValue = (value: SingleTagValue): number | null => {
+    if (typeof value === 'number') return value
+    if (Array.isArray(value)) {
+        const latest = value[value.length - 1]
+        if (Array.isArray(latest)) {
+            const nested = latest[latest.length - 1]
+            return typeof nested === 'number' ? nested : null
+        }
+        return typeof latest === 'number' ? latest : null
+    }
+    return null
+}
+
 const handleChange = () => {
     if (props.multiple) {
         emit('update:modelValue', selectedValues.value)
@@ -241,9 +265,10 @@ const handleChange = () => {
             .filter(Boolean) as Tag[]
         emit('change', tags)
     } else {
-        emit('update:modelValue', selectedValue.value)
-        if (selectedValue.value) {
-            const tag = findTagById(tagTree.value, selectedValue.value)
+        const normalizedValue = normalizeSelectedValue(selectedValue.value)
+        emit('update:modelValue', normalizedValue)
+        if (normalizedValue !== null) {
+            const tag = findTagById(tagTree.value, normalizedValue)
             selectedTag.value = tag
             emit('change', tag)
         } else {
@@ -275,11 +300,17 @@ watch(() => props.modelValue, (newValue) => {
             selectedValues.value = []
         }
     } else {
-        if (typeof newValue === 'number' && newValue !== selectedValue.value) {
-            selectedValue.value = newValue
-            const tag = findTagById(tagTree.value, newValue)
-            selectedTag.value = tag
-        } else if (!newValue) {
+        const normalizedValue = typeof newValue === 'number' ? newValue : null
+        if (normalizedValue !== normalizeSelectedValue(selectedValue.value)) {
+            selectedValue.value = normalizedValue ?? null
+            if (normalizedValue !== null) {
+                const tag = findTagById(tagTree.value, normalizedValue)
+                selectedTag.value = tag
+            } else {
+                selectedTag.value = null
+            }
+        }
+        if (normalizedValue === null) {
             selectedValue.value = null
             selectedTag.value = null
         }

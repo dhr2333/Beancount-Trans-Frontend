@@ -234,7 +234,7 @@
                     <p class="migration-tip">请选择要将映射迁移到的目标账户：</p>
 
                     <div class="account-selector">
-                        <el-cascader v-model="selectedMigrationAccount" :options="migrationCandidates"
+                        <el-cascader v-model="migrationCascaderValue" :options="migrationCandidates"
                             :props="cascaderProps" placeholder="请选择迁移目标账户" :filterable="true" :clearable="true"
                             :show-all-levels="false" :separator="' > '" @change="handleMigrationAccountChange"
                             @visible-change="handleMigrationVisibleChange" class="account-cascader" style="width: 100%;"
@@ -302,7 +302,7 @@
             <template #footer>
                 <el-button @click="deleteAccountDialog = false">取消</el-button>
                 <el-button type="danger" @click="confirmDeleteAccount"
-                    :disabled="hasMappings && !selectedMigrationAccount" :loading="deleteAccountLoading">
+                    :disabled="hasMappings && !selectedMigrationAccountId" :loading="deleteAccountLoading">
                     确定删除
                 </el-button>
             </template>
@@ -316,9 +316,16 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import { emitAccountTreeUpdated } from '~/utils/accountEvents'
-import type { FormInstance, FormRules } from 'element-plus'
+import type {
+    CascaderOption,
+    CascaderProps,
+    CascaderValue,
+    FormInstance,
+    FormRules
+} from 'element-plus'
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
 import { hasAuthTokens } from '../../utils/auth'
+import { getAccountTypeColor } from '~/utils/accountTypeColor'
 
 // 接口定义
 interface Account {
@@ -339,10 +346,14 @@ interface Account {
     }
 }
 
+type AccountOption = Omit<Account, 'children'> & CascaderOption & {
+    children?: AccountOption[]
+}
+
 // 响应式数据
 const loading = ref(false)
-const accountTree = ref<Account[]>([])
-const selectedAccount = ref<Account | null>(null)
+const accountTree = ref<AccountOption[]>([])
+const selectedAccount = ref<AccountOption | null>(null)
 const defaultExpandedKeys = ref<number[]>([])
 
 // 树形结构状态保持
@@ -377,11 +388,19 @@ const editAccountForm = ref({
 })
 
 // 删除账户相关
-const migrationCandidates = ref<any[]>([])
+const migrationCandidates = ref<AccountOption[]>([])
 const migrationCandidatesLoading = ref(false)
-const selectedMigrationAccount = ref<number | null>(null)
-const selectedMigrationAccountInfo = ref<any>(null)
+type MigrationModelValue = CascaderValue | CascaderValue[] | null
+const selectedMigrationAccount = ref<MigrationModelValue>(null)
+const selectedMigrationAccountInfo = ref<AccountOption | null>(null)
 const deleteAccountLoading = ref(false)
+
+const migrationCascaderValue = computed<CascaderValue | undefined>({
+    get: () => selectedMigrationAccount.value === null ? undefined : selectedMigrationAccount.value as unknown as CascaderValue,
+    set: (value) => {
+        selectedMigrationAccount.value = (value ?? null) as MigrationModelValue
+    }
+})
 
 // 表单引用
 const accountForm = ref<FormInstance>()
@@ -394,7 +413,7 @@ const treeProps = {
 }
 
 // 级联选择器配置
-const cascaderProps = {
+const cascaderProps: CascaderProps = {
     value: 'id',
     label: 'account',
     children: 'children',
@@ -402,6 +421,21 @@ const cascaderProps = {
     checkStrictly: true,
     expandTrigger: 'hover'
 }
+
+const normalizeCascaderValue = (value: MigrationModelValue): number | null => {
+    if (typeof value === 'number') return value
+    if (Array.isArray(value)) {
+        const last = value[value.length - 1]
+        if (Array.isArray(last)) {
+            const nested = last[last.length - 1]
+            return typeof nested === 'number' ? nested : null
+        }
+        return typeof last === 'number' ? last : null
+    }
+    return null
+}
+
+const selectedMigrationAccountId = computed(() => normalizeCascaderValue(selectedMigrationAccount.value))
 
 // 表单验证规则
 const accountRules: FormRules = {
@@ -413,7 +447,7 @@ const accountRules: FormRules = {
 
 
 // 计算默认展开的节点
-const calculateDefaultExpandedKeys = (accounts: Account[], level: number = 1): number[] => {
+const calculateDefaultExpandedKeys = (accounts: AccountOption[], level: number = 1): number[] => {
     const expandedKeys: number[] = []
 
     accounts.forEach(account => {
@@ -450,16 +484,16 @@ const fetchAccountTree = async () => {
         const previousSelectedId = currentSelectedAccountId.value
 
         const response = await axios.get('/account/tree/')
-        accountTree.value = response.data
+        accountTree.value = response.data as AccountOption[]
 
         // 保持之前的展开状态
         defaultExpandedKeys.value = previousExpandedKeys.length > 0 ? previousExpandedKeys : calculateDefaultExpandedKeys(response.data)
 
         // 恢复选中的账户
         if (previousSelectedId) {
-            const selectedAccount = findAccountById(accountTree.value, previousSelectedId)
-            if (selectedAccount) {
-                selectedAccount.value = selectedAccount
+            const matchedAccount = findAccountById(accountTree.value, previousSelectedId)
+            if (matchedAccount) {
+                selectedAccount.value = matchedAccount
                 currentSelectedAccountId.value = previousSelectedId
                 // 重新获取映射数据
                 await fetchAccountMappings()
@@ -478,7 +512,7 @@ const fetchAccountTree = async () => {
 }
 
 // 节点点击处理
-const handleNodeClick = async (data: Account) => {
+const handleNodeClick = async (data: AccountOption) => {
     selectedAccount.value = data
     currentSelectedAccountId.value = data.id
     // 重置映射详情状态
@@ -489,39 +523,22 @@ const handleNodeClick = async (data: Account) => {
 }
 
 // 节点展开处理
-const handleNodeExpand = (data: Account) => {
+const handleNodeExpand = (data: AccountOption) => {
     if (!expandedKeys.value.includes(data.id)) {
         expandedKeys.value.push(data.id)
     }
 }
 
 // 节点折叠处理
-const handleNodeCollapse = (data: Account) => {
+const handleNodeCollapse = (data: AccountOption) => {
     const index = expandedKeys.value.indexOf(data.id)
     if (index > -1) {
         expandedKeys.value.splice(index, 1)
     }
 }
 
-// 获取账户类型颜色
-const getAccountTypeColor = (type: string) => {
-    const colorMap: Record<string, string> = {
-        'Assets': 'success',
-        'Expenses': 'warning',
-        'Income': 'primary',
-        'Liabilities': 'danger',
-        'Equity': 'info',
-        // 中文类型映射
-        '资产账户': 'success',
-        '支出账户': 'warning',
-        '收入账户': 'primary',
-        '负债账户': 'danger',
-        '权益账户': 'info'
-    }
-    return colorMap[type] || 'info'
-}
 // 更新账户状态
-const updateAccountStatus = async (account: Account) => {
+const updateAccountStatus = async (account: AccountOption) => {
     try {
         await axios.patch(`/account/${account.id}/`, {
             enable: account.enable
@@ -639,20 +656,24 @@ const fetchMigrationCandidates = async () => {
 }
 
 // 构建账户树形结构
-const buildAccountTree = (accounts: any[]): any[] => {
-    const accountMap = new Map()
-    const rootAccounts: any[] = []
+const buildAccountTree = (accounts: Account[]): AccountOption[] => {
+    const accountMap = new Map<number, AccountOption>()
+    const rootAccounts: AccountOption[] = []
 
-    // 创建账户映射
     accounts.forEach(account => {
         accountMap.set(account.id, { ...account, children: [] })
     })
 
-    // 构建树形结构
     accounts.forEach(account => {
         const accountNode = accountMap.get(account.id)
+        if (!accountNode) return
+
         if (account.parent && accountMap.has(account.parent)) {
-            accountMap.get(account.parent).children.push(accountNode)
+            const parentNode = accountMap.get(account.parent)
+            if (parentNode) {
+                if (!parentNode.children) parentNode.children = []
+                parentNode.children.push(accountNode)
+            }
         } else {
             rootAccounts.push(accountNode)
         }
@@ -662,7 +683,7 @@ const buildAccountTree = (accounts: any[]): any[] => {
 }
 
 // 查找账户对象
-const findAccountById = (accounts: any[], id: number): any | null => {
+const findAccountById = (accounts: AccountOption[], id: number): AccountOption | null => {
     for (const account of accounts) {
         if (account.id === id) return account
         if (account.children) {
@@ -674,9 +695,10 @@ const findAccountById = (accounts: any[], id: number): any | null => {
 }
 
 // 处理迁移账户选择变化
-const handleMigrationAccountChange = (value: number) => {
-    if (value) {
-        const account = findAccountById(migrationCandidates.value, value)
+const handleMigrationAccountChange = (value: CascaderValue | null) => {
+    const normalizedValue = normalizeCascaderValue(value)
+    if (normalizedValue !== null) {
+        const account = findAccountById(migrationCandidates.value, normalizedValue)
         selectedMigrationAccountInfo.value = account
     } else {
         selectedMigrationAccountInfo.value = null
@@ -695,7 +717,7 @@ const confirmDeleteAccount = async () => {
     if (!selectedAccount.value) return
 
     // 如果有映射但没有选择迁移目标，则不允许删除
-    if (hasMappings.value && !selectedMigrationAccount.value) {
+    if (hasMappings.value && selectedMigrationAccountId.value === null) {
         ElMessage.warning('请选择迁移目标账户')
         return
     }
@@ -704,9 +726,9 @@ const confirmDeleteAccount = async () => {
         deleteAccountLoading.value = true
 
         // 构建删除请求数据
-        const deleteData: any = {}
-        if (hasMappings.value && selectedMigrationAccount.value) {
-            deleteData.migrate_to = selectedMigrationAccount.value
+        const deleteData: Record<string, unknown> = {}
+        if (hasMappings.value && selectedMigrationAccountId.value !== null) {
+            deleteData.migrate_to = selectedMigrationAccountId.value
         }
 
         await axios.delete(`/account/${selectedAccount.value.id}/`, {

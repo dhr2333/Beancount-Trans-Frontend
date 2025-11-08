@@ -2,6 +2,11 @@ import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 
 // 创建引导实例
+type DriverConfig = NonNullable<Parameters<typeof driver>[0]>
+type DriverSteps = NonNullable<DriverConfig['steps']>
+type DriverPopover = NonNullable<DriverSteps[number]['popover']>
+type DriverStepSide = DriverPopover['side']
+
 const driverObj = driver({
   showProgress: true,
   steps: [
@@ -10,7 +15,7 @@ const driverObj = driver({
       popover: {
         title: '🎉 欢迎使用 Beancount-Trans',
         description: '我们已为您准备好两个示例账单文件（微信、支付宝），让我们一起体验如何将账单转换为专业财务报表！',
-        side: 'center',
+        side: 'center' as unknown as DriverStepSide,
         align: 'center'
       }
     },
