@@ -11,7 +11,6 @@ import Login from "./views/login/index.vue"
 import PhoneBinding from "./views/phone-binding/index.vue"
 import Settings from "./views/settings/index.vue"
 import AuthenticateByGithubToken from './components/GitHubCallback.vue';
-import OAuthPhoneRegister from './views/oauth-phone-register/index.vue'
 // 模板管理
 import AccountTemplates from "./components/template/AccountTemplates.vue"
 import MappingTemplates from "./components/template/MappingTemplates.vue"
@@ -34,7 +33,6 @@ const router = createRouter({
     { path: '/template/mappings', name: "mappingTemplates", component: MappingTemplates },
     { path: '/login', name: "login", component: Login },
     { path: '/phone-binding', name: "phoneBinding", component: PhoneBinding },
-    { path: '/oauth/phone-register', name: 'oauthPhoneRegister', component: OAuthPhoneRegister },
     { path: '/settings', name: "settings", component: Settings },
   ]
 })
@@ -45,7 +43,7 @@ router.beforeEach(async (to, from, next) => {
   const username = localStorage.getItem('username');
   
   // 如果是登录页面、手机号绑定页面或OAuth回调页面，直接放行
-  if (to.path === '/login' || to.path === '/phone-binding' || to.path === '/auth/github/token' || to.path === '/oauth/phone-register' || to.path === '/') {
+  if (to.path === '/login' || to.path === '/phone-binding' || to.path === '/auth/github/token' || to.path === '/') {
     // 如果已登录且访问首页，检查是否需要绑定手机号
     if (token && username && to.path === '/') {
       try {

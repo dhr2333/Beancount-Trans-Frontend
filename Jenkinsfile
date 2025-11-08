@@ -58,7 +58,7 @@ pipeline {
                     updateGitHubStatus('pending', '正在构建镜像...')
 
                     docker.build("${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}", "--rm .")
-                    if (env.BRANCH_NAME == 'main') {
+                    if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME.startsWith('fix/')) {
                         sh "docker tag ${env.REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.REGISTRY}/${env.IMAGE_NAME}:latest"
                     }
                 }
@@ -67,7 +67,10 @@ pipeline {
 
 		stage('部署到服务器') {
 		    when {
-		        branch 'main'
+		        anyOf {
+		            branch 'main'
+		            branch pattern: 'fix/.*', comparator: 'REGEXP'
+		        }
 		    }
 		    steps {
 		        script {
@@ -89,13 +92,35 @@ pipeline {
         success {
             script {
                 echo '✅ 构建成功'
-                def message = env.BRANCH_NAME == 'main' ?
+                def isDeployBranch = env.BRANCH_NAME == 'main' || env.BRANCH_NAME.startsWith('fix/')
+                def message = isDeployBranch ?
                     "构建成功 ✓ | 已部署到生产环境" :
                     "构建成功 ✓"
                 updateGitHubStatus('success', message)
 
-                if (env.BRANCH_NAME == 'main') {
+                if (isDeployBranch) {
                     echo "🚀 已部署到生产环境"
+                }
+
+                echo '🧹 清理旧的Docker镜像（保留最近3个）...'
+                try {
+                    sh """
+                        # 获取所有git-*标签的镜像，按创建时间排序，删除第4个及以后的镜像
+                        docker images ${env.REGISTRY}/${env.IMAGE_NAME} --format "{{.ID}} {{.Tag}} {{.CreatedAt}}" | \
+                        grep " git-" | \
+                        sort -k3 -r | \
+                        tail -n +4 | \
+                        awk '{print \$2}' | \
+                        while read tag; do
+                            if [ ! -z "\$tag" ]; then
+                                echo "删除旧镜像: \${tag}"
+                                docker rmi ${env.REGISTRY}/${env.IMAGE_NAME}:\${tag} || true
+                            fi
+                        done
+                    """
+                    echo "✅ 镜像清理完成"
+                } catch (Exception e) {
+                    echo "⚠️ 清理旧镜像时出现警告: ${e.message}"
                 }
             }
         }
