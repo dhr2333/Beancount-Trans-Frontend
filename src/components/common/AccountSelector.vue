@@ -85,7 +85,7 @@ const emit = defineEmits<{
 
 // 响应式数据
 const accountTree = ref<Account[]>([])
-const selectedValue = ref<number[]>([])
+const selectedValue = ref<number | null>(props.modelValue ?? null)
 const selectedAccount = ref<Account | null>(null)
 const loading = ref(false)
 
@@ -129,6 +129,11 @@ const fetchAccountTree = async () => {
         } else {
             console.warn('账户树数据格式异常:', response.data)
             accountTree.value = []
+        }
+
+        if (selectedValue.value) {
+            const account = findAccountById(accountTree.value, selectedValue.value)
+            selectedAccount.value = account
         }
     } catch (error: any) {
         console.error('获取账户树失败:', error)
@@ -216,11 +221,13 @@ const customFilterMethod = (node: any, keyword: string) => {
 }
 
 // 处理选择变化
-const handleChange = (value: number) => {
-    emit('update:modelValue', value)
+const handleChange = (value: number | null) => {
+    const normalizedValue = value ?? null
+    selectedValue.value = normalizedValue
+    emit('update:modelValue', normalizedValue)
 
-    if (value) {
-        const account = findAccountById(accountTree.value, value)
+    if (normalizedValue) {
+        const account = findAccountById(accountTree.value, normalizedValue)
         selectedAccount.value = account
         emit('change', account)
     } else {
@@ -238,12 +245,14 @@ const handleVisibleChange = (visible: boolean) => {
 
 // 监听外部值变化
 watch(() => props.modelValue, (newValue) => {
-    if (newValue && newValue !== selectedValue.value) {
-        selectedValue.value = [newValue]
+    if (newValue !== selectedValue.value) {
+        selectedValue.value = newValue ?? null
+    }
+
+    if (newValue) {
         const account = findAccountById(accountTree.value, newValue)
         selectedAccount.value = account
-    } else if (!newValue) {
-        selectedValue.value = []
+    } else {
         selectedAccount.value = null
     }
 }, { immediate: true })
@@ -257,6 +266,11 @@ onMounted(() => {
                 selectedAccount.value = account
             }
         })
+    }
+
+    if (selectedValue.value) {
+        const account = findAccountById(accountTree.value, selectedValue.value)
+        selectedAccount.value = account
     }
 })
 </script>
