@@ -11,8 +11,8 @@
                     </template>
                 </el-input>
                 <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 120px;"
-                    @change="handleSearch">
-                    <el-option label="全部" :value="null" />
+                    @change="handleSearch" @clear="statusFilter = 'all'; handleSearch()">
+                    <el-option label="全部" :value="'all'" />
                     <el-option label="已启用" :value="true" />
                     <el-option label="已禁用" :value="false" />
                 </el-select>
@@ -292,6 +292,7 @@ import { pinyin } from 'pinyin-pro';
 import AccountSelector from '../common/AccountSelector.vue'
 import TagSelector from '../common/TagSelector.vue'
 // import CurrencySelector from '../common/CurrencySelector.vue'
+import { getAccountTypeColor } from '~/utils/accountTypeColor'
 
 
 const dialogError = ref(false)
@@ -331,7 +332,7 @@ const IncomeData = ref<Income[]>([])
 const selectedItems = ref<Income[]>([])
 
 // 过滤器状态
-const statusFilter = ref<boolean | null>(null)
+const statusFilter = ref<'all' | boolean>('all')
 
 const fetchData = async () => {
     try {
@@ -392,7 +393,7 @@ const filterIncomeData = computed(() =>
         }
 
         // 状态过滤
-        if (statusFilter.value !== null && data.enable !== statusFilter.value) {
+        if (statusFilter.value !== 'all' && data.enable !== statusFilter.value) {
             return false
         }
 
@@ -414,7 +415,8 @@ const handleAdd = () => {
         ruleForm.value = {
             key: lastEditedData.value.key || '',
             payer: lastEditedData.value.payer ?? null,
-            income: lastEditedData.value.income_id || null
+            income: lastEditedData.value.income_id || null,
+            tag_ids: lastEditedData.value.tags?.map(tag => tag.id) ?? []
             // currency_id: lastEditedData.value.currency_ids?.[0] || null
         };
     } else {
@@ -422,7 +424,8 @@ const handleAdd = () => {
         ruleForm.value = {
             key: '',
             payer: null,
-            income: null
+            income: null,
+            tag_ids: []
             // currency_id: null
         };
         if (ruleFormRef.value) {
@@ -712,24 +715,6 @@ const confirmDelete = async () => {
             dialogError.value = true
         }
     }
-}
-
-// 获取账户类型颜色
-const getAccountTypeColor = (type: string) => {
-    const colorMap: Record<string, string> = {
-        'Assets': 'success',
-        'Expenses': 'warning',
-        'Income': 'primary',
-        'Liabilities': 'danger',
-        'Equity': 'info',
-        // 中文类型映射
-        '资产账户': 'success',
-        '支出账户': 'warning',
-        '收入账户': 'primary',
-        '负债账户': 'danger',
-        '权益账户': 'info'
-    }
-    return colorMap[type] || 'info'
 }
 
 // 处理账户选择变化

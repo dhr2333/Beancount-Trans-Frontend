@@ -179,6 +179,7 @@ import { Folder, Document, Plus } from '@element-plus/icons-vue'
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import axios from '../../utils/request'
 import { ElMessage } from 'element-plus'
+import type { TagProps } from 'element-plus'
 import { parse } from 'path'
 import { startUserTour, continueUserTour } from '../../utils/userTour'
 
@@ -658,9 +659,10 @@ const parseProgressPercentage = computed(() => {
     return totalTasks.value > 0 ? Math.round((completedTasks.value / totalTasks.value) * 100) : 0;
 });
 
-const parseStatus = computed(() => {
+const parseStatus = computed<'' | 'success' | 'warning' | 'exception'>(() => {
     if (parseProgressPercentage.value === 100) return 'success';
-    return isProcessing.value ? 'primary' : 'exception';
+    if (isProcessing.value) return 'warning';
+    return parseProgressPercentage.value > 0 ? 'exception' : '';
 });
 
 const parseStatusText = computed(() => {
@@ -804,12 +806,18 @@ function stopPolling() {
 }
 
 // 状态标签类型
-function statusTagType(status: string) {
+function statusTagType(status: string): TagProps['type'] {
     switch (status) {
-        case 'success': return 'success';
-        case 'failed': return 'danger';
-        case 'processing': return 'primary';
-        default: return 'info'; // 其他状态
+        case 'success':
+            return 'success'
+        case 'failed':
+            return 'danger'
+        case 'processing':
+            return 'primary'
+        case 'pending':
+            return 'warning'
+        default:
+            return 'info' // 其他状态
     }
 }
 
@@ -827,18 +835,18 @@ function translateStatus(status: string | undefined): string {
     return statusMap[status] || status;
 }
 
-function getStatusColor(status: string | undefined): string {
-    if (!status) return 'info';
+function getStatusColor(status: string | undefined): TagProps['type'] {
+    if (!status) return 'info'
 
-    const statusMap: Record<string, string> = {
-        'unprocessed': 'info',
-        'pending': 'primary',
-        'processing': 'warning',
-        'success': 'success',
-        'failed': 'danger'
-    };
+    const statusMap: Record<string, TagProps['type']> = {
+        unprocessed: 'info',
+        pending: 'primary',
+        processing: 'warning',
+        success: 'success',
+        failed: 'danger'
+    }
 
-    return statusMap[status] || 'info';
+    return statusMap[status] || 'info'
 }
 
 </script>

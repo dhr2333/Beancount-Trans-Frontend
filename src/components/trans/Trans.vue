@@ -110,6 +110,7 @@ import { UploadFilled, DocumentCopy } from '@element-plus/icons-vue'
 import { ref, computed, watch } from 'vue';
 import axios from '../../utils/request';
 import RegisterPrompt from '../common/RegisterPrompt.vue';
+import type { UploadFile, UploadFiles } from 'element-plus'
 
 
 const input = ref()
@@ -272,8 +273,10 @@ const downloadCSV = (csvData: string) => {
   }
 }
 
-const handleChange = (file: File, fileList: File[]) => {
-  filename.value = file.name.split('.')[0]
+const handleChange = (uploadFile: UploadFile, _uploadFiles: UploadFiles) => {
+  if (uploadFile?.name) {
+    filename.value = uploadFile.name.split('.')[0]
+  }
 };
 
 const handleUploadError = (err: any, file: any) => {

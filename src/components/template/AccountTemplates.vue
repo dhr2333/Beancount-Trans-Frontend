@@ -67,7 +67,7 @@
                                 class="account-group">
                                 <h4 class="account-group-title">
                                     <el-tag :type="getAccountTypeColor(accountType)" size="small">{{ accountType
-                                    }}</el-tag>
+                                        }}</el-tag>
                                     <span>{{ getAccountTypeName(accountType) }}</span>
                                     <span class="account-count">({{ group.length }})</span>
                                 </h4>
@@ -156,6 +156,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { User, Clock, DocumentDelete, Loading, Download, List } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
+import { getAccountTypeColor } from '~/utils/accountTypeColor'
 
 interface AccountTemplateItem {
     id: number
@@ -189,18 +190,6 @@ const applyForm = ref({
     action: 'merge',
     conflict_resolution: 'skip'
 })
-
-// 获取账户类型颜色
-const getAccountTypeColor = (type: string) => {
-    const colorMap: Record<string, string> = {
-        'Assets': 'success',
-        'Liabilities': 'danger',
-        'Equity': 'info',
-        'Income': 'primary',
-        'Expenses': 'warning'
-    }
-    return colorMap[type] || 'info'
-}
 
 // 获取账户类型名称
 const getAccountTypeName = (type: string) => {

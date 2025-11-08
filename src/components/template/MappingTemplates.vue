@@ -175,6 +175,7 @@ import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { User, Clock, DocumentDelete, Loading, Download } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
+import type { TagProps } from 'element-plus'
 
 interface TemplateItem {
     id: number;
@@ -214,8 +215,8 @@ const getTypeText = (type: string) => {
 }
 
 // 获取模板类型标签样式
-const getTypeTag = (type: string) => {
-    const typeTagMap: Record<string, string> = {
+const getTypeTag = (type: string): TagProps['type'] => {
+    const typeTagMap: Record<string, TagProps['type']> = {
         // 'expense': 'danger',
         // 'income': 'success',
         // 'assets': 'warning'
@@ -223,7 +224,7 @@ const getTypeTag = (type: string) => {
         'income': 'primary',
         'assets': 'success'
     }
-    return typeTagMap[type] || ''
+    return typeTagMap[type] || 'info'
 }
 
 // 格式化日期
