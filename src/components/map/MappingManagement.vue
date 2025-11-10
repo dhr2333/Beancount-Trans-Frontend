@@ -374,7 +374,7 @@ onMounted(() => {
 <style scoped>
 .mapping-management {
     padding: 20px;
-    background-color: #f5f7fa;
+    background-color: var(--ep-bg-color);
     min-height: 100vh;
 }
 
@@ -392,7 +392,7 @@ onMounted(() => {
 }
 
 .analytics-card {
-    background: #f8f9fa;
+    background: var(--ep-fill-color-light);
     border-radius: 8px;
     padding: 16px;
     height: 100%;
@@ -401,7 +401,7 @@ onMounted(() => {
 .analytics-title {
     font-size: 16px;
     font-weight: 600;
-    color: #303133;
+    color: var(--ep-text-color-primary);
     margin-bottom: 16px;
 }
 
@@ -414,7 +414,7 @@ onMounted(() => {
 
 .chart-placeholder {
     text-align: center;
-    color: #909399;
+    color: var(--ep-text-color-secondary);
 }
 
 .chart-placeholder .el-icon {
@@ -429,7 +429,7 @@ onMounted(() => {
 
 .chart-placeholder small {
     font-size: 12px;
-    color: #c0c4cc;
+    color: var(--ep-text-color-placeholder);
 }
 
 .analytics-metrics {
@@ -443,28 +443,28 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     padding: 8px 12px;
-    background: white;
+    background: var(--ep-bg-color);
     border-radius: 6px;
-    border-left: 3px solid #409eff;
+    border-left: 3px solid var(--ep-color-primary);
 }
 
 .metric-label {
     font-size: 14px;
-    color: #606266;
+    color: var(--ep-text-color-regular);
 }
 
 .metric-value {
     font-size: 16px;
     font-weight: 600;
-    color: #67c23a;
+    color: var(--ep-color-success);
 }
 
 .metric-value.warning {
-    color: #e6a23c;
+    color: var(--ep-color-warning);
 }
 
 .metric-value.danger {
-    color: #f56c6c;
+    color: var(--ep-color-danger);
 }
 
 .analytics-suggestions {
@@ -477,7 +477,7 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     height: 100px;
-    color: #67c23a;
+    color: var(--ep-color-success);
 }
 
 .no-suggestions .el-icon {
@@ -501,7 +501,7 @@ onMounted(() => {
     align-items: flex-start;
     gap: 8px;
     padding: 8px;
-    background: white;
+    background: var(--ep-bg-color);
     border-radius: 6px;
     font-size: 13px;
     line-height: 1.4;
@@ -513,11 +513,11 @@ onMounted(() => {
 }
 
 .suggestion-item .el-icon.warning {
-    color: #e6a23c;
+    color: var(--ep-color-warning);
 }
 
 .suggestion-item .el-icon.info {
-    color: #409eff;
+    color: var(--ep-color-primary);
 }
 
 .card-header {
@@ -528,7 +528,7 @@ onMounted(() => {
 
 
 .mapping-tabs {
-    background: white;
+    background: var(--ep-bg-color);
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }

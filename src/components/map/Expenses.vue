@@ -1070,9 +1070,9 @@ const sortByAccount = (a: Expense, b: Expense): number => {
 <style scoped>
 .expense-mapping {
   padding: 20px;
-  background: white;
+  background: var(--ep-bg-color);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .toolbar {
@@ -1082,6 +1082,10 @@ const sortByAccount = (a: Expense, b: Expense): number => {
   margin-bottom: 20px;
   gap: 16px;
   flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--ep-fill-color-light);
+  border: 1px solid var(--ep-border-color);
+  border-radius: 8px;
 }
 
 .search-section {
@@ -1172,7 +1176,7 @@ const sortByAccount = (a: Expense, b: Expense): number => {
 
 .progress-text {
   margin-top: 8px;
-  color: #606266;
+  color: var(--ep-text-color-regular);
   font-size: 14px;
 }
 
@@ -1183,9 +1187,9 @@ const sortByAccount = (a: Expense, b: Expense): number => {
 .delete-items-list {
   max-height: 300px;
   overflow-y: auto;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--ep-border-color);
   border-radius: 6px;
-  background-color: #fafafa;
+  background-color: var(--ep-fill-color-light);
   margin-bottom: 20px;
 }
 
@@ -1194,7 +1198,7 @@ const sortByAccount = (a: Expense, b: Expense): number => {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid #e4e7ed;
+  border-bottom: 1px solid var(--ep-border-color);
   transition: background-color 0.2s ease;
 }
 
@@ -1203,7 +1207,7 @@ const sortByAccount = (a: Expense, b: Expense): number => {
 }
 
 .delete-item:hover {
-  background-color: #f0f2f5;
+  background-color: var(--ep-fill-color-lighter);
 }
 
 .item-info {
@@ -1220,25 +1224,25 @@ const sortByAccount = (a: Expense, b: Expense): number => {
 }
 
 .item-payee {
-  color: #606266;
+  color: var(--ep-text-color-regular);
   font-size: 14px;
 }
 
 .item-account {
-  color: #909399;
+  color: var(--ep-text-color-secondary);
   font-size: 12px;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  background-color: #f0f9ff;
+  background-color: var(--ep-color-primary-light-9);
   padding: 2px 6px;
   border-radius: 4px;
   display: inline-block;
 }
 
 .item-index {
-  color: #909399;
+  color: var(--ep-text-color-secondary);
   font-size: 12px;
   font-weight: 500;
-  background-color: #e4e7ed;
+  background-color: var(--ep-fill-color);
   padding: 4px 8px;
   border-radius: 12px;
   min-width: 24px;
@@ -1252,7 +1256,7 @@ const sortByAccount = (a: Expense, b: Expense): number => {
 
 .progress-text {
   margin-top: 8px;
-  color: #606266;
+  color: var(--ep-text-color-regular);
   font-size: 14px;
 }
 
@@ -1267,7 +1271,7 @@ const sortByAccount = (a: Expense, b: Expense): number => {
 
 .error-item {
   margin-bottom: 4px;
-  color: #f56c6c;
+  color: var(--ep-color-danger);
   font-size: 13px;
 }
 
@@ -1366,7 +1370,7 @@ const sortByAccount = (a: Expense, b: Expense): number => {
   margin: 0 0 12px 0;
   font-size: 14px;
   font-weight: 600;
-  color: #303133;
+  color: var(--ep-text-color-primary);
 }
 
 .current-tags {

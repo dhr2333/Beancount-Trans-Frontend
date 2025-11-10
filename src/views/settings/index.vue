@@ -980,6 +980,8 @@ onMounted(() => {
     padding: 20px;
     max-width: 1000px;
     margin: 0 auto;
+    background: var(--ep-bg-color);
+    border-radius: 16px;
 }
 
 .settings-card {
@@ -992,7 +994,7 @@ onMounted(() => {
 
 .card-header h2 {
     margin: 0 0 8px 0;
-    color: #303133;
+    color: var(--ep-text-color-primary);
     font-size: 24px;
 }
 
@@ -1005,8 +1007,9 @@ onMounted(() => {
 }
 
 .danger-card {
-    border: 1px solid #d8dee4;
+    border: 1px solid var(--ep-border-color);
     padding: 0;
+    background: var(--ep-fill-color-light);
 }
 
 .danger-zone {
@@ -1020,8 +1023,8 @@ onMounted(() => {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    border: 1px solid #f0d9dc;
-    background: #fff;
+    border: 1px solid var(--ep-color-danger-light-7);
+    background: var(--ep-color-danger-light-9);
     border-radius: 8px;
     padding: 20px 24px;
     gap: 24px;
@@ -1029,13 +1032,13 @@ onMounted(() => {
 
 .danger-zone__content {
     flex: 1;
-    color: #57606a;
+    color: var(--ep-text-color-regular);
     line-height: 1.6;
 }
 
 .danger-zone__title {
     font-weight: 600;
-    color: #24292f;
+    color: var(--ep-text-color-primary);
     margin-bottom: 6px;
     font-size: 16px;
 }
@@ -1045,7 +1048,7 @@ onMounted(() => {
 }
 
 .danger-zone__content p strong {
-    color: #cf222e;
+    color: var(--ep-color-danger);
 }
 
 .danger-zone__actions {
@@ -1054,17 +1057,17 @@ onMounted(() => {
 }
 
 .danger-zone__button {
-    border-color: #cf222e;
-    color: #cf222e;
+    border-color: var(--ep-color-danger);
+    color: var(--ep-color-danger);
     font-weight: 600;
     padding: 10px 20px;
 }
 
 .danger-zone__button:hover,
 .danger-zone__button:focus {
-    background: rgba(207, 34, 46, 0.08);
-    color: #b6202c;
-    border-color: #b6202c;
+    background: var(--ep-color-danger-light-7);
+    color: var(--ep-color-danger);
+    border-color: var(--ep-color-danger);
 }
 
 .binding-item,
@@ -1073,7 +1076,7 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     padding: 16px 0;
-    border-bottom: 1px solid #ebeef5;
+    border-bottom: 1px solid var(--ep-border-color);
 }
 
 .binding-item:last-child,
@@ -1092,7 +1095,7 @@ onMounted(() => {
 .security-icon {
     font-size: 24px;
     margin-right: 12px;
-    color: #409eff;
+    color: var(--ep-color-primary);
 }
 
 .binding-details,
@@ -1108,7 +1111,7 @@ onMounted(() => {
 
 .binding-value,
 .security-value {
-    color: #606266;
+    color: var(--ep-text-color-regular);
     font-size: 14px;
 }
 
@@ -1153,11 +1156,11 @@ onMounted(() => {
 :global(.settings-confirm-dialog .ep-message-box__title) {
     font-weight: 600;
     font-size: 18px;
-    color: #24292f;
+    color: var(--ep-text-color-primary);
 }
 
 :global(.settings-confirm-dialog .ep-message-box__content) {
-    color: #57606a;
+    color: var(--ep-text-color-regular);
     line-height: 1.6;
     text-align: left;
     padding: 12px 0 0;
@@ -1170,8 +1173,8 @@ onMounted(() => {
 }
 
 :global(.settings-confirm-primary) {
-    background-color: #2da44e;
-    border-color: #2da44e;
+    background-color: var(--ep-color-success);
+    border-color: var(--ep-color-success);
     border-radius: 6px;
     min-width: 96px;
     font-weight: 600;
@@ -1187,8 +1190,8 @@ onMounted(() => {
 }
 
 :global(.settings-confirm-danger) {
-    background-color: #d0353a;
-    border-color: #d0353a;
+    background-color: var(--ep-color-danger);
+    border-color: var(--ep-color-danger);
     border-radius: 6px;
     min-width: 110px;
     font-weight: 600;

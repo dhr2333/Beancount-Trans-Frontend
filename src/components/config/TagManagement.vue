@@ -575,7 +575,7 @@ onMounted(() => {
 <style scoped>
 .tag-management {
     padding: 20px;
-    background-color: #ffffff;
+    background-color: var(--ep-bg-color);
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     animation: fadeIn 0.6s ease;
@@ -587,12 +587,12 @@ onMounted(() => {
     align-items: center;
     margin-bottom: 20px;
     padding-bottom: 15px;
-    border-bottom: 1px solid #e4e7ed;
+    border-bottom: 1px solid var(--ep-border-color);
 }
 
 .management-header h2 {
     margin: 0;
-    color: #303133;
+    color: var(--ep-text-color-primary);
     font-size: 24px;
     font-weight: 600;
 }
@@ -610,18 +610,18 @@ onMounted(() => {
 
 .tag-tree-panel {
     flex: 0 0 400px;
-    border: 1px solid #e4e7ed;
+    border: 1px solid var(--ep-border-color);
     border-radius: 8px;
     padding: 15px;
-    background-color: #fafafa;
+    background-color: var(--ep-fill-color-light);
 }
 
 .tag-detail-panel {
     flex: 1;
-    border: 1px solid #e4e7ed;
+    border: 1px solid var(--ep-border-color);
     border-radius: 8px;
     padding: 20px;
-    background-color: #ffffff;
+    background-color: var(--ep-bg-color);
 }
 
 .tag-tree {
@@ -643,7 +643,7 @@ onMounted(() => {
 
 .node-label {
     font-weight: 500;
-    color: #303133;
+    color: var(--ep-text-color-primary);
 }
 
 .node-actions {
@@ -654,11 +654,11 @@ onMounted(() => {
 
 .tag-detail h3 {
     margin: 0 0 20px 0;
-    color: #303133;
+    color: var(--ep-text-color-primary);
     font-size: 20px;
     font-weight: 600;
     padding-bottom: 10px;
-    border-bottom: 2px solid #409eff;
+    border-bottom: 2px solid var(--ep-color-primary);
 }
 
 .info-card {
@@ -678,7 +678,7 @@ onMounted(() => {
 }
 
 .info-card code {
-    background: #f5f7fa;
+    background: var(--ep-fill-color-light);
     padding: 2px 8px;
     border-radius: 4px;
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
@@ -692,12 +692,12 @@ onMounted(() => {
     gap: 10px;
     margin-top: 20px;
     padding-top: 20px;
-    border-top: 1px solid #e4e7ed;
+    border-top: 1px solid var(--ep-border-color);
 }
 
 .form-help-text {
     font-size: 12px;
-    color: #909399;
+    color: var(--ep-text-color-secondary);
     margin-top: 4px;
 }
 
@@ -728,15 +728,15 @@ onMounted(() => {
     align-items: center;
     padding: 12px 16px;
     margin-bottom: 8px;
-    background-color: #f8f9fa;
+    background-color: var(--ep-fill-color-light);
     border-radius: 6px;
-    border: 1px solid #e9ecef;
+    border: 1px solid var(--ep-border-color);
     transition: all 0.2s ease;
 }
 
 .mapping-item:hover {
-    background-color: #e9ecef;
-    border-color: #dee2e6;
+    background-color: var(--ep-fill-color);
+    border-color: var(--ep-border-color);
 }
 
 .mapping-info {
@@ -748,9 +748,9 @@ onMounted(() => {
 
 .mapping-key {
     font-weight: 500;
-    color: #303133;
+    color: var(--ep-text-color-primary);
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-    background-color: #f1f3f4;
+    background-color: var(--ep-fill-color-lighter);
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 12px;
@@ -759,21 +759,21 @@ onMounted(() => {
 .mapping-payee,
 .mapping-full,
 .mapping-payer {
-    color: #606266;
+    color: var(--ep-text-color-regular);
     font-size: 14px;
 }
 
 .mapping-account {
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-    background-color: #f0f9ff;
+    background-color: var(--ep-color-primary-light-9);
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 12px;
-    color: #0369a1;
+    color: var(--ep-color-primary);
 }
 
 .mapping-currency {
-    color: #909399;
+    color: var(--ep-text-color-secondary);
     font-size: 12px;
     font-style: italic;
 }

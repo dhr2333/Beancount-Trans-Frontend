@@ -101,7 +101,8 @@
             <el-table-column prop="name" label="名称">
                 <template #default="{ row }">
                     <div class="flex items-center cursor-pointer" @click="handleNodeClick(row)">
-                        <el-icon :color="row.node_type === 'directory' ? '#F7C242' : '#409EFF'">
+                        <el-icon
+                            :color="row.node_type === 'directory' ? 'var(--ep-color-warning)' : 'var(--ep-color-primary)'">
                             <component :is="row.node_type === 'directory' ? Folder : Document" />
                         </el-icon>
                         <span class="ml-2">{{ row.name }}</span>
@@ -859,7 +860,7 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
 
 .file-management {
     padding: 20px;
-    background-color: #ffffff;
+    background-color: var(--ep-bg-color);
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     animation: fadeIn 0.6s ease;
@@ -868,9 +869,9 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
 .path-display {
     margin-bottom: 15px;
     font-size: 14px;
-    color: #606266;
+    color: var(--ep-text-color-regular);
     padding: 10px;
-    background: #f5f7fa;
+    background: var(--ep-fill-color-light);
     border-radius: 4px;
 }
 
