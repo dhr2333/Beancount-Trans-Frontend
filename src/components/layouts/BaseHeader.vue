@@ -108,6 +108,10 @@
         <img src="/images/wechat-channel.jpg" alt="Wechat-Channel" style="max-width: 100%" slot="content" />
       </el-popover>
     </el-menu-item> -->
+    <el-menu-item index="theme-toggle" class="theme-toggle">
+      <el-switch v-model="isDark" size="small" inline-prompt :active-icon="Moon" :inactive-icon="Sunny" active-text="夜间"
+        inactive-text="日间" />
+    </el-menu-item>
     <el-menu-item>
       <el-link href="https://github.com/dhr2333/Beancount-Trans" target="_blank"
         style="display: inline-flex; align-items: center;"> <img
@@ -136,6 +140,8 @@ import { ref, onMounted, watchEffect } from "vue";
 import axios from '../../utils/request'
 import router from "~/routers";
 import { ElMessage, ElLoading } from 'element-plus';
+import { isDark } from "~/composables";
+import { Moon, Sunny } from "@element-plus/icons-vue";
 
 // 定义响应式的用户名
 const username = ref(localStorage.getItem("username") || "未登录");
@@ -233,7 +239,6 @@ watchEffect(() => {
 const handleSelect = (key: string, keyPath: string[]) => {
   // 你可以在这里添加自定义逻辑
 };
-
 // 临时测试数据
 announcements.value = [{
   id: 1,
@@ -304,7 +309,7 @@ const openFavaInstance = async () => {
   padding: 20px;
   margin-bottom: 15px;
   border-radius: 8px;
-  background: #f8f9fa;
+  background: var(--ep-fill-color-light);
   transition: all 0.3s;
 
   &:hover {
@@ -321,18 +326,18 @@ const openFavaInstance = async () => {
 
   .announce-title {
     margin: 0;
-    color: #2c3e50;
+    color: var(--ep-text-color-primary);
     font-size: 1.1em;
   }
 
   .announce-time {
-    color: #95a5a6;
+    color: var(--ep-text-color-secondary);
     font-size: 0.9em;
   }
 
   .announce-content {
     line-height: 1.6;
-    color: #34495e;
+    color: var(--ep-text-color-regular);
 
     /* 处理富文本内容样式 */
     & p {
@@ -347,5 +352,19 @@ const openFavaInstance = async () => {
 
 .empty-announce {
   padding: 40px 0;
+}
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+
+  .el-switch {
+    --el-switch-on-color: var(--ep-color-primary);
+    --el-switch-off-color: var(--ep-fill-color-dark);
+  }
+}
+
+html.dark .announce-item {
+  background: var(--ep-fill-color);
 }
 </style>

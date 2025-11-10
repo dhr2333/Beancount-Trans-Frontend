@@ -315,6 +315,8 @@ onMounted(() => {
     padding: 20px;
     max-width: 1200px;
     margin: 0 auto;
+    background-color: var(--ep-bg-color);
+    border-radius: 12px;
 }
 
 .template-header {
@@ -327,13 +329,14 @@ onMounted(() => {
 .template-header h1 {
     margin: 0;
     font-size: 24px;
-    color: #303133;
+    color: var(--ep-text-color-primary);
 }
 
 .template-card {
     margin-bottom: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+    background-color: var(--ep-fill-color-light);
 }
 
 .template-card__header {
@@ -352,7 +355,7 @@ onMounted(() => {
     flex-wrap: wrap;
     align-items: center;
     margin-bottom: 10px;
-    color: #909399;
+    color: var(--ep-text-color-regular);
     font-size: 14px;
     gap: 15px;
 }
@@ -365,7 +368,7 @@ onMounted(() => {
 
 .template-description {
     margin: 10px 0;
-    color: #606266;
+    color: var(--ep-text-color-regular);
 }
 
 .template-collapse {
@@ -387,11 +390,11 @@ onMounted(() => {
     gap: 8px;
     margin: 0 0 10px 0;
     font-size: 14px;
-    color: #303133;
+    color: var(--ep-text-color-primary);
 }
 
 .account-count {
-    color: #909399;
+    color: var(--ep-text-color-secondary);
     font-weight: normal;
 }
 
@@ -406,21 +409,21 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     padding: 8px 12px;
-    background-color: #f8f9fa;
+    background-color: var(--ep-fill-color-light);
     border-radius: 4px;
-    border-left: 3px solid #409eff;
+    border-left: 3px solid var(--ep-color-primary);
 }
 
 .account-path {
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
     font-size: 13px;
-    color: #606266;
+    color: var(--ep-text-color-regular);
 }
 
 .template-actions {
     margin-top: 15px;
     padding-top: 15px;
-    border-top: 1px solid #ebeef5;
+    border-top: 1px solid var(--ep-border-color);
     display: flex;
     justify-content: flex-end;
 }
@@ -432,7 +435,7 @@ onMounted(() => {
 .empty-state {
     text-align: center;
     padding: 40px 0;
-    color: #909399;
+    color: var(--ep-text-color-secondary);
 }
 
 .empty-state .el-icon {
