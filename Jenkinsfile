@@ -65,6 +65,23 @@ pipeline {
             }
         }
 
+        stage('语义化发布') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo "📝 运行 semantic-release，生成前端版本与发布记录..."
+                    withCredentials([string(credentialsId: '1b709f07-d907-4000-8a8a-2adafa6fc658', variable: 'GITHUB_TOKEN')]) {
+                        sh '''
+                            npm ci
+                            npm run release
+                        '''
+                    }
+                }
+            }
+        }
+
 		stage('部署到服务器') {
 		    when {
 		        anyOf {
