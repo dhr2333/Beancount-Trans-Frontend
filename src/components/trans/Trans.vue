@@ -9,7 +9,7 @@
       <el-icon class="el-icon--upload"><upload-filled /></el-icon>
       拖拽文件至此处 或 <em>单击上传</em>
     </div>
-    <p class="upload-privacy-hint" style="color: #666; font-size: 0.9em;">
+    <p class="upload-privacy-hint">
       该操作不会保存您的任何文件，所有上传的文件均在处理完成后立即删除
     </p>
     <template #tip>
@@ -78,11 +78,12 @@ or
               <el-tag v-if="scope.row.ai_choose" type="success" class="selected-tag">{{ scope.row.ai_choose }}</el-tag>
               <span v-else class="no-category-tip">无分类建议</span>
             </div>
-            <div v-if="scope.row.ai_candidates && scope.row.ai_candidates.length > 1" class="candidates">
+            <div v-if="scope.row.ai_candidates && scope.row.ai_candidates.length > 0" class="candidates">
               <span class="label">候选分类：</span>
               <div class="candidate-tags">
                 <el-tag v-for="(candidate, idx) in scope.row.ai_candidates" :key="idx"
-                  :type="candidate.key === scope.row.ai_choose ? 'success' : 'info'" class="candidate-tag"
+                  :type="candidate.key === scope.row.ai_choose ? 'success' : 'info'"
+                  :class="['candidate-tag', { 'is-selected': candidate.key === scope.row.ai_choose }]"
                   @click="handleAiChoose(scope.$index, candidate.key)">
                   {{ candidate.key }}
                   <span class="score" v-if="candidate.score !== undefined">
@@ -91,11 +92,8 @@ or
                 </el-tag>
               </div>
             </div>
-            <div v-else-if="scope.row.ai_candidates && scope.row.ai_candidates.length === 1" class="candidates">
-              <span class="label" style="color: #909399;">仅有一个分类建议</span>
-            </div>
             <div v-else class="candidates">
-              <span class="label" style="color: #909399;">无候选分类</span>
+              <span class="label muted">无候选分类</span>
             </div>
           </div>
         </template>
@@ -157,7 +155,7 @@ interface BillEntry {
   id: string;
   formatted: string;
   ai_choose: string;
-  ai_candidates: Array<{
+  ai_candidates?: Array<{
     key: string;
     score?: number;
   }>;
@@ -229,11 +227,23 @@ const handleUploadSuccess = (response: any, file: any) => {
     responseData.value = response
     downloadCSV(responseData.value)
   } else {
-    responseList.value = response.results; // 存储所有条目
-    responseData.value = response.results.map((item: any) => item.formatted).join(''); // 存储所有条目
+    const normalizedResults: BillEntry[] = Array.isArray(response.results)
+      ? response.results.map((item: BillEntry & { ai_candidates?: any[] }) => {
+        const candidates = Array.isArray(item.ai_candidates) ? item.ai_candidates : []
+        const firstCandidate = candidates[0]?.key || ''
+        return {
+          ...item,
+          ai_candidates: candidates,
+          ai_choose: item.ai_choose || firstCandidate || ''
+        }
+      })
+      : []
+
+    responseList.value = normalizedResults // 存储所有条目
+    responseData.value = normalizedResults.map((item) => item.formatted).join('\n') // 存储所有条目
 
     // 检查是否需要显示注册引导
-    parsedCount.value = response.results.length
+    parsedCount.value = normalizedResults.length
     checkAndShowRegisterPrompt()
   }
 };
@@ -264,8 +274,9 @@ const downloadCSV = (csvData: string) => {
   const link = document.createElement("a");
   if (link.download !== undefined) { // 检查浏览器是否支持下载属性
     const url = URL.createObjectURL(blob);
+    const baseName = filename.value ? String(filename.value) : 'beancount-trans-result'
     link.setAttribute("href", url);
-    link.setAttribute("download", filename.value + ".csv");  // 设定下载文件名
+    link.setAttribute("download", `${baseName}.csv`);  // 设定下载文件名
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();  // 触发下载
@@ -335,11 +346,11 @@ const handleAiChoose = async (rowIndex: number, key: string) => {
       responseList.value[rowIndex] = {
         ...responseList.value[rowIndex], // 保留原有属性
         formatted: updatedData.formatted, // 更新格式化内容
-        ai_choose: updatedData.ai_choose // 更新AI选择
+        ai_choose: updatedData.ai_choose || key
       };
 
       // 更新整个结果文本框
-      responseData.value = responseList.value.map(item => item.formatted).join('');
+      responseData.value = responseList.value.map(item => item.formatted).join('\n');
 
       ElMessage.success('已反馈AI选择');
     } else {
@@ -363,6 +374,12 @@ const handleAiChoose = async (rowIndex: number, key: string) => {
   margin-left: 14px;
 }
 
+.upload-privacy-hint {
+  color: var(--ep-text-color-secondary);
+  font-size: 0.9em;
+  margin: 6px 0 0;
+}
+
 .result-container {
   position: relative;
   margin-top: 20px;
@@ -373,7 +390,6 @@ const handleAiChoose = async (rowIndex: number, key: string) => {
   right: 10px;
   top: 10px;
   z-index: 100;
-
 }
 
 .result-textarea textarea {
@@ -395,9 +411,13 @@ const handleAiChoose = async (rowIndex: number, key: string) => {
 
 .label {
   font-size: 12px;
-  color: #606266;
+  color: var(--ep-text-color-secondary);
   margin-right: 8px;
   flex-shrink: 0;
+}
+
+.label.muted {
+  color: var(--ep-text-color-placeholder);
 }
 
 .candidate-tags {
@@ -413,34 +433,27 @@ const handleAiChoose = async (rowIndex: number, key: string) => {
 
 .candidate-tag:hover {
   transform: translateY(-2px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
 .candidate-tag.is-selected {
   font-weight: bold;
-  border-width: 2px;
 }
 
 .score {
   font-size: 0.85em;
-  color: #909399;
+  color: var(--ep-text-color-placeholder);
   margin-left: 2px;
 }
 
-.candidate-tag:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
-
 .no-category-tip {
-  color: #909399;
+  color: var(--ep-text-color-placeholder);
   font-size: 12px;
   display: inline-block;
   line-height: 22px;
-  /* 与 el-tag 高度一致 */
   padding: 0 9px;
   border-radius: 4px;
-  background: #f4f4f5;
+  background: var(--ep-fill-color-light);
   vertical-align: middle;
 }
 
@@ -461,9 +474,11 @@ const handleAiChoose = async (rowIndex: number, key: string) => {
   box-sizing: border-box;
 }
 
-.el-table {
-  border-radius: 10px;
-  overflow: hidden;
-  background: #fff;
+:deep(html.dark) .candidate-tag:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+:deep(html.dark) .no-category-tip {
+  background: var(--ep-fill-color-darker);
 }
 </style>

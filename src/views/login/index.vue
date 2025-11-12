@@ -735,17 +735,30 @@ const switchToRegister = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 0;
+  padding: 24px 16px;
   overflow: auto;
   box-sizing: border-box;
+  background: radial-gradient(circle at top, rgba(64, 158, 255, 0.18), transparent 55%),
+    radial-gradient(circle at bottom, rgba(103, 194, 58, 0.12), transparent 60%);
+}
+
+:deep(html.dark) .login-container {
+  background: radial-gradient(circle at top, rgba(64, 158, 255, 0.12), transparent 55%),
+    radial-gradient(circle at bottom, rgba(103, 194, 58, 0.08), transparent 60%);
 }
 
 .login-card {
   width: 100%;
   max-width: 480px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  background: var(--ep-bg-color);
+  border: 1px solid var(--ep-border-color);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(16px);
+}
+
+:deep(html.dark) .login-card {
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
 }
 
 .card-header {
@@ -754,7 +767,7 @@ const switchToRegister = () => {
 
 .card-header h2 {
   margin: 0 0 8px 0;
-  color: #303133;
+  color: var(--ep-text-color-primary);
   font-size: 24px;
 }
 
@@ -791,7 +804,11 @@ const switchToRegister = () => {
   text-align: center;
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid var(--ep-border-color);
+}
+
+:deep(html.dark) .form-footer {
+  border-top-color: var(--ep-border-color-extra-light, var(--ep-border-color));
 }
 
 :deep(.el-tabs__item) {
@@ -803,14 +820,15 @@ const switchToRegister = () => {
 }
 
 :deep(.el-input__wrapper) {
-  box-shadow: 0 0 0 1px #dcdfe6 inset;
+  box-shadow: 0 0 0 1px var(--ep-border-color) inset;
+  background-color: var(--ep-color-white, var(--ep-bg-color));
 }
 
 :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px #c0c4cc inset;
+  box-shadow: 0 0 0 1px var(--ep-color-primary-light-5) inset;
 }
 
 :deep(.el-input.is-focus .el-input__wrapper) {
-  box-shadow: 0 0 0 1px #409eff inset;
+  box-shadow: 0 0 0 1px var(--ep-color-primary) inset;
 }
 </style>
