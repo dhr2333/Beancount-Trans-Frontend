@@ -1,3 +1,6 @@
+# Changelog
+
+本文件由 semantic-release 自动维护，用于记录 Beancount-Trans-Backend 的版本变化。
 ## 1.0.0 (2025-11-11)
 
 ### Features
