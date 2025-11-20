@@ -1,0 +1,108 @@
+---
+globs: src/api/**/*.ts
+description: 应用层 - API 调用规范
+---
+
+# 应用层：API 调用规范
+
+## API 文件组织
+
+- 所有 API 调用必须放在 `src/api/` 目录下
+- 按功能模块组织 API 文件，例如 `tags.ts`、`accounts.ts` 等
+- 每个 API 文件对应一个业务模块
+- 参考实际 API 文件：[src/api/tags.ts](mdc:src/api/tags.ts)
+
+## API 函数定义
+
+### 类型定义
+
+- **所有 API 函数必须提供明确的返回类型**，使用泛型 `axios.get<T>()`、`axios.post<T>()` 等
+- 请求参数必须定义接口类型，禁止使用 `any`
+- 响应数据类型必须在 `src/types/` 目录下定义
+
+```typescript
+// ✅ 正确示例：定义请求参数和响应类型（参考 src/api/tags.ts）
+import axios from '../utils/request'
+import type { Tag, TagForm } from '../types/tag'
+
+interface FetchTagsParams {
+  name?: string
+  enable?: boolean
+  page?: number
+  page_size?: number
+}
+
+interface TagsResponse {
+  count: number
+  results: Tag[]
+}
+
+export const fetchTags = (params?: FetchTagsParams) => {
+  return axios.get<TagsResponse>('/tags/', { params })
+}
+
+export const createTag = (data: TagForm) => {
+  return axios.post<Tag>('/tags/', data)
+}
+```
+
+### 函数命名
+
+- 使用动词开头：`fetch`、`get`、`create`、`update`、`delete`、`patch`、`put`
+- 使用驼峰命名法
+- 函数名应该清晰表达其功能
+
+```typescript
+// ✅ 正确的命名
+export const fetchTagTree = () => { ... }
+export const createTag = (data: TagForm) => { ... }
+export const updateTag = (id: number, data: Partial<TagForm>) => { ... }
+export const deleteTag = (id: number) => { ... }
+
+// ❌ 错误的命名
+export const getTags = () => { ... }  // 应该用 fetch
+export const tagCreate = (data: TagForm) => { ... }  // 动词应该在前面
+```
+
+### 文档注释
+
+- 每个 API 函数都应该有 JSDoc 注释，说明其功能
+- 注释应该简洁明了
+
+```typescript
+/**
+ * 获取标签树形结构
+ */
+export const fetchTagTree = () => {
+  return axios.get<Tag[]>('/tags/tree/')
+}
+
+/**
+ * 创建标签
+ * @param data - 标签表单数据
+ */
+export const createTag = (data: TagForm) => {
+  return axios.post<Tag>('/tags/', data)
+}
+```
+
+## 导入规范
+
+- 使用相对路径导入工具和类型
+- API 文件应该从 `../utils/request` 导入 axios 实例
+- 类型应该从 `../types/` 目录导入
+
+```typescript
+// ✅ 正确的导入
+import axios from '../utils/request'
+import type { Tag, TagForm } from '../types/tag'
+
+// ❌ 错误的导入（直接导入 axios）
+import axios from 'axios'  // 应该使用封装的 request
+```
+
+## 错误处理
+
+- API 调用中的错误由 `src/utils/request.ts` 中的拦截器统一处理
+- 不需要在 API 函数中捕获错误，除非有特殊需求
+- 错误提示由拦截器统一显示，使用 `ElMessage`

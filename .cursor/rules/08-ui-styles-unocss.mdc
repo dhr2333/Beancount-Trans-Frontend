@@ -1,0 +1,112 @@
+---
+globs: *.vue
+description: UI层 - UnoCSS 原子化 CSS 使用规范
+---
+
+# UI层：UnoCSS 原子化 CSS 使用规范
+
+## UnoCSS 配置
+
+项目使用 UnoCSS 作为原子化 CSS 框架，配置在 [vite.config.ts](mdc:vite.config.ts) 中。
+
+## 原子化 CSS 使用
+
+### 工具类使用
+
+- 在模板中直接使用 UnoCSS 的工具类，避免重复定义样式
+- 优先使用 UnoCSS 工具类，而不是在 `<style>` 中定义简单样式
+
+```vue
+<template>
+  <!-- ✅ 使用 UnoCSS 工具类 -->
+  <div class="flex items-center justify-between p-4">
+    <h1 class="text-xl font-bold">标题</h1>
+    <button class="px-4 py-2 bg-blue-500 text-white rounded">
+      按钮
+    </button>
+  </div>
+</template>
+
+<!-- ❌ 避免在样式中定义简单的工具类 -->
+<style scoped>
+.flex-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+</style>
+```
+
+### 属性化模式
+
+- UnoCSS 支持属性化模式，可以直接在元素上使用属性
+- 属性化模式使模板更简洁
+
+```vue
+<template>
+  <!-- ✅ 使用属性化模式 -->
+  <div flex items-center justify-between p-4>
+    <span text-xl font-bold>文本</span>
+  </div>
+</template>
+```
+
+## 响应式工具类
+
+### 断点使用
+
+- 使用 UnoCSS 的响应式工具类进行移动端适配
+- 断点：`sm:` (640px), `md:` (768px), `lg:` (1024px), `xl:` (1280px)
+
+```vue
+<template>
+  <!-- ✅ UnoCSS 响应式 -->
+  <div class="w-full md:w-1/2 lg:w-1/3">
+    内容
+  </div>
+  
+  <!-- ✅ 响应式显示/隐藏 -->
+  <div class="hidden md:block">
+    桌面端显示
+  </div>
+  
+  <div class="block md:hidden">
+    移动端显示
+  </div>
+</template>
+```
+
+## 与 SCSS 结合
+
+### 何时使用 SCSS
+
+- 复杂的样式逻辑使用 SCSS
+- 需要嵌套和变量时使用 SCSS
+- 简单的布局和间距使用 UnoCSS 工具类
+
+```vue
+<template>
+  <!-- ✅ 简单布局用 UnoCSS -->
+  <div class="flex gap-4 p-4">
+    <div class="flex-1">内容1</div>
+    <div class="flex-1">内容2</div>
+  </div>
+</template>
+
+<style scoped lang="scss">
+// ✅ 复杂样式用 SCSS
+.card {
+  position: relative;
+  transition: all 0.3s;
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  }
+  
+  &__header {
+    // 复杂嵌套逻辑
+  }
+}
+</style>
+```

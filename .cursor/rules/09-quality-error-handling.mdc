@@ -1,0 +1,215 @@
+---
+globs: src/**/*.ts,src/**/*.vue
+description: 质量层 - 错误处理规范
+---
+
+# 质量层：错误处理规范
+
+## 统一错误处理
+
+### Axios 拦截器
+
+- API 请求的错误由 `src/utils/request.ts` 中的响应拦截器统一处理
+- 拦截器负责处理认证错误、网络错误等通用错误情况
+- 组件中通常不需要捕获 API 错误，除非有特殊处理需求
+
+```typescript
+// src/utils/request.ts
+instance.interceptors.response.use(
+  (response) => {
+    return response
+  },
+  async (error) => {
+    // 统一错误处理
+    // 401 错误：自动刷新令牌
+    // 403 错误：跳转到手机号绑定页面
+    // 其他错误：显示错误消息
+    return Promise.reject(error)
+  }
+)
+```
+
+## 组件中的错误处理
+
+### API 调用错误处理
+
+- 在组件中调用 API 时，使用 `try-catch` 捕获错误
+- **错误类型必须明确定义，禁止使用 `any`**
+- 使用 `ElMessage` 显示用户友好的错误消息
+
+```typescript
+// ✅ 正确的错误处理
+import { ElMessage } from 'element-plus'
+import { fetchTags } from '../../api/tags'
+
+async function loadTags() {
+  try {
+    const response = await fetchTags()
+    tagList.value = response.data.results
+  } catch (error: unknown) {
+    // 类型安全的错误处理
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { data?: { message?: string }, status?: number } }
+      const message = axiosError.response?.data?.message || '加载标签失败'
+      ElMessage.error(message)
+    } else {
+      ElMessage.error('网络错误，请稍后重试')
+    }
+  }
+}
+
+// ❌ 错误的错误处理（使用 any）
+async function loadTags() {
+  try {
+    const response = await fetchTags()
+    tagList.value = response.data.results
+  } catch (error: any) {  // 禁止使用 any
+    ElMessage.error(error.response?.data?.message || '加载失败')
+  }
+}
+```
+
+### 表单验证错误处理
+
+- 表单验证错误由 Element Plus 的表单组件自动处理
+- 自定义验证规则应该返回明确的错误消息
+
+```typescript
+import type { FormRules } from 'element-plus'
+
+const formRules: FormRules = {
+  name: [
+    { 
+      required: true, 
+      message: '请输入名称', 
+      trigger: 'blur' 
+    },
+    {
+      validator: (rule, value, callback) => {
+        if (value && value.length < 2) {
+          callback(new Error('名称至少需要 2 个字符'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ]
+}
+```
+
+## 错误类型定义
+
+### 定义错误类型接口
+
+- 为 API 错误响应定义类型接口
+- 错误类型应该在 `src/types/` 目录下定义
+
+```typescript
+// src/types/error.ts
+export interface ApiError {
+  code?: string
+  message: string
+  details?: Record<string, unknown>
+}
+
+export interface ApiErrorResponse {
+  code?: string
+  message: string
+  errors?: Record<string, string[]>
+}
+
+// 使用错误类型
+try {
+  await createTag(data)
+} catch (error: unknown) {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const axiosError = error as { response?: { data?: ApiErrorResponse } }
+    const errorData = axiosError.response?.data
+    if (errorData) {
+      ElMessage.error(errorData.message)
+    }
+  }
+}
+```
+
+## 用户友好的错误消息
+
+### 错误消息规范
+
+- 错误消息应该清晰、具体，帮助用户理解问题
+- 避免显示技术性的错误信息（如 HTTP 状态码）
+- 提供操作建议
+
+```typescript
+// ✅ 用户友好的错误消息
+function handleError(error: unknown) {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const axiosError = error as { response?: { status?: number, data?: { message?: string } } }
+    const status = axiosError.response?.status
+    const message = axiosError.response?.data?.message
+    
+    switch (status) {
+      case 400:
+        ElMessage.error(message || '请求参数错误，请检查输入')
+        break
+      case 401:
+        ElMessage.error('登录已过期，请重新登录')
+        break
+      case 403:
+        ElMessage.error(message || '没有权限执行此操作')
+        break
+      case 404:
+        ElMessage.error('请求的资源不存在')
+        break
+      case 500:
+        ElMessage.error('服务器错误，请稍后重试')
+        break
+      default:
+        ElMessage.error(message || '操作失败，请稍后重试')
+    }
+  } else {
+    ElMessage.error('网络连接失败，请检查网络设置')
+  }
+}
+```
+
+## 加载状态处理
+
+### 使用加载状态
+
+- API 调用时应该显示加载状态
+- 使用 Element Plus 的 `v-loading` 指令或 `loading` 状态
+
+```vue
+<template>
+  <!-- ✅ 使用 v-loading -->
+  <div v-loading="loading">
+    <el-table :data="tableData">...</el-table>
+  </div>
+  
+  <!-- ✅ 使用加载状态 -->
+  <el-button :loading="submitting" @click="handleSubmit">
+    提交
+  </el-button>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+
+const loading = ref(false)
+const submitting = ref(false)
+
+async function loadData() {
+  loading.value = true
+  try {
+    const response = await fetchData()
+    // 处理数据
+  } catch (error: unknown) {
+    // 错误处理
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+```

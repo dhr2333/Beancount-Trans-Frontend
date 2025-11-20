@@ -1,0 +1,112 @@
+---
+globs: *.ts,*.tsx,*.vue
+description: 基础层 - TypeScript 语言规范
+---
+
+# 基础层：TypeScript 语言规范
+
+## 语言要求
+
+### 统一使用 TypeScript
+
+- **所有新文件必须使用 TypeScript**，禁止创建 `.js` 文件
+- Vue 组件的 `<script>` 标签必须包含 `lang="ts"` 属性
+- 所有工具函数、API 调用、类型定义都应使用 TypeScript
+
+### 类型安全原则
+
+- **严格禁止使用 `any` 类型**，必须为所有变量、函数参数、返回值提供明确的类型定义
+- 如果类型暂时无法确定，应使用以下替代方案：
+  - 使用 `unknown` 类型，并在使用时进行类型守卫（type guard）
+  - 创建具体的接口（interface）或类型别名（type alias）
+  - 使用泛型（generic）来保持类型安全
+  - 使用联合类型（union types）如 `string | number | null`
+
+```typescript
+// ❌ 错误示例：禁止使用 any
+function processData(data: any) {
+  return data.value
+}
+
+// ✅ 正确示例：使用具体的类型
+interface Data {
+  value: string | number
+}
+function processData(data: Data) {
+  return data.value
+}
+
+// ✅ 如果类型暂时未知，使用 unknown + 类型守卫
+function processData(data: unknown) {
+  if (typeof data === 'object' && data !== null && 'value' in data) {
+    return (data as { value: string | number }).value
+  }
+  throw new Error('Invalid data format')
+}
+```
+
+### TypeScript 配置
+
+- 确保 `tsconfig.json` 中 `strict` 模式已启用
+- 使用 `vue-tsc` 进行类型检查，确保类型安全
+- 运行 `npm run typecheck` 确保没有类型错误
+
+## 类型定义规范
+
+### 接口定义
+
+- 使用 `interface` 定义对象类型
+- 接口名使用 PascalCase（大驼峰）
+- 接口应该清晰表达其用途
+- 参考实际类型定义文件：[src/types/tag.ts](mdc:src/types/tag.ts)
+
+```typescript
+// ✅ 正确的接口定义（参考 src/types/tag.ts）
+export interface Tag {
+  id: number
+  name: string
+  parent: number | null
+  full_path: string
+  description: string
+  enable: boolean
+  children?: Tag[]
+}
+
+export interface TagForm {
+  name: string
+  parent?: number | null
+  description?: string
+  enable?: boolean
+}
+```
+
+### 类型别名
+
+- 使用 `type` 定义类型别名
+- 适用于联合类型、工具类型等
+
+```typescript
+// ✅ 类型别名
+export type TagStatus = 'active' | 'inactive'
+export type TagId = number
+export type Nullable<T> = T | null
+```
+
+### 泛型使用
+
+- 合理使用泛型提高代码复用性
+- 泛型参数使用大写字母，如 `T`、`K`、`V`
+
+```typescript
+// ✅ 泛型函数
+function identity<T>(arg: T): T {
+  return arg
+}
+
+// ✅ 泛型接口
+interface ApiResponse<T> {
+  data: T
+  status: number
+  message: string
+}
+```

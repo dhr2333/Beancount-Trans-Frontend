@@ -1,0 +1,149 @@
+---
+globs: *.vue
+description: 基础层 - Vue 组合式 API 规范
+---
+
+# 基础层：Vue 组合式 API 规范
+
+## Vue 框架要求
+
+### 组合式 API（Composition API）
+
+- **所有 Vue 组件必须使用组合式 API**，禁止使用选项式 API（Options API）
+- 使用 `<script setup lang="ts">` 语法糖，这是推荐的组合式 API 写法
+
+```vue
+<!-- ❌ 错误示例：禁止使用选项式 API -->
+<script lang="ts">
+import { defineComponent } from 'vue'
+export default defineComponent({
+  name: 'MyComponent',
+  data() {
+    return {
+      count: 0
+    }
+  },
+  methods: {
+    increment() {
+      this.count++
+    }
+  }
+})
+</script>
+
+<!-- ✅ 正确示例：使用组合式 API -->
+<script setup lang="ts">
+import { ref } from 'vue'
+
+const count = ref<number>(0)
+
+const increment = () => {
+  count.value++
+}
+</script>
+```
+
+## 组件定义规范
+
+### Props 类型定义
+
+- 使用 TypeScript 接口定义 Props 类型
+- 使用 `defineProps<T>()` 进行类型定义
+- 可选的 Props 使用 `?` 标记
+- 提供默认值时使用 `withDefaults`
+- 参考实际组件示例：[src/components/common/TagSelector.vue](mdc:src/components/common/TagSelector.vue)
+
+```typescript
+interface Props {
+  title: string
+  count?: number
+  disabled?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  count: 0,
+  disabled: false
+})
+```
+
+### Emits 类型定义
+
+- 使用对象语法定义 Emits 类型
+- 事件名使用 kebab-case
+- 事件参数必须明确类型
+
+```typescript
+const emit = defineEmits<{
+  'update:modelValue': [value: string]
+  'change': [value: string, oldValue: string]
+  'click': [event: MouseEvent]
+}>()
+```
+
+### 响应式数据类型
+
+- 所有响应式变量必须提供明确的类型定义
+- `ref<T>()` 和 `reactive<T>()` 都需要指定泛型类型
+
+```typescript
+// ✅ 正确的响应式类型定义
+const count = ref<number>(0)
+const user = ref<User | null>(null)
+const list = ref<Item[]>([])
+
+interface State {
+  name: string
+  age: number
+}
+const state = reactive<State>({
+  name: '',
+  age: 0
+})
+```
+
+## Composables（组合式函数）
+
+### Composables 规范
+
+- 可复用的逻辑应封装为 Composables
+- Composables 文件应使用 `.ts` 扩展名（而非 `.js`）
+- 文件命名使用 `use` 前缀，例如 `useDark.ts`、`useCounter.ts`
+- 所有 Composables 的返回值都应提供明确的类型定义
+
+```typescript
+// ✅ Composables 类型定义示例
+interface UseCounterReturn {
+  count: Ref<number>
+  increment: () => void
+  decrement: () => void
+}
+
+export function useCounter(initialValue: number = 0): UseCounterReturn {
+  const count = ref<number>(initialValue)
+  
+  const increment = () => {
+    count.value++
+  }
+  
+  const decrement = () => {
+    count.value--
+  }
+  
+  return {
+    count,
+    increment,
+    decrement
+  }
+}
+```
+
+### Composables 组织
+
+- Composables 文件放在 `src/composables/` 目录下
+- 通过 `src/composables/index.ts` 统一导出
+
+```typescript
+// src/composables/index.ts
+export * from './dark'
+export * from './counter'
+```

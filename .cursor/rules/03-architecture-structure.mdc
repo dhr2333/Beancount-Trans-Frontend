@@ -1,0 +1,166 @@
+---
+alwaysApply: true
+description: 架构层 - 项目结构和组织规范
+---
+
+# 架构层：项目结构和组织规范
+
+## 项目目录结构
+
+### 标准目录结构
+
+```text
+src/
+├── api/              # API 调用接口
+├── assets/           # 静态资源（图片、字体等）
+├── components/       # Vue 组件
+│   ├── common/       # 通用组件
+│   ├── config/       # 配置管理组件
+│   ├── file/         # 文件管理组件
+│   ├── layouts/      # 布局组件
+│   ├── map/          # 映射相关组件
+│   ├── template/     # 模板管理组件
+│   └── trans/        # 转换相关组件
+├── composables/      # 组合式函数（Composables）
+├── routers.ts        # 路由配置
+├── styles/           # 全局样式
+│   └── element/      # Element Plus 主题定制
+├── types/            # TypeScript 类型定义
+├── utils/            # 工具函数
+├── views/            # 页面视图
+│   ├── login/        # 登录页面
+│   ├── phone-binding/# 手机号绑定页面
+│   └── settings/     # 设置页面
+├── App.vue           # 根组件
+└── main.ts           # 应用入口
+```
+
+## 文件命名规范
+
+### TypeScript 文件
+
+- 使用 camelCase（小驼峰）命名，例如：`request.ts`、`auth.ts`
+- 工具函数文件使用动词或名词，例如：`getUserInfo.ts`、`formatDate.ts`
+
+### Vue 组件文件
+
+- 使用 PascalCase（大驼峰）命名，例如：`TagSelector.vue`、`AccountManagement.vue`
+- 组件名应该清晰表达其功能
+
+### 目录命名
+
+- 使用小写字母和连字符（kebab-case），例如：`phone-binding`、`user-tour`
+- 使用单数形式，例如：`component` 而非 `components`
+
+## 模块组织规范
+
+### API 模块
+
+- **位置**: `src/api/`
+- **命名**: 按业务模块命名，例如 `tags.ts`、`accounts.ts`
+- **导出**: 每个文件导出相关的 API 函数
+
+### 类型定义模块
+
+- **位置**: `src/types/`
+- **命名**: 按业务模块命名，例如 `tag.ts`、`account.ts`
+- **导出**: 导出接口、类型别名和枚举
+
+### 工具函数模块
+
+- **位置**: `src/utils/`
+- **命名**: 按功能命名，例如 `auth.ts`、`request.ts`、`formatDate.ts`
+- **导出**: 导出相关的工具函数
+
+### Composables 模块
+
+- **位置**: `src/composables/`
+- **命名**: 使用 `use` 前缀，例如 `useDark.ts`、`useCounter.ts`
+- **导出**: 导出 composable 函数
+
+## 导入路径规范
+
+### 优先使用相对路径导入同一模块或文件夹下的文件
+
+- 当导入同模块或目录下的文件时，优先采用相对路径，例如 `./` 或 `../`
+- 有利于模块间的解耦和后续移动、重构
+- 路径层级应保持清晰简洁，避免过度嵌套
+
+```typescript
+// ✅ 推荐：导入同一目录或子目录
+import { fetchTags } from './tags'
+import TagSelector from '../common/TagSelector.vue'
+```
+
+### 跨模块时建议使用路径别名
+
+- 为减少长串 `../../../`，项目结构层级较深时建议使用别名
+- 别名统一配置在构建工具（如 `tsconfig.json`、`vite.config.ts` 或 `webpack` 配置中）
+- 常用别名如 `@/`、`~/` 等，指向 `src/`
+
+```typescript
+// ✅ 推荐：跨模块/全局资源使用别名
+import { getUserInfo } from '@/api/user'
+import '~/styles/global.scss'
+```
+
+### 路径书写建议
+
+- 路径区分大小写，严格遵循文件系统命名
+- 统一使用正斜杠 `/`
+- 避免硬编码绝对路径，确保可移植性
+- 不推荐在路径中混用多种风格，团队内部需统一约定
+
+### 总结
+
+- 简单场景优先相对路径，复杂结构合理使用别名
+- 保持路径简洁一致，便于维护和迁移
+
+## 代码组织原则
+
+### 单一职责原则
+
+- 每个文件应该只负责一个功能模块
+- 避免在一个文件中混合不同的功能
+
+### 模块化设计
+
+- 相关功能应该组织在同一个模块中
+- 模块之间应该保持低耦合
+
+### 依赖关系
+
+- 模块之间的依赖关系应该清晰
+- 避免循环依赖
+
+```text
+api/ → utils/request.ts
+api/ → types/
+components/ → api/
+components/ → types/
+components/ → composables/
+components/ → utils/
+views/ → components/
+```
+
+## 环境变量和配置
+
+### 环境变量使用
+
+- 环境变量通过 `import.meta.env` 访问
+- 变量名必须以 `VITE_` 开头
+- 环境变量类型应该在 `src/env.d.ts` 中定义
+
+```typescript
+// ✅ 正确：使用环境变量
+const apiUrl = import.meta.env.VITE_API_URL
+
+// ❌ 错误：硬编码 URL
+const apiUrl = 'http://localhost:8000'
+```
+
+### 配置文件位置
+
+- 构建配置文件在根目录：`vite.config.ts`、`tsconfig.json`
+- 样式配置文件在 `src/styles/` 目录
+- 路由配置文件为 `src/routers.ts`
