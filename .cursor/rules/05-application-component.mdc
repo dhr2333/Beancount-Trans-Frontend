@@ -1,0 +1,165 @@
+---
+globs: src/components/**/*.vue,src/views/**/*.vue
+description: 应用层 - Vue 组件开发规范
+---
+
+# 应用层：Vue 组件开发规范
+
+## 组件目录结构
+
+### 组件分类
+
+组件应该按功能分类放在以下目录：
+
+- **`src/components/common/`** - 通用组件，可在多个地方复用
+- **`src/components/layouts/`** - 布局组件
+- **`src/components/config/`** - 配置管理相关组件
+- **`src/components/map/`** - 映射相关组件
+- **`src/components/template/`** - 模板相关组件
+- **`src/components/file/`** - 文件管理相关组件
+- **`src/components/trans/`** - 转换相关组件
+- **`src/views/`** - 页面视图组件（每个页面一个目录）
+
+### 组件文件命名
+
+- **使用 PascalCase（大驼峰）命名组件文件**，例如：`TagSelector.vue`、`AccountManagement.vue`
+- 页面组件放在 `src/views/` 目录下，目录名使用 kebab-case，例如：`phone-binding/index.vue`
+
+## 组件内部结构
+
+### 标准结构顺序
+
+```vue
+<template>
+  <!-- 模板内容 -->
+</template>
+
+<script setup lang="ts">
+// 脚本内容
+</script>
+
+<style scoped lang="scss">
+<!-- 样式内容 -->
+</style>
+```
+
+### Script 部分结构顺序
+
+参考实际组件示例：[src/components/common/TagSelector.vue](mdc:src/components/common/TagSelector.vue)：
+
+```typescript
+<script setup lang="ts">
+// 1. 导入 Vue 相关
+import { ref, computed, watch, onMounted } from 'vue'
+
+// 2. 导入第三方库
+import { ElMessage } from 'element-plus'
+import type { FormInstance } from 'element-plus'
+
+// 3. 导入 Element Plus 图标
+import { Plus, Edit, Delete } from '@element-plus/icons-vue'
+
+// 4. 导入 API 和类型
+import { fetchTags, createTag } from '../../api/tags'
+import type { Tag, TagForm } from '../../types/tag'
+
+// 5. 导入工具函数
+import { hasAuthTokens } from '../../utils/auth'
+
+// 6. 导入子组件
+import TagSelector from '../common/TagSelector.vue'
+
+// 7. Props 和 Emits 定义
+interface Props {
+  // ...
+}
+const props = defineProps<Props>()
+const emit = defineEmits<{ ... }>()
+
+// 8. 响应式数据
+const count = ref<number>(0)
+
+// 9. 计算属性
+const filteredList = computed(() => { ... })
+
+// 10. 方法定义
+const handleClick = () => { ... }
+
+// 11. 生命周期钩子
+onMounted(() => { ... })
+</script>
+```
+
+## 组件导入规范
+
+### 使用相对路径
+
+- 组件导入使用相对路径
+- 根据目录层级合理使用 `../` 或 `../../`
+
+```typescript
+// ✅ 从同级目录导入
+import TagSelector from '../common/TagSelector.vue'
+
+// ✅ 从父级目录导入
+import { fetchTags } from '../../api/tags'
+import type { Tag } from '../../types/tag'
+```
+
+### 按需导入
+
+- Element Plus 组件按需导入，不要全量导入
+- 图标按需导入，不要导入所有图标
+
+```typescript
+// ✅ 按需导入
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Edit, Delete } from '@element-plus/icons-vue'
+
+// ❌ 全量导入
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+```
+
+## 组件通信
+
+### Props 定义
+
+- 使用 TypeScript 接口定义 Props 类型
+- 可选的 Props 使用 `?` 标记
+- 提供默认值时使用 `withDefaults`
+
+```typescript
+interface Props {
+  title: string
+  count?: number
+  disabled?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  count: 0,
+  disabled: false
+})
+```
+
+### Emits 定义
+
+- 使用对象语法定义 Emits 类型
+- 事件名使用 kebab-case
+
+```typescript
+const emit = defineEmits<{
+  'update:modelValue': [value: string]
+  'change': [value: string, oldValue: string]
+  'click': [event: MouseEvent]
+}>()
+```
+
+### 组件引用
+
+- 子组件通过 `ref` 引用时，必须提供类型
+
+```typescript
+import TagSelector from '../common/TagSelector.vue'
+
+const tagSelectorRef = ref<InstanceType<typeof TagSelector> | null>(null)
+```

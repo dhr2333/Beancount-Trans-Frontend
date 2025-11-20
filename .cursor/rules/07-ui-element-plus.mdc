@@ -1,0 +1,194 @@
+---
+globs: *.vue,src/**/*.vue
+description: UI层 - Element Plus 组件库使用规范
+---
+
+# UI层：Element Plus 组件库使用规范
+
+## 组件导入
+
+### 按需导入组件
+
+- **禁止全量导入 Element Plus**，应该按需导入所需组件
+- 组件已经通过 `unplugin-vue-components` 自动导入，通常不需要手动导入
+- 如果需要使用组件的方法或类型，才需要手动导入
+
+```typescript
+// ✅ 自动导入（推荐）- 直接在模板中使用
+<template>
+  <el-button type="primary">按钮</el-button>
+  <el-table :data="tableData">...</el-table>
+</template>
+
+// ✅ 手动导入（仅当需要类型或方法时）
+import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
+```
+
+### 图标导入
+
+- **图标必须从 `@element-plus/icons-vue` 按需导入**，禁止全量导入
+- 使用具体的图标名称，例如：`Plus`、`Edit`、`Delete`
+
+```typescript
+// ✅ 正确：按需导入图标
+import { Plus, Edit, Delete, Search } from '@element-plus/icons-vue'
+
+// ❌ 错误：全量导入图标
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+```
+
+### 类型导入
+
+- Element Plus 的类型应该单独导入，使用 `type` 关键字
+
+```typescript
+// ✅ 正确：类型导入
+import { ElMessage } from 'element-plus'
+import type { FormInstance, FormRules, CascaderProps } from 'element-plus'
+
+// ✅ 可以混合导入
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+```
+
+## 组件使用
+
+### Props 类型定义
+
+- 使用 Element Plus 提供的类型定义，不要使用 `any`
+
+```typescript
+// ✅ 使用 Element Plus 类型
+import type { CascaderProps, FormInstance, FormRules } from 'element-plus'
+
+const cascaderProps: CascaderProps = {
+  value: 'id',
+  label: 'name',
+  children: 'children',
+  emitPath: false
+}
+
+const formRef = ref<FormInstance>()
+const formRules: FormRules = {
+  name: [
+    { required: true, message: '请输入名称', trigger: 'blur' }
+  ]
+}
+```
+
+### 消息提示
+
+- 使用 `ElMessage` 显示消息提示
+- 使用 `ElMessageBox` 显示确认对话框
+- 禁止使用原生的 `alert` 或 `confirm`
+
+```typescript
+import { ElMessage, ElMessageBox } from 'element-plus'
+
+// ✅ 成功消息
+ElMessage.success('操作成功')
+
+// ✅ 错误消息
+ElMessage.error('操作失败')
+
+// ✅ 警告消息
+ElMessage.warning('请注意')
+
+// ✅ 确认对话框
+ElMessageBox.confirm('确定要删除吗？', '提示', {
+  confirmButtonText: '确定',
+  cancelButtonText: '取消',
+  type: 'warning'
+}).then(() => {
+  // 确认操作
+}).catch(() => {
+  // 取消操作
+})
+```
+
+### 表单验证
+
+- 使用 Element Plus 的表单验证规则
+- 验证规则必须定义类型
+
+```typescript
+import type { FormRules } from 'element-plus'
+
+const formRules: FormRules = {
+  name: [
+    { required: true, message: '请输入名称', trigger: 'blur' },
+    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9]+$/, message: '只能包含字母和数字', trigger: 'blur' }
+  ],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
+  ]
+}
+```
+
+### 表格组件
+
+- 表格数据必须提供明确的类型
+- 表格列定义应该明确类型
+
+```vue
+<template>
+  <el-table :data="tableData" style="width: 100%">
+    <el-table-column prop="name" label="名称" />
+    <el-table-column prop="date" label="日期" />
+  </el-table>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+
+interface TableItem {
+  name: string
+  date: string
+  address: string
+}
+
+const tableData = ref<TableItem[]>([
+  { name: '张三', date: '2024-01-01', address: '北京市' }
+])
+</script>
+```
+
+## 主题定制
+
+- Element Plus 主题定制应该在 `src/styles/element/` 目录下进行
+- 使用 SCSS 变量定制主题颜色
+- 支持暗色模式，相关样式在 `dark.scss` 中定义
+
+## 命名空间
+
+- Element Plus 组件使用 `ep` 命名空间（通过 `el-config-provider` 配置）
+- 在模板中使用组件时不需要添加命名空间前缀
+
+```vue
+<template>
+  <el-config-provider namespace="ep">
+    <el-button>按钮</el-button>
+  </el-config-provider>
+</template>
+```
+
+## 样式覆盖
+
+- 需要覆盖 Element Plus 组件样式时，使用深度选择器或 CSS 变量
+- 优先使用 CSS 变量进行主题定制
+
+```scss
+// ✅ 使用 CSS 变量
+:root {
+  --ep-color-primary: #409eff;
+}
+
+// ✅ 使用深度选择器覆盖样式
+.my-component {
+  :deep(.el-button) {
+    border-radius: 4px;
+  }
+}
+```

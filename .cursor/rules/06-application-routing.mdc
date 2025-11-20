@@ -1,0 +1,184 @@
+---
+globs: src/routers.ts
+description: 应用层 - 路由管理规范
+---
+
+# 应用层：路由管理规范
+
+## 路由文件组织
+
+- 路由配置统一放在 `src/routers.ts` 文件中
+- 路由定义应该清晰、结构良好
+- 参考实际路由文件：[src/routers.ts](mdc:src/routers.ts)
+
+## 路由定义
+
+### 基本路由结构
+
+- 每个路由必须包含 `path` 和 `component`
+- 建议为每个路由添加 `name` 属性，便于编程式导航
+- 路由名称使用 camelCase（小驼峰）命名
+
+```typescript
+import { createRouter, createWebHistory } from 'vue-router'
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: '/trans',
+      name: 'trans',
+      component: () => import('./components/trans/Trans.vue')
+    },
+    {
+      path: '/config/tags',
+      name: 'tagManagement',
+      component: () => import('./components/config/TagManagement.vue')
+    }
+  ]
+})
+
+export default router
+```
+
+### 组件导入
+
+- 路由组件可以使用懒加载（动态导入）或静态导入
+- 对于大型应用，推荐使用懒加载以优化首屏加载
+
+```typescript
+// ✅ 懒加载（推荐）
+{
+  path: '/trans',
+  component: () => import('./components/trans/Trans.vue')
+}
+
+// ✅ 静态导入（小应用或核心页面）
+import Trans from './components/trans/Trans.vue'
+{
+  path: '/trans',
+  component: Trans
+}
+```
+
+### 路由命名规范
+
+- 路由 `name` 使用 camelCase 命名
+- 名称应该清晰表达路由的用途
+- 避免使用过于简短或模糊的名称
+
+```typescript
+// ✅ 正确的命名
+{ path: '/config/tags', name: 'tagManagement' }
+{ path: '/config/accounts', name: 'accountManagement' }
+{ path: '/phone-binding', name: 'phoneBinding' }
+```
+
+## 路由守卫
+
+### 导航守卫类型
+
+- **全局前置守卫** (`beforeEach`) - 用于认证检查和权限验证
+- **全局后置钩子** (`afterEach`) - 用于页面切换后的操作（如页面分析）
+
+### 守卫实现规范
+
+- 路由守卫中的错误处理必须有明确的类型定义
+- 使用 `error.response?.status` 进行错误判断时，必须检查 `error` 的类型
+- **禁止使用 `any` 类型**
+
+```typescript
+// ✅ 正确的错误处理
+router.beforeEach(async (to, from, next) => {
+  try {
+    // 检查认证状态
+    const token = localStorage.getItem('access')
+    if (!token) {
+      next('/login')
+      return
+    }
+    
+    // 验证令牌有效性
+    const axios = (await import('./utils/request')).default
+    await axios.get(import.meta.env.VITE_API_URL + '/auth/profile/me/')
+    next()
+  } catch (error: unknown) {
+    // 类型安全的错误处理
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { status?: number } }
+      if (axiosError.response?.status === 403) {
+        next('/phone-binding')
+      } else {
+        next('/login')
+      }
+    } else {
+      next('/login')
+    }
+  }
+})
+
+// ❌ 错误的错误处理（使用 any）
+router.beforeEach(async (to, from, next) => {
+  try {
+    // ...
+  } catch (error: any) {  // 禁止使用 any
+    if (error.response?.status === 403) {
+      next('/phone-binding')
+    }
+  }
+})
+```
+
+### 路由元信息
+
+- 可以使用 `meta` 字段存储路由相关的元信息
+- 元信息应该定义类型
+
+```typescript
+interface RouteMeta {
+  requiresAuth?: boolean
+  title?: string
+  requiresPhone?: boolean
+}
+
+declare module 'vue-router' {
+  interface RouteMeta extends RouteMeta {}
+}
+```
+
+## 编程式导航
+
+### 使用路由名称
+
+- 编程式导航优先使用路由名称，而非路径
+
+```typescript
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+// ✅ 使用路由名称
+router.push({ name: 'tagManagement' })
+
+// ✅ 也可以使用路径
+router.push('/config/tags')
+```
+
+### 导航参数
+
+- 传递路由参数时，必须定义类型
+
+```typescript
+// 路由定义
+{
+  path: '/tag/:id',
+  name: 'tagDetail',
+  component: TagDetail
+}
+
+// 导航
+router.push({
+  name: 'tagDetail',
+  params: { id: tagId as string | number }
+})
+```

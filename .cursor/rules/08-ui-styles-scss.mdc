@@ -1,0 +1,192 @@
+---
+globs: *.scss,*.vue
+description: UI层 - SCSS 样式编写规范
+---
+
+# UI层：SCSS 样式编写规范
+
+## 样式文件组织
+
+### 目录结构
+
+参考项目实际结构：
+
+- **`src/styles/`** - 全局样式文件
+  - `index.scss` - 主样式文件，导入所有其他样式
+  - `element/` - Element Plus 主题定制
+    - `index.scss` - Element Plus 主题变量，参考 [src/styles/element/index.scss](mdc:src/styles/element/index.scss)
+    - `dark.scss` - 暗色模式样式
+
+### 样式导入
+
+全局样式在 [src/main.ts](mdc:src/main.ts) 中导入：
+
+```typescript
+import "~/styles/index.scss"
+import "uno.css"
+```
+
+组件样式使用 `<style scoped>` 局部作用域：
+
+```vue
+<!-- 组件内 -->
+<style scoped lang="scss">
+// 组件样式，不会影响其他组件
+</style>
+
+<!-- 需要覆盖第三方组件时 -->
+<style lang="scss">
+// 使用深度选择器
+.my-component {
+  :deep(.el-button) {
+    // 样式
+  }
+}
+</style>
+```
+
+## SCSS 使用规范
+
+### 变量定义
+
+- 使用 SCSS 变量存储颜色、尺寸等可复用值
+- 变量定义应该在组件的 `<style>` 部分顶部，或使用全局变量文件
+- 优先使用 Element Plus 的 CSS 变量进行主题定制
+
+```scss
+// ✅ 组件内变量
+<style scoped lang="scss">
+$primary-color: #409eff;
+$border-radius: 4px;
+
+.button {
+  background-color: $primary-color;
+  border-radius: $border-radius;
+}
+</style>
+
+// ✅ 使用全局变量（Element Plus CSS 变量）
+<style scoped lang="scss">
+.container {
+  background-color: var(--ep-bg-color);
+  color: var(--ep-text-color-primary);
+  border-color: var(--ep-border-color);
+}
+</style>
+```
+
+### 嵌套规范
+
+- 嵌套层级不超过 4 层，保持样式清晰
+- 使用 BEM 命名规范或类似的命名方式
+
+```scss
+// ✅ 合理的嵌套
+.tag-selector {
+  &__header {
+    display: flex;
+    
+    &-title {
+      font-size: 16px;
+    }
+  }
+  
+  &__content {
+    padding: 20px;
+  }
+}
+
+// ❌ 过度嵌套
+.component {
+  .wrapper {
+    .container {
+      .content {
+        .item {
+          // 嵌套过深，难以维护
+        }
+      }
+    }
+  }
+}
+```
+
+### 类名命名
+
+- 使用 kebab-case（短横线命名）命名 CSS 类
+- 使用语义化的类名，避免使用缩写
+
+```scss
+// ✅ 正确的命名
+.tag-selector { }
+.file-management { }
+.account-form { }
+
+// ❌ 错误的命名
+.ts { }  // 缩写不清晰
+.fileMgmt { }  // 混合大小写
+fileManagement { }  // 没有连字符
+```
+
+## 样式作用域
+
+### Scoped 样式
+
+- 组件样式必须使用 `scoped`，避免样式污染
+- 需要影响子组件时，使用深度选择器 `:deep()`
+
+```vue
+<style scoped lang="scss">
+// ✅ 作用域样式
+.container {
+  padding: 20px;
+  
+  // ✅ 深度选择器
+  :deep(.el-button) {
+    margin: 10px;
+  }
+}
+</style>
+```
+
+### 避免内联样式
+
+- 避免在模板中使用大量内联样式
+- 简单的动态样式可以使用内联，复杂的应该使用类名
+
+```vue
+<template>
+  <!-- ✅ 简单的动态样式 -->
+  <div :style="{ color: textColor }">文本</div>
+  
+  <!-- ✅ 复杂样式使用类名 -->
+  <div :class="['container', { 'is-active': isActive }]">内容</div>
+  
+  <!-- ❌ 避免大量内联样式 -->
+  <div :style="{ 
+    color: textColor, 
+    fontSize: fontSize + 'px', 
+    padding: padding + 'px',
+    margin: margin + 'px'
+  }">
+    文本
+  </div>
+</template>
+```
+
+## 响应式设计
+
+### 移动端适配
+
+- 使用 Element Plus 的响应式栅格系统
+- 确保关键功能在移动端可用
+
+```vue
+<template>
+  <!-- Element Plus 栅格 -->
+  <el-row :gutter="20">
+    <el-col :xs="24" :sm="12" :md="8">
+      内容
+    </el-col>
+  </el-row>
+</template>
+```

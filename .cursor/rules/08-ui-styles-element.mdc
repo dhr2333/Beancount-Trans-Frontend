@@ -1,0 +1,167 @@
+---
+globs: *.scss,*.vue
+description: UI层 - Element Plus 主题定制规范
+---
+
+# UI层：Element Plus 主题定制规范
+
+## 主题配置文件
+
+Element Plus 主题定制文件位置：
+
+- **`src/styles/element/index.scss`** - 主题变量配置，参考 [src/styles/element/index.scss](mdc:src/styles/element/index.scss)
+- **`src/styles/element/dark.scss`** - 暗色模式样式
+
+## CSS 变量定制
+
+### 主题变量定义
+
+在 `src/styles/element/index.scss` 中使用 SCSS 变量定义主题：
+
+```scss
+$--colors: (
+  "primary": (
+    "base": green,
+  ),
+  "success": (
+    "base": #21ba45,
+  ),
+  // ...
+);
+
+@forward "element-plus/theme-chalk/src/common/var.scss" with (
+  $colors: $--colors,
+  $button-padding-horizontal: ("default": 50px)
+);
+```
+
+### CSS 变量使用
+
+在组件中使用 Element Plus 的 CSS 变量：
+
+```scss
+// ✅ 使用 Element Plus CSS 变量
+<style scoped lang="scss">
+.container {
+  background-color: var(--ep-bg-color);
+  color: var(--ep-text-color-primary);
+  border-color: var(--ep-border-color);
+  border-radius: var(--ep-border-radius-base);
+}
+
+.button {
+  background-color: var(--ep-color-primary);
+  color: var(--ep-color-white);
+  
+  &:hover {
+    background-color: var(--ep-color-primary-light-3);
+  }
+}
+</style>
+```
+
+## 暗色模式支持
+
+### 暗色模式变量
+
+暗色模式样式在 `src/styles/element/dark.scss` 中定义：
+
+```scss
+// 暗色模式支持
+html.dark {
+  .my-component {
+    background-color: var(--ep-bg-color);
+    color: var(--ep-text-color-primary);
+  }
+  
+  // 自定义组件暗色模式
+  .custom-card {
+    background-color: var(--ep-bg-color-page);
+    border-color: var(--ep-border-color);
+  }
+}
+```
+
+### 确保暗色模式兼容
+
+- 所有自定义组件都应该支持暗色模式
+- 使用 Element Plus 的 CSS 变量而不是硬编码颜色
+- 在 `html.dark` 选择器下定义暗色模式样式
+
+```vue
+<template>
+  <div class="my-component">
+    内容
+  </div>
+</template>
+
+<style scoped lang="scss">
+.my-component {
+  background-color: var(--ep-bg-color);
+  color: var(--ep-text-color-primary);
+}
+
+// ✅ 暗色模式支持
+html.dark {
+  .my-component {
+    // 暗色模式下的特殊样式（如果需要）
+  }
+}
+</style>
+```
+
+## 样式覆盖
+
+### 深度选择器
+
+需要覆盖 Element Plus 组件样式时，使用深度选择器：
+
+```vue
+<template>
+  <el-button class="custom-button">按钮</el-button>
+</template>
+
+<style scoped lang="scss">
+.custom-button {
+  // ✅ 使用深度选择器覆盖 Element Plus 样式
+  :deep(.el-button) {
+    border-radius: 8px;
+    font-weight: 600;
+  }
+  
+  // ✅ 覆盖伪元素
+  :deep(.el-button::before) {
+    // 样式
+  }
+}
+</style>
+```
+
+### CSS 变量覆盖
+
+优先使用 CSS 变量进行主题定制，而不是直接覆盖样式：
+
+```scss
+// ✅ 使用 CSS 变量（推荐）
+:root {
+  --ep-color-primary: #409eff;
+  --ep-border-radius-base: 8px;
+}
+
+// ❌ 直接覆盖样式（不推荐）
+.el-button {
+  border-radius: 8px;
+}
+```
+
+## 命名空间
+
+Element Plus 组件使用 `ep` 命名空间（通过 `el-config-provider` 配置），在 [src/App.vue](mdc:src/App.vue) 中设置：
+
+```vue
+<template>
+  <el-config-provider namespace="ep">
+    <!-- 应用内容 -->
+  </el-config-provider>
+</template>
+```
