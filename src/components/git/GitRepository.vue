@@ -39,7 +39,7 @@
             </el-tag>
           </div>
           
-          <div class="info-item">
+          <!-- <div class="info-item">
             <label>HTTPS 地址：</label>
             <div class="url-display">
               <code class="repo-url">{{ repository.repo_url }}</code>
@@ -54,7 +54,7 @@
               </el-button>
             </div>
           </div>
-          
+           -->
           <div class="info-item">
             <label>SSH 地址：</label>
             <div class="url-display">
