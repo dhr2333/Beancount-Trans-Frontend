@@ -10,6 +10,12 @@
                 </template>
 
                 <el-tabs v-model="activeTab" class="settings-tabs">
+                    <!-- Git 同步 -->
+                    <el-tab-pane label="Git 同步" name="git">
+                        <GitSetup v-if="!gitRepository" @created="onGitRepositoryCreated" />
+                        <GitRepositoryComponent v-else :repository="gitRepository" @updated="onGitRepositoryUpdated" />
+                    </el-tab-pane>
+
                     <!-- 账户绑定 -->
                     <el-tab-pane label="账户绑定" name="bindings">
                         <el-card shadow="never" class="section-card">
@@ -383,11 +389,18 @@ import { User, Phone, Message, Lock, DocumentCopy } from '@element-plus/icons-vu
 import axios from '../../utils/request'
 import { hasAuthTokens } from '../../utils/auth'
 import router from '~/routers'
+import { getGitRepository } from '../../api/git'
+import type { GitRepository } from '../../types/git'
+import GitSetup from '../../components/git/GitSetup.vue'
+import GitRepositoryComponent from '../../components/git/GitRepository.vue'
 
 const apiUrl = import.meta.env.VITE_API_URL
 
 const isAuthenticated = ref(hasAuthTokens())
 const unauthorizedNotified = ref(false)
+
+// Git 仓库状态
+const gitRepository = ref<GitRepository | null>(null)
 
 const handleUnauthorized = () => {
     if (!unauthorizedNotified.value) {
@@ -965,6 +978,29 @@ const handleConfirmDisableTOTP = async () => {
     }
 }
 
+// Git 仓库相关
+const fetchGitRepository = async () => {
+    try {
+        gitRepository.value = await getGitRepository()
+    } catch (error: any) {
+        // 404 表示未启用 Git，这是正常的
+        if (error.response?.status !== 404) {
+            console.error('Failed to fetch git repository:', error)
+        }
+        gitRepository.value = null
+    }
+}
+
+const onGitRepositoryCreated = (repository: GitRepository) => {
+    gitRepository.value = repository
+    // 切换到Git tab以显示新创建的仓库
+    activeTab.value = 'git'
+}
+
+const onGitRepositoryUpdated = (repository: GitRepository) => {
+    gitRepository.value = repository
+}
+
 onMounted(() => {
     if (!isAuthenticated.value) {
         handleUnauthorized()
@@ -972,6 +1008,7 @@ onMounted(() => {
     }
     fetchBindings()
     fetch2FAStatus()
+    fetchGitRepository()
 })
 </script>
 
