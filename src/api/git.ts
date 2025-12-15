@@ -4,7 +4,8 @@ import type {
   CreateRepositoryRequest,
   SyncStatusInfo,
   SyncResponse,
-  DeployKeyResponse
+  DeployKeyResponse,
+  DeleteRepositoryResponse
 } from '../types/git'
 
 const API_BASE = import.meta.env.VITE_API_URL
@@ -28,6 +29,15 @@ export const getGitRepository = async (): Promise<GitRepository> => {
  */
 export const createGitRepository = async (data: CreateRepositoryRequest): Promise<GitRepository> => {
   const response = await axios.post(`${API_BASE}/git/repository/`, data)
+  return response.data
+}
+
+/**
+ * 删除用户 Git 仓库
+ * DELETE /api/git/repository/delete/
+ */
+export const deleteGitRepository = async (): Promise<DeleteRepositoryResponse> => {
+  const response = await axios.delete(`${API_BASE}/git/repository/delete/`)
   return response.data
 }
 
@@ -186,4 +196,3 @@ export const pollSyncStatus = (
     poll()
   })
 }
-

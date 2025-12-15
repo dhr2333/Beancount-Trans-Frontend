@@ -5,7 +5,6 @@
 // Git 仓库信息
 export interface GitRepository {
   id: number
-  repo_url: string
   ssh_clone_url: string
   https_clone_url: string
   repo_name: string
@@ -80,6 +79,12 @@ export interface DeployKeyResponse {
   content_type: string
   message: string
   key_id?: number
+}
+
+// 删除仓库响应
+export interface DeleteRepositoryResponse {
+  message: string
+  cleaned_files: string[]
 }
 
 // API 错误响应

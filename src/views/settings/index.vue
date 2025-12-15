@@ -13,7 +13,8 @@
                     <!-- Git 同步 -->
                     <el-tab-pane label="Git 同步" name="git">
                         <GitSetup v-if="!gitRepository" @created="onGitRepositoryCreated" />
-                        <GitRepositoryComponent v-else :repository="gitRepository" @updated="onGitRepositoryUpdated" />
+                        <GitRepositoryComponent v-else :repository="gitRepository" @updated="onGitRepositoryUpdated"
+                            @deleted="onGitRepositoryDeleted" />
                     </el-tab-pane>
 
                     <!-- 账户绑定 -->
@@ -999,6 +1000,10 @@ const onGitRepositoryCreated = (repository: GitRepository) => {
 
 const onGitRepositoryUpdated = (repository: GitRepository) => {
     gitRepository.value = repository
+}
+
+const onGitRepositoryDeleted = () => {
+    gitRepository.value = null
 }
 
 onMounted(() => {
