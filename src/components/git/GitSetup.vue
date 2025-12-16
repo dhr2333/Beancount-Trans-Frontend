@@ -304,7 +304,7 @@ const createRepository = async () => {
   gap: 12px;
   padding: 16px;
   border-radius: 8px;
-  background-color: var(--el-fill-color-lighter);
+  background-color: var(--ep-fill-color-lighter);
 }
 
 .feature-icon {
@@ -323,7 +323,7 @@ const createRepository = async () => {
 .feature-item p {
   margin: 0;
   font-size: 13px;
-  color: var(--el-text-color-regular);
+  color: var(--ep-text-color-regular);
   line-height: 1.5;
 }
 
@@ -364,7 +364,7 @@ const createRepository = async () => {
 }
 
 .option-card:hover {
-  border-color: var(--el-border-color-hover);
+  border-color: var(--ep-border-color-hover);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
@@ -407,7 +407,7 @@ const createRepository = async () => {
 .option-description p {
   margin: 0 0 12px 0;
   font-size: 14px;
-  color: var(--el-text-color-regular);
+  color: var(--ep-text-color-regular);
   line-height: 1.5;
 }
 
@@ -421,7 +421,7 @@ const createRepository = async () => {
   margin-bottom: 6px;
   font-size: 13px;
   line-height: 1.4;
-  color: var(--el-text-color-regular);
+  color: var(--ep-text-color-regular);
 }
 
 .action-buttons {
