@@ -76,6 +76,8 @@ declare module '@vue/runtime-core' {
     FileManage: typeof import('./components/file/FileManage.vue')['default']
     Format: typeof import('./components/map/Format.vue')['default']
     GitHubCallback: typeof import('./components/GitHubCallback.vue')['default']
+    GitRepository: typeof import('./components/git/GitRepository.vue')['default']
+    GitSetup: typeof import('./components/git/GitSetup.vue')['default']
     Income: typeof import('./components/map/Income.vue')['default']
     Logos: typeof import('./components/Logos.vue')['default']
     MappingManagement: typeof import('./components/map/MappingManagement.vue')['default']
