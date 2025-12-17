@@ -120,15 +120,15 @@ interface UseCounterReturn {
 
 export function useCounter(initialValue: number = 0): UseCounterReturn {
   const count = ref<number>(initialValue)
-  
+
   const increment = () => {
     count.value++
   }
-  
+
   const decrement = () => {
     count.value--
   }
-  
+
   return {
     count,
     increment,

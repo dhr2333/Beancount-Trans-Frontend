@@ -85,12 +85,12 @@ $border-radius: 4px;
 .tag-selector {
   &__header {
     display: flex;
-    
+
     &-title {
       font-size: 16px;
     }
   }
-  
+
   &__content {
     padding: 20px;
   }
@@ -139,7 +139,7 @@ fileManagement { }  // 没有连字符
 // ✅ 作用域样式
 .container {
   padding: 20px;
-  
+
   // ✅ 深度选择器
   :deep(.el-button) {
     margin: 10px;
@@ -157,10 +157,10 @@ fileManagement { }  // 没有连字符
 <template>
   <!-- ✅ 简单的动态样式 -->
   <div :style="{ color: textColor }">文本</div>
-  
+
   <!-- ✅ 复杂样式使用类名 -->
   <div :class="['container', { 'is-active': isActive }]">内容</div>
-  
+
   <!-- ❌ 避免大量内联样式 -->
   <div :style="{ 
     color: textColor, 

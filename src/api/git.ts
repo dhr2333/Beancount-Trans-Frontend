@@ -114,13 +114,13 @@ export const handleDeployKeyDownload = async (regenerate: boolean = false) => {
     const blob = regenerate 
       ? await regenerateDeployKey()
       : await downloadDeployKey()
-    
+
     const username = localStorage.getItem('username') || 'user'
     const suffix = regenerate ? '_new' : ''
     const filename = `${username}_deploy_key${suffix}.pem`
-    
+
     downloadFile(blob, filename)
-    
+
     return {
       success: true,
       message: regenerate ? 'Deploy Key 已重新生成并下载' : 'Deploy Key 已下载'
@@ -141,9 +141,9 @@ export const handleTransDownload = async () => {
     const blob = await downloadTransArchive()
     const username = localStorage.getItem('username') || 'user'
     const filename = `${username}_trans.zip`
-    
+
     downloadFile(blob, filename)
-    
+
     return {
       success: true,
       message: 'Trans 目录已下载'
@@ -166,33 +166,33 @@ export const pollSyncStatus = (
 ): Promise<SyncStatusInfo> => {
   return new Promise((resolve, reject) => {
     let attempts = 0
-    
+
     const poll = async () => {
       try {
         attempts++
         const status = await getSyncStatus()
         onStatusUpdate(status)
-        
+
         // 如果同步完成（成功或失败），停止轮询
         if (status.status === 'success' || status.status === 'failed') {
           resolve(status)
           return
         }
-        
+
         // 如果超过最大尝试次数，停止轮询
         if (attempts >= maxAttempts) {
           resolve(status)
           return
         }
-        
+
         // 继续轮询
         setTimeout(poll, intervalMs)
-        
+
       } catch (error) {
         reject(error)
       }
     }
-    
+
     poll()
   })
 }

@@ -40,14 +40,14 @@ export const getUsername = () => {
 export const isTokenExpiringSoon = () => {
   const token = getAccessToken()
   if (!token) return true
-  
+
   try {
     // 解析JWT令牌
     const payload = JSON.parse(atob(token.split('.')[1]))
     const currentTime = Math.floor(Date.now() / 1000)
     const expirationTime = payload.exp
     const timeUntilExpiry = expirationTime - currentTime
-    
+
     // 如果令牌在5分钟内过期，返回true
     return timeUntilExpiry < 300 // 5分钟 = 300秒
   } catch (error) {
