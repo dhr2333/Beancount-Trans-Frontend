@@ -90,13 +90,13 @@
                 <pre><code># 设置 SSH 密钥权限
 chmod 600 ~/Downloads/{{ username }}_deploy_key.pem
 
-# 添加 SSH 配置（可选）
+# 添加 SSH 配置
 cat >> ~/.ssh/config &lt;&lt; 'EOF'
 Host gitea-beancount
-HostName gitea.dhr2333.cn
-Port 30022
-User git
-IdentityFile ~/Downloads/{{ username }}_deploy_key.pem
+        HostName gitea.dhr2333.cn
+        Port 30022
+        User git
+        IdentityFile ~/Downloads/{{ username }}_deploy_key.pem
 EOF</code></pre>
               </div>
             </div>
@@ -106,11 +106,9 @@ EOF</code></pre>
             <div class="instruction-content">
               <p>使用以下命令克隆仓库到本地：</p>
               <div class="code-block">
-                <pre><code># 使用 SSH 并配置仓库别名（推荐）
-git clone {{ repository.ssh_clone_url }} Assets
-
-# 或使用配置的别名
-git clone gitea-beancount:beancount-trans/{{ repository.repo_name }}.git Assets</code></pre>
+                <pre><code># 使用 SSH 并配置仓库别名
+git clone gitea-beancount:beancount-trans/{{ repository.repo_name }}.git Assets
+</code></pre>
               </div>
             </div>
           </el-collapse-item>
@@ -126,7 +124,7 @@ git add .
 git commit -m "更新账本"
 
 # 推送到平台
-git push ssh://git@gitea.dhr2333.cn:30022/beancount-trans/d01275-assets.git main</code></pre>
+git push origin main</code></pre>
               </div>
               <p><strong>注意：</strong>推送后平台会自动同步，您也可以手动点击"立即同步"按钮。</p>
             </div>
