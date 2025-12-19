@@ -123,8 +123,10 @@ git add .
 # 提交修改
 git commit -m "更新账本"
 
-# 推送到平台
-git push origin main</code></pre>
+# 推送到平台（二选一）
+git push origin main
+
+git push gitea-beancount:beancount-trans/c3965d-assets.git main</code></pre>
               </div>
               <p><strong>注意：</strong>推送后平台会自动同步，您也可以手动点击"立即同步"按钮。</p>
             </div>
