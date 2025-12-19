@@ -16,7 +16,7 @@ const refreshToken = async () => {
         const refreshRes = await axios.post(apiUrl + '/auth/token/refresh/', { 
             "refresh": refresh 
         });
-        
+
         const newToken = refreshRes.data.access;
         localStorage.setItem('access', newToken);
         return newToken;
@@ -66,7 +66,7 @@ instance.interceptors.response.use(
     },
     async (error) => {
         const originalRequest = error.config;
-        
+
         // 处理403错误：手机号未绑定
         if (error.response?.status === 403 && error.response?.data?.code === 'PHONE_NUMBER_REQUIRED') {
             // 检查是否已经在手机号绑定页面
@@ -82,11 +82,11 @@ instance.interceptors.response.use(
             }
             return Promise.reject(error);
         }
-        
+
         // 如果是401错误且不是刷新令牌的请求，尝试刷新令牌
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
-            
+
             try {
                 const newToken = await refreshToken();
                 // 更新请求头中的令牌
@@ -99,7 +99,7 @@ instance.interceptors.response.use(
                 return Promise.reject(refreshError);
             }
         }
-        
+
         return Promise.reject(error);
     }
 );

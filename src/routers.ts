@@ -41,7 +41,7 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const token = localStorage.getItem('access');
   const username = localStorage.getItem('username');
-  
+
   // 如果是登录页面、手机号绑定页面或OAuth回调页面，直接放行
   if (to.path === '/login' || to.path === '/phone-binding' || to.path === '/auth/github/token' || to.path === '/') {
     // 如果已登录且访问首页，检查是否需要绑定手机号
@@ -65,14 +65,14 @@ router.beforeEach(async (to, from, next) => {
     }
     return;
   }
-  
+
   // 如果没有token，允许匿名访问（用于访问admin用户数据）
   if (!token || !username) {
     // 匿名用户允许访问，后端会返回id=1用户的数据
     next();
     return;
   }
-  
+
   // 对于需要认证的页面，检查手机号绑定状态
   try {
     const axios = (await import('./utils/request')).default;

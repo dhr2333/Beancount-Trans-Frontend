@@ -19,7 +19,7 @@ const driverObj = driver({
         align: 'center'
       }
     },
-    
+
     // 步骤 2：文件列表
     {
       element: '#tour-file-table',
@@ -30,7 +30,7 @@ const driverObj = driver({
         align: 'start'
       }
     },
-    
+
     // 步骤 3：解析按钮
     {
       element: '.tour-parse-first-file',
@@ -46,7 +46,7 @@ const driverObj = driver({
         }
       }
     },
-    
+
     // 步骤 4：账本管理
     {
       element: '#tour-ledger-menu',

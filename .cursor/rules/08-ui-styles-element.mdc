@@ -52,7 +52,7 @@ $--colors: (
 .button {
   background-color: var(--ep-color-primary);
   color: var(--ep-color-white);
-  
+
   &:hover {
     background-color: var(--ep-color-primary-light-3);
   }
@@ -73,7 +73,7 @@ html.dark {
     background-color: var(--ep-bg-color);
     color: var(--ep-text-color-primary);
   }
-  
+
   // 自定义组件暗色模式
   .custom-card {
     background-color: var(--ep-bg-color-page);
@@ -128,7 +128,7 @@ html.dark {
     border-radius: 8px;
     font-weight: 600;
   }
-  
+
   // ✅ 覆盖伪元素
   :deep(.el-button::before) {
     // 样式

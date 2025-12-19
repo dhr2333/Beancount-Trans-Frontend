@@ -97,7 +97,7 @@ router.beforeEach(async (to, from, next) => {
       next('/login')
       return
     }
-    
+
     // 验证令牌有效性
     const axios = (await import('./utils/request')).default
     await axios.get(import.meta.env.VITE_API_URL + '/auth/profile/me/')

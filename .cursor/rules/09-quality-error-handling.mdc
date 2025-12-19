@@ -148,7 +148,7 @@ function handleError(error: unknown) {
     const axiosError = error as { response?: { status?: number, data?: { message?: string } } }
     const status = axiosError.response?.status
     const message = axiosError.response?.data?.message
-    
+
     switch (status) {
       case 400:
         ElMessage.error(message || '请求参数错误，请检查输入')
@@ -187,7 +187,7 @@ function handleError(error: unknown) {
   <div v-loading="loading">
     <el-table :data="tableData">...</el-table>
   </div>
-  
+
   <!-- ✅ 使用加载状态 -->
   <el-button :loading="submitting" @click="handleSubmit">
     提交
