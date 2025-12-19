@@ -54,10 +54,10 @@ export const downloadDeployKey = async (): Promise<Blob> => {
 
 /**
  * 重新生成并下载 Deploy Key
- * POST /api/git/repository/deploy-key/
+ * POST /api/git/repository/deploy-key/regenerate/
  */
 export const regenerateDeployKey = async (): Promise<Blob> => {
-  const response = await axios.post(`${API_BASE}/git/repository/deploy-key/`, {}, {
+  const response = await axios.post(`${API_BASE}/git/repository/deploy-key/regenerate/`, {}, {
     responseType: 'blob'
   })
   return response.data
