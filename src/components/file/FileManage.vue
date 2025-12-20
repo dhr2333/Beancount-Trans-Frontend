@@ -17,8 +17,13 @@
                         <Search />
                     </el-icon>
                 </template>
-                <template #append v-if="isGlobalSearch">
-                    <el-tag type="info" size="small">全局搜索</el-tag>
+                <template #append>
+                    <el-select v-model="selectedStatusFilter" placeholder="状态筛选" clearable style="width: 120px;"
+                        class="status-filter-select">
+                        <el-option v-for="option in statusFilterOptions" :key="option.value || 'all'"
+                            :label="option.label" :value="option.value">
+                        </el-option>
+                    </el-select>
                 </template>
             </el-input>
             <el-dropdown @command="handleNewCommand">
@@ -58,6 +63,7 @@
             <el-select v-model="batchAction" placeholder="批量操作" class="batch-select"
                 :disabled="selectedItems.length === 0" @change="executeBatchAction">
                 <el-option label="解析" value="parse"></el-option>
+                <el-option label="取消解析" value="cancel"></el-option>
                 <el-option label="下载" value="download"></el-option>
                 <el-option label="删除" value="delete"></el-option>
             </el-select>
@@ -77,8 +83,17 @@
                 <el-table-column prop="status" label="状态" width="100">
                     <template #default="{ row }">
                         <el-tag :type="statusTagType(row.status)">
-                            {{ row.status }}
+                            {{ translateStatus(row.status) }}
                         </el-tag>
+                    </template>
+                </el-table-column>
+                <el-table-column label="操作" width="100">
+                    <template #default="{ row }">
+                        <el-button
+                            v-if="row.status === 'pending' || row.status === 'processing' || row.status === 'parsed'"
+                            size="small" type="warning" @click="cancelParse([row.file_id])">
+                            取消
+                        </el-button>
                     </template>
                 </el-table-column>
             </el-table>
@@ -132,9 +147,18 @@
 
             <el-table-column label="操作" width="120">
                 <template #default="{ row, $index }">
-
-                    <el-button icon="Tickets" circle size="small" :class="{ 'tour-parse-first-file': $index === 0 }"
-                        @click="parseSingleFile(row)" />
+                    <!-- 解析/取消按钮（根据状态切换，parsed状态也可以取消以清除.bean文件内容） -->
+                    <el-tooltip
+                        v-if="row.node_type === 'file' && (row.parse_status === 'pending' || row.parse_status === 'processing' || row.parse_status === 'parsed')"
+                        :content="row.parse_status === 'parsed' ? '清除解析结果' : '取消解析'" placement="top">
+                        <el-button icon="Tickets" circle size="small" @click="cancelSingleFile(row)">
+                        </el-button>
+                    </el-tooltip>
+                    <el-tooltip v-else-if="row.node_type === 'file'" content="解析" placement="top">
+                        <el-button icon="Tickets" circle size="small" :class="{ 'tour-parse-first-file': $index === 0 }"
+                            @click="parseSingleFile(row)">
+                        </el-button>
+                    </el-tooltip>
 
                     <el-button v-if="row.node_type === 'file'" icon="Download" circle size="small"
                         @click="downloadFile(row.id)" />
@@ -215,6 +239,18 @@ const rootDirectoryId = ref<string | null>(null)
 const isGlobalSearch = ref(false);
 const globalSearchResults = ref<FileItem[]>([]);
 const uploadTrigger = ref<HTMLButtonElement | null>(null)
+const selectedStatusFilter = ref<string | null>(null)
+
+// 状态筛选选项配置
+const statusFilterOptions = [
+    { value: null, label: '全部状态' },
+    { value: 'unprocessed', label: '未解析' },
+    { value: 'pending', label: '待解析' },
+    { value: 'processing', label: '解析中' },
+    { value: 'parsed', label: '已解析' },
+    { value: 'failed', label: '解析失败' },
+    { value: 'cancelled', label: '取消解析' }
+]
 
 function handleNewCommand(command: string) {
     if (command === 'folder') {
@@ -229,6 +265,7 @@ function handleNewCommand(command: string) {
 
 async function customUpload(options: any) {
     const { file, onProgress, onSuccess, onError } = options;
+    const uploadedFileName = file.name;
 
     try {
         isUploading.value = true;
@@ -262,9 +299,44 @@ async function customUpload(options: any) {
         onSuccess(response);
         ElMessage.success('文件上传成功');
         await loadDirectoryContent();
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('文件上传失败:', error);
         let errorMsg = '文件上传失败';
+
+        // 类型安全的错误处理
+        if (error && typeof error === 'object' && 'response' in error) {
+            const axiosError = error as {
+                response?: {
+                    data?: {
+                        error?: string,
+                        existing_files?: Array<{ directory_path: string, directory_id: number }>
+                    },
+                    status?: number
+                }
+            };
+            const errorData = axiosError.response?.data;
+            const errorText = errorData?.error || '';
+
+            // 检测同名文件冲突错误
+            if (errorData?.existing_files && errorData.existing_files.length > 0) {
+                const directoryPaths = errorData.existing_files.map(f => f.directory_path).join('、');
+                errorMsg = `文件名 "${uploadedFileName}" 在以下目录已存在：${directoryPaths}。为避免解析结果冲突，请重命名文件后上传。`;
+            }
+            // 检测同一目录重复文件错误（数据库唯一约束）
+            else if (errorText.includes('duplicate key') || errorText.includes('already exists')) {
+                // 提取文件名，格式：Key (name, directory_id)=(文件名, 目录ID) already exists
+                const match = errorText.match(/\(name, directory_id\)=\(([^,]+),\s*\d+\)/);
+                if (match && match[1]) {
+                    const fileName = match[1].trim();
+                    errorMsg = `文件名 "${fileName}" 在当前目录下已存在，请勿重复上传`;
+                } else {
+                    errorMsg = '文件在当前目录下已存在，请勿重复上传';
+                }
+            } else if (errorText) {
+                // 其他错误，使用后端返回的错误信息
+                errorMsg = errorText;
+            }
+        }
 
         ElMessage.error(errorMsg);
         onError(error);
@@ -321,19 +393,37 @@ watch(searchQuery, async (newQuery) => {
 
 // 计算属性
 const filteredItems = computed(() => {
+    let result: FileItem[] = [];
+
     if (isGlobalSearch.value && searchQuery.value) {
         // 全局搜索模式 - 显示全局结果
-        return globalSearchResults.value;
+        result = globalSearchResults.value;
     } else {
         // 本地搜索模式 - 在当前目录中搜索
-        let result = items.value.filter(item =>
+        result = items.value.filter(item =>
             item.name.toLowerCase().includes(searchQuery.value.toLowerCase())
         );
+    }
 
-        // 分页处理
+    // 应用状态筛选（仅对文件类型生效，目录不受影响）
+    if (selectedStatusFilter.value !== null) {
+        result = result.filter(item => {
+            // 目录始终显示
+            if (item.node_type === 'directory') {
+                return true;
+            }
+            // 文件需要匹配状态筛选
+            return item.parse_status === selectedStatusFilter.value;
+        });
+    }
+
+    // 分页处理（仅对本地搜索模式生效）
+    if (!isGlobalSearch.value || !searchQuery.value) {
         const start = (currentPage.value - 1) * pageSize.value;
         return result.slice(start, start + pageSize.value);
     }
+
+    return result;
 });
 
 
@@ -559,6 +649,8 @@ function handleSelectionChange(selection: FileItem[]) {
 function executeBatchAction(action: string) {
     if (action === 'parse') {
         batchParse();
+    } else if (action === 'cancel') {
+        batchCancel();
     } else if (action === 'delete') {
         batchDelete()
     } else if (action === 'move') {
@@ -621,6 +713,7 @@ async function performGlobalSearch(query: string) {
                 size_display: formatFileSize(file.size),
                 uploaded_at: file.uploaded_at,
                 content_type: file.content_type,
+                parse_status: file.parse_status, // 添加解析状态
                 path: file.directory_name // 添加路径信息
             }))
         ];
@@ -740,6 +833,64 @@ async function batchParse() {
     await submitParseTask(selectedFiles.map(file => file.id));
 }
 
+// 批量取消解析
+async function batchCancel() {
+    // 只筛选文件类型
+    const selectedFiles = selectedItems.value.filter(item => item.node_type === 'file');
+
+    if (selectedFiles.length === 0) {
+        ElMessage.warning('请选择至少一个文件进行取消解析');
+        return;
+    }
+
+    // 筛选出可以取消的文件（pending/processing/parsed状态）
+    const cancellableFiles = selectedFiles.filter(file =>
+        ['pending', 'processing', 'parsed'].includes(file.parse_status || '')
+    );
+
+    if (cancellableFiles.length === 0) {
+        ElMessage.warning('所选文件中没有可以取消解析的文件');
+        return;
+    }
+
+    if (cancellableFiles.length < selectedFiles.length) {
+        ElMessage.warning(`部分文件无法取消解析，将处理 ${cancellableFiles.length} 个文件`);
+    }
+
+    // 调用取消解析方法
+    await cancelParse(cancellableFiles.map(file => file.id));
+}
+
+// 取消解析
+async function cancelParse(fileIds: string[]) {
+    try {
+        const response = await axios.post('/translate/cancel', {
+            file_ids: fileIds
+        }, { headers: headers.value });
+
+        ElMessage.success(response.data.message || '已取消解析');
+        await loadDirectoryContent();
+    } catch (error: any) {
+        ElMessage.error(error.response?.data?.error || '取消解析失败');
+        console.error(error);
+    }
+}
+
+// 取消单个文件解析（或清除已解析文件的内容）
+async function cancelSingleFile(fileItem: FileItem) {
+    if (fileItem.node_type !== 'file') {
+        ElMessage.warning('只能取消文件的解析');
+        return;
+    }
+
+    if (!['pending', 'processing', 'parsed'].includes(fileItem.parse_status || '')) {
+        ElMessage.warning('只能取消待解析、解析中或已解析的文件');
+        return;
+    }
+
+    await cancelParse([fileItem.id]);
+}
+
 // 开始轮询任务状态
 function startPollingTaskStatus() {
     isProcessing.value = true;
@@ -762,7 +913,7 @@ function startPollingTaskStatus() {
             taskDetails.value = taskDetails.value.map(task => {
                 const taskStatus = statusData.tasks.find((t: any) => t.file_id === task.file_id);
                 if (taskStatus) {
-                    if (taskStatus.status === 'success' || taskStatus.status === 'failed') {
+                    if (taskStatus.status === 'parsed' || taskStatus.status === 'failed' || taskStatus.status === 'cancelled') {
                         completedTasks.value++;
                     }
                     return { ...task, status: taskStatus.status };
@@ -809,7 +960,7 @@ function stopPolling() {
 // 状态标签类型
 function statusTagType(status: string): TagProps['type'] {
     switch (status) {
-        case 'success':
+        case 'parsed':
             return 'success'
         case 'failed':
             return 'danger'
@@ -817,6 +968,8 @@ function statusTagType(status: string): TagProps['type'] {
             return 'primary'
         case 'pending':
             return 'warning'
+        case 'cancelled':
+            return 'info'
         default:
             return 'info' // 其他状态
     }
@@ -830,8 +983,9 @@ function translateStatus(status: string | undefined): string {
         'unprocessed': '未解析',
         'pending': '待解析',
         'processing': '解析中',
-        'success': '解析成功',
-        'failed': '解析失败'
+        'parsed': '已解析',
+        'failed': '解析失败',
+        'cancelled': '取消解析'
     };
     return statusMap[status] || status;
 }
@@ -843,8 +997,9 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
         unprocessed: 'info',
         pending: 'primary',
         processing: 'warning',
-        success: 'success',
-        failed: 'danger'
+        parsed: 'success',
+        failed: 'danger',
+        cancelled: 'info'
     }
 
     return statusMap[status] || 'info'
@@ -887,7 +1042,7 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
 }
 
 .search-input {
-    width: 220px;
+    width: 400px;
     margin-left: auto;
 }
 
