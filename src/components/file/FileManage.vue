@@ -265,6 +265,7 @@ function handleNewCommand(command: string) {
 
 async function customUpload(options: any) {
     const { file, onProgress, onSuccess, onError } = options;
+    const uploadedFileName = file.name;
 
     try {
         isUploading.value = true;
@@ -306,15 +307,23 @@ async function customUpload(options: any) {
         if (error && typeof error === 'object' && 'response' in error) {
             const axiosError = error as {
                 response?: {
-                    data?: { error?: string },
+                    data?: {
+                        error?: string,
+                        existing_files?: Array<{ directory_path: string, directory_id: number }>
+                    },
                     status?: number
                 }
             };
             const errorData = axiosError.response?.data;
             const errorText = errorData?.error || '';
 
-            // 检测重复文件错误
-            if (errorText.includes('duplicate key') || errorText.includes('already exists')) {
+            // 检测同名文件冲突错误
+            if (errorData?.existing_files && errorData.existing_files.length > 0) {
+                const directoryPaths = errorData.existing_files.map(f => f.directory_path).join('、');
+                errorMsg = `文件名 "${uploadedFileName}" 在以下目录已存在：${directoryPaths}。为避免解析结果冲突，请重命名文件后上传。`;
+            }
+            // 检测同一目录重复文件错误（数据库唯一约束）
+            else if (errorText.includes('duplicate key') || errorText.includes('already exists')) {
                 // 提取文件名，格式：Key (name, directory_id)=(文件名, 目录ID) already exists
                 const match = errorText.match(/\(name, directory_id\)=\(([^,]+),\s*\d+\)/);
                 if (match && match[1]) {
