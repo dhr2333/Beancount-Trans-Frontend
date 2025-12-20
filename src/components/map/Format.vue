@@ -111,6 +111,7 @@ import { ElMessage } from 'element-plus'
 import axios from '../../utils/request'
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
 import { hasAuthTokens } from '../../utils/auth'
+import { shouldShowAnonymousPrompt } from '~/composables/useAnonymousPrompt'
 import type { FormInstance } from 'element-plus'
 
 const configForm = ref<FormInstance>()
@@ -221,12 +222,19 @@ const handleSkipAnonymous = () => {
 // 初始化加载配置
 onMounted(() => {
     // 检查用户是否已登录
-    if (!hasAuthTokens()) {
-        // 未登录用户显示提示
-        showAnonymousPrompt.value = true
-    } else {
+    const isAuthenticated = hasAuthTokens()
+
+    if (isAuthenticated) {
         // 已登录用户直接加载配置
         loadConfig()
+    } else {
+        // 未登录用户：检查是否应该显示提示（仅显示一次）
+        if (shouldShowAnonymousPrompt(false)) {
+            showAnonymousPrompt.value = true
+        } else {
+            // 如果用户已经看过提示，直接加载配置，显示admin用户的共享配置
+            loadConfig()
+        }
     }
 })
 
