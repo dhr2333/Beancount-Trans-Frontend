@@ -17,8 +17,13 @@
                         <Search />
                     </el-icon>
                 </template>
-                <template #append v-if="isGlobalSearch">
-                    <el-tag type="info" size="small">全局搜索</el-tag>
+                <template #append>
+                    <el-select v-model="selectedStatusFilter" placeholder="状态筛选" clearable style="width: 120px;"
+                        class="status-filter-select">
+                        <el-option v-for="option in statusFilterOptions" :key="option.value || 'all'"
+                            :label="option.label" :value="option.value">
+                        </el-option>
+                    </el-select>
                 </template>
             </el-input>
             <el-dropdown @command="handleNewCommand">
@@ -234,6 +239,18 @@ const rootDirectoryId = ref<string | null>(null)
 const isGlobalSearch = ref(false);
 const globalSearchResults = ref<FileItem[]>([]);
 const uploadTrigger = ref<HTMLButtonElement | null>(null)
+const selectedStatusFilter = ref<string | null>(null)
+
+// 状态筛选选项配置
+const statusFilterOptions = [
+    { value: null, label: '全部状态' },
+    { value: 'unprocessed', label: '未解析' },
+    { value: 'pending', label: '待解析' },
+    { value: 'processing', label: '解析中' },
+    { value: 'parsed', label: '已解析' },
+    { value: 'failed', label: '解析失败' },
+    { value: 'cancelled', label: '取消解析' }
+]
 
 function handleNewCommand(command: string) {
     if (command === 'folder') {
@@ -367,19 +384,37 @@ watch(searchQuery, async (newQuery) => {
 
 // 计算属性
 const filteredItems = computed(() => {
+    let result: FileItem[] = [];
+
     if (isGlobalSearch.value && searchQuery.value) {
         // 全局搜索模式 - 显示全局结果
-        return globalSearchResults.value;
+        result = globalSearchResults.value;
     } else {
         // 本地搜索模式 - 在当前目录中搜索
-        let result = items.value.filter(item =>
+        result = items.value.filter(item =>
             item.name.toLowerCase().includes(searchQuery.value.toLowerCase())
         );
+    }
 
-        // 分页处理
+    // 应用状态筛选（仅对文件类型生效，目录不受影响）
+    if (selectedStatusFilter.value !== null) {
+        result = result.filter(item => {
+            // 目录始终显示
+            if (item.node_type === 'directory') {
+                return true;
+            }
+            // 文件需要匹配状态筛选
+            return item.parse_status === selectedStatusFilter.value;
+        });
+    }
+
+    // 分页处理（仅对本地搜索模式生效）
+    if (!isGlobalSearch.value || !searchQuery.value) {
         const start = (currentPage.value - 1) * pageSize.value;
         return result.slice(start, start + pageSize.value);
     }
+
+    return result;
 });
 
 
@@ -669,6 +704,7 @@ async function performGlobalSearch(query: string) {
                 size_display: formatFileSize(file.size),
                 uploaded_at: file.uploaded_at,
                 content_type: file.content_type,
+                parse_status: file.parse_status, // 添加解析状态
                 path: file.directory_name // 添加路径信息
             }))
         ];
@@ -997,7 +1033,7 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
 }
 
 .search-input {
-    width: 220px;
+    width: 400px;
     margin-left: auto;
 }
 
