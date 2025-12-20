@@ -264,7 +264,7 @@ const checkAndShowRegisterPrompt = () => {
 // 处理跳过注册
 const handleSkipRegister = () => {
   showRegisterPrompt.value = false
-  ElMessage.info('您可以随时注册账号保存您的账本数据')
+  // ElMessage.info('您可以随时注册账号保存您的账本数据')
 }
 
 // 函数用于下载CSV文件

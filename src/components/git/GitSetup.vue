@@ -57,13 +57,7 @@
           </div>
         </div>
 
-        <el-alert
-          title="注意事项"
-          type="info"
-          :closable="false"
-          show-icon
-          class="notice-alert"
-        >
+        <el-alert title="注意事项" type="info" :closable="false" show-icon class="notice-alert">
           <ul class="notice-list">
             <li>Git 功能启用后，您的账本将托管在平台的私有 Git 仓库中</li>
             <li>平台会自动生成 SSH 密钥，用于安全的 Git 操作</li>
@@ -72,12 +66,7 @@
         </el-alert>
 
         <div class="action-buttons">
-          <el-button 
-            type="primary" 
-            size="large"
-            :loading="loading"
-            @click="showCreateOptions"
-          >
+          <el-button type="primary" size="large" :loading="loading" @click="showCreateOptions">
             <el-icon>
               <i-ep-plus />
             </el-icon>
@@ -91,11 +80,7 @@
     <el-card v-if="showOptions" shadow="never" class="options-card">
       <template #header>
         <div class="card-header">
-          <el-button 
-            text 
-            type="info"
-            @click="backToIntro"
-          >
+          <el-button text type="info" @click="backToIntro">
             <el-icon>
               <i-ep-arrow-left />
             </el-icon>
@@ -111,11 +96,8 @@
       <div class="options-content">
         <div class="option-cards">
           <!-- 基于模板创建 -->
-          <el-card 
-            :class="['option-card', { 'selected': selectedOption === true }]"
-            :body-style="{ padding: '20px' }"
-            @click="selectOption(true)"
-          >
+          <el-card :class="['option-card', { 'selected': selectedOption === true }]" :body-style="{ padding: '20px' }"
+            @click="selectOption(true)">
             <div class="option-header">
               <el-icon class="option-icon template-icon">
                 <i-ep-document-add />
@@ -124,13 +106,9 @@
                 <h4>基于模板创建</h4>
                 <el-tag type="success" size="small">推荐新手</el-tag>
               </div>
-              <el-radio 
-                :model-value="selectedOption" 
-                :label="true"
-                @click.stop
-              />
+              <el-radio :model-value="radioModelValue" label="template" @click.stop />
             </div>
-            
+
             <div class="option-description">
               <p>适合刚开始使用 Beancount 或希望遵循最佳实践的用户</p>
               <ul class="feature-list">
@@ -143,11 +121,8 @@
           </el-card>
 
           <!-- 空仓库创建 -->
-          <el-card 
-            :class="['option-card', { 'selected': selectedOption === false }]"
-            :body-style="{ padding: '20px' }"
-            @click="selectOption(false)"
-          >
+          <el-card :class="['option-card', { 'selected': selectedOption === false }]" :body-style="{ padding: '20px' }"
+            @click="selectOption(false)">
             <div class="option-header">
               <el-icon class="option-icon empty-icon">
                 <i-ep-folder />
@@ -156,13 +131,9 @@
                 <h4>空仓库创建</h4>
                 <el-tag type="info" size="small">推荐迁移用户</el-tag>
               </div>
-              <el-radio 
-                :model-value="selectedOption" 
-                :label="false"
-                @click.stop
-              />
+              <el-radio :model-value="radioModelValue" label="empty" @click.stop />
             </div>
-            
+
             <div class="option-description">
               <p>适合已有 Beancount 账本需要迁移的用户</p>
               <ul class="feature-list">
@@ -176,19 +147,11 @@
         </div>
 
         <div class="action-buttons">
-          <el-button 
-            size="large"
-            @click="backToIntro"
-          >
+          <el-button size="large" @click="backToIntro">
             取消
           </el-button>
-          <el-button 
-            type="primary" 
-            size="large"
-            :loading="loading"
-            :disabled="selectedOption === null"
-            @click="createRepository"
-          >
+          <el-button type="primary" size="large" :loading="loading" :disabled="selectedOption === undefined"
+            @click="createRepository">
             <el-icon>
               <i-ep-check />
             </el-icon>
@@ -201,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createGitRepository } from '../../api/git'
 import type { GitRepository } from '../../types/git'
@@ -216,18 +179,27 @@ const emit = defineEmits<{
 
 // 响应式状态
 const showOptions = ref(false)
-const selectedOption = ref<boolean | null>(null)
+const selectedOption = ref<boolean | undefined>(undefined)
 const loading = ref(false)
+
+// 计算属性：将 boolean 转换为字符串，用于 el-radio 的 model-value
+// el-radio 的 model-value 需要与 label 完全匹配才会选中
+// 使用字符串避免布尔值比较问题
+const radioModelValue = computed<string | undefined>(() => {
+  if (selectedOption.value === true) return 'template'
+  if (selectedOption.value === false) return 'empty'
+  return undefined
+})
 
 // 方法
 const showCreateOptions = () => {
   showOptions.value = true
-  selectedOption.value = null
+  selectedOption.value = undefined
 }
 
 const backToIntro = () => {
   showOptions.value = false
-  selectedOption.value = null
+  selectedOption.value = undefined
 }
 
 const selectOption = (option: boolean) => {
@@ -235,23 +207,28 @@ const selectOption = (option: boolean) => {
 }
 
 const createRepository = async () => {
-  if (selectedOption.value === null) {
+  if (selectedOption.value === undefined) {
     ElMessage.warning('请选择创建方式')
     return
   }
 
   loading.value = true
-  
+
   try {
     const repository = await createGitRepository({
       template: selectedOption.value
     })
-    
+
     ElMessage.success('Git 仓库创建成功！')
     emit('created', repository)
-    
-  } catch (error: any) {
-    const message = error.response?.data?.error || '创建失败，请稍后重试'
+
+  } catch (error: unknown) {
+    const message = (error && typeof error === 'object' && 'response' in error &&
+      error.response && typeof error.response === 'object' && 'data' in error.response &&
+      error.response.data && typeof error.response.data === 'object' && 'error' in error.response.data &&
+      typeof error.response.data.error === 'string')
+      ? error.response.data.error
+      : '创建失败，请稍后重试'
     ElMessage.error(message)
   } finally {
     loading.value = false
@@ -334,6 +311,7 @@ const createRepository = async () => {
 .notice-list {
   margin: 0;
   padding-left: 16px;
+  text-align: left;
 }
 
 .notice-list li {
@@ -434,20 +412,19 @@ const createRepository = async () => {
   .features-list {
     grid-template-columns: 1fr;
   }
-  
+
   .option-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .action-buttons {
     flex-direction: column;
     align-items: center;
   }
-  
+
   .action-buttons .el-button {
     width: 100%;
     max-width: 200px;
   }
 }
 </style>
-

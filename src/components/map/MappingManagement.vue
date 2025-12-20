@@ -180,6 +180,7 @@ import IncomeMapping from './Income.vue'
 import AssetsMapping from './Assets.vue'
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
 import { hasAuthTokens } from '../../utils/auth'
+import { shouldShowAnonymousPrompt } from '~/composables/useAnonymousPrompt'
 import type { FormInstance, FormRules, TabPaneName } from 'element-plus'
 
 // 响应式数据
@@ -363,9 +364,14 @@ const loadAllTabData = () => {
 // 组件挂载时初始化
 onMounted(() => {
     // 检查用户是否已登录
-    if (!hasAuthTokens()) {
-        // 未登录用户显示提示
-        showAnonymousPrompt.value = true
+    const isAuthenticated = hasAuthTokens()
+
+    if (!isAuthenticated) {
+        // 未登录用户：检查是否应该显示提示（仅显示一次）
+        if (shouldShowAnonymousPrompt(false)) {
+            showAnonymousPrompt.value = true
+        }
+        // 如果用户已经看过提示，直接显示页面，显示admin用户的共享配置
     }
     // 页面初始化
 })

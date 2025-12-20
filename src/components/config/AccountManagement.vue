@@ -270,10 +270,10 @@
                                             selectedMigrationAccountInfo.mapping_count.expense }}支出</el-tag>
                                         <el-tag type="success" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.assets
-                                        }}资产</el-tag>
+                                            }}资产</el-tag>
                                         <el-tag type="primary" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.income
-                                        }}收入</el-tag>
+                                            }}收入</el-tag>
                                     </div>
                                 </div>
                             </el-card>
@@ -326,6 +326,7 @@ import type {
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
 import { hasAuthTokens } from '../../utils/auth'
 import { getAccountTypeColor } from '~/utils/accountTypeColor'
+import { shouldShowAnonymousPrompt } from '~/composables/useAnonymousPrompt'
 
 // 接口定义
 interface Account {
@@ -839,12 +840,19 @@ const handleSkipAnonymous = () => {
 // 组件挂载时初始化数据
 onMounted(() => {
     // 检查用户是否已登录
-    if (!hasAuthTokens()) {
-        // 未登录用户显示提示
-        showAnonymousPrompt.value = true
-    } else {
+    const isAuthenticated = hasAuthTokens()
+
+    if (isAuthenticated) {
         // 已登录用户直接加载数据
         fetchAccountTree()
+    } else {
+        // 未登录用户：检查是否应该显示提示（仅显示一次）
+        if (shouldShowAnonymousPrompt(false)) {
+            showAnonymousPrompt.value = true
+        } else {
+            // 如果用户已经看过提示，直接加载数据，显示admin用户的共享配置
+            fetchAccountTree()
+        }
     }
 })
 </script>

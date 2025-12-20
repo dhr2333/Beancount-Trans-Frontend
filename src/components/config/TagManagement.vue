@@ -107,7 +107,7 @@
                                             <div class="mapping-info">
                                                 <span class="mapping-key">{{ mapping.key }}</span>
                                                 <span v-if="mapping.payee" class="mapping-payee">{{ mapping.payee
-                                                    }}</span>
+                                                }}</span>
                                                 <span class="mapping-account">→ {{ mapping.account || '未知账户' }}</span>
                                                 <span v-if="mapping.currency" class="mapping-currency">{{
                                                     mapping.currency }}</span>
@@ -146,7 +146,7 @@
                                             <div class="mapping-info">
                                                 <span class="mapping-key">{{ mapping.key }}</span>
                                                 <span v-if="mapping.payer" class="mapping-payer">{{ mapping.payer
-                                                    }}</span>
+                                                }}</span>
                                                 <span class="mapping-account">→ {{ mapping.account || '未知账户' }}</span>
                                             </div>
                                             <el-tag :type="mapping.enable ? 'success' : 'info'" size="small">
@@ -216,6 +216,7 @@ import {
 import type { Tag, TagForm } from '../../types/tag'
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
 import { hasAuthTokens } from '../../utils/auth'
+import { shouldShowAnonymousPrompt } from '~/composables/useAnonymousPrompt'
 
 // 响应式数据
 const tagTree = ref<Tag[]>([])
@@ -562,12 +563,19 @@ const handleSkipAnonymous = () => {
 // 组件挂载
 onMounted(() => {
     // 检查用户是否已登录
-    if (!hasAuthTokens()) {
-        // 未登录用户显示提示
-        showAnonymousPrompt.value = true
-    } else {
+    const isAuthenticated = hasAuthTokens()
+
+    if (isAuthenticated) {
         // 已登录用户直接加载数据
         loadTagTree()
+    } else {
+        // 未登录用户：检查是否应该显示提示（仅显示一次）
+        if (shouldShowAnonymousPrompt(false)) {
+            showAnonymousPrompt.value = true
+        } else {
+            // 如果用户已经看过提示，直接加载数据，显示admin用户的共享配置
+            loadTagTree()
+        }
     }
 })
 </script>

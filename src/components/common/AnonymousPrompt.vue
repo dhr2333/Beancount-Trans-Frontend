@@ -60,7 +60,7 @@
         <template #footer>
             <div class="dialog-footer">
                 <el-button @click="handleSkip" size="large">
-                    继续使用共享配置
+                    继续使用共享配置并不再弹出
                 </el-button>
                 <el-button type="primary" @click="handleLogin" size="large" :loading="loginLoading">
                     <el-icon>
@@ -76,8 +76,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { Lock, User, Setting, Document, View } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import router from '~/routers'
+import { markAnonymousPromptAsShown } from '~/composables/useAnonymousPrompt'
 
 interface Props {
     modelValue: boolean
@@ -108,6 +108,9 @@ const handleSkip = () => {
     visible.value = false
     emit('skip')
 
+    // 标记用户已经看过提示，不再显示
+    markAnonymousPromptAsShown()
+
     // 记录用户跳过登录的行为
     trackUserAction('anonymous_prompt_skipped', {
         timestamp: new Date().toISOString()
@@ -116,6 +119,9 @@ const handleSkip = () => {
 
 const handleLogin = () => {
     loginLoading.value = true
+
+    // 标记用户已经看过提示，不再显示
+    markAnonymousPromptAsShown()
 
     // 记录用户点击登录的行为
     trackUserAction('anonymous_prompt_login_clicked', {
@@ -131,7 +137,7 @@ const handleLogin = () => {
 }
 
 // 用户行为追踪
-const trackUserAction = (action: string, data: any) => {
+const trackUserAction = (action: string, data: Record<string, unknown>) => {
     // 这里可以集成 Google Analytics、百度统计等
     console.log('User action:', action, data)
 
