@@ -51,14 +51,7 @@
             <!-- 隐藏的上传组件 -->
             <el-upload :show-file-list="false" :http-request="customUpload" :before-upload="validateUpload">
                 <button ref="uploadTrigger" style="display: none"></button>
-                <template #tip>
-                    <div v-if="uploadProgress > 0" class="upload-progress">
-                        <el-progress :percentage="uploadProgress" :stroke-width="6" status="success"
-                            v-show="uploadProgress < 100" />
-                    </div>
-                </template>
             </el-upload>
-
 
             <el-select v-model="batchAction" placeholder="批量操作" class="batch-select"
                 :disabled="selectedItems.length === 0" @change="executeBatchAction">
@@ -67,6 +60,11 @@
                 <el-option label="下载" value="download"></el-option>
                 <el-option label="删除" value="delete"></el-option>
             </el-select>
+        </div>
+
+        <!-- 上传进度条（独立显示，不影响工具栏布局） -->
+        <div v-if="uploadProgress > 0 && uploadProgress < 100" class="upload-progress-container">
+            <el-progress :percentage="uploadProgress" :stroke-width="6" status="success" />
         </div>
 
         <!-- 任务状态对话框  -->
@@ -1008,9 +1006,11 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
 </script>
 
 <style scoped>
-.upload-progress {
+.upload-progress-container {
     margin-top: 10px;
-    width: 200px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 400px;
 }
 
 .file-management {
@@ -1035,6 +1035,7 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
     align-items: center;
     gap: 10px;
     margin-bottom: 20px;
+    flex-wrap: nowrap;
 }
 
 .batch-select {
@@ -1043,7 +1044,9 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
 
 .search-input {
     width: 400px;
+    min-width: 200px;
     margin-left: auto;
+    flex-shrink: 0;
 }
 
 .flex {
