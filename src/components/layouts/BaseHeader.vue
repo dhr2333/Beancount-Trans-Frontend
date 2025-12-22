@@ -251,7 +251,7 @@ announcements.value = [{
 const openFavaInstance = async () => {
   const loading = ElLoading.service({
     lock: true,
-    text: '您即将查看基于您刚上传的账单生成的专业级财务报表。您可以看到月度支出趋势、消费分类饼图等。',
+    text: '正在为您生成专属加密空间，请稍候',
   });
 
   try {
