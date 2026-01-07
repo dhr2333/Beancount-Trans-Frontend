@@ -233,13 +233,42 @@ const normalizeCascaderValue = (value: InternalCascaderValue): number | null => 
     return null
 }
 
-const handleChange = (value: CascaderValue | CascaderValue[] | null) => {
+const handleChange = async (value: CascaderValue | CascaderValue[] | null) => {
     const normalizedValue = normalizeCascaderValue(value)
     selectedValue.value = (value ?? null) as InternalCascaderValue
+
+    // 先更新 modelValue，确保值不会丢失
     emit('update:modelValue', normalizedValue)
 
     if (normalizedValue !== null) {
-        const account = findAccountById(accountTree.value, normalizedValue)
+        // 如果账户树为空且不在加载中，先加载账户树
+        if (accountTree.value.length === 0 && !loading.value) {
+            await fetchAccountTree()
+        }
+
+        // 尝试查找账户对象
+        let account = findAccountById(accountTree.value, normalizedValue)
+
+        // 如果找不到且正在加载中，等待加载完成后再查找
+        if (!account && loading.value) {
+            // 等待加载完成（最多等待2秒）
+            await new Promise<void>((resolve) => {
+                const unwatch = watch(loading, (isLoading) => {
+                    if (!isLoading) {
+                        unwatch()
+                        resolve()
+                    }
+                })
+                // 设置超时，避免无限等待
+                setTimeout(() => {
+                    unwatch()
+                    resolve()
+                }, 2000)
+            })
+            // 加载完成后再次查找
+            account = findAccountById(accountTree.value, normalizedValue)
+        }
+
         selectedAccount.value = account
         emit('change', account)
     } else {
@@ -250,7 +279,9 @@ const handleChange = (value: CascaderValue | CascaderValue[] | null) => {
 
 // 处理下拉框显示状态
 const handleVisibleChange = (visible: boolean) => {
-    if (visible) {
+    // 如果下拉框打开且账户树为空且不在加载中，才加载账户树
+    // 这样可以避免重复加载，同时确保数据可用
+    if (visible && accountTree.value.length === 0 && !loading.value) {
         fetchAccountTree()
     }
 }
@@ -275,20 +306,23 @@ onMounted(() => {
         fetchAccountTree()
     })
 
-    if (props.modelValue) {
-        fetchAccountTree().then(() => {
+    // 立即预加载账户树，确保用户操作时数据已就绪
+    fetchAccountTree().then(() => {
+        // 如果组件有初始值，设置对应的账户对象
+        if (props.modelValue) {
             const account = findAccountById(accountTree.value, props.modelValue!)
             if (account) {
                 selectedAccount.value = account
             }
-        })
-    }
+        }
 
-    const normalized = normalizeCascaderValue(selectedValue.value)
-    if (normalized !== null) {
-        const account = findAccountById(accountTree.value, normalized)
-        selectedAccount.value = account
-    }
+        // 处理 selectedValue 中的值
+        const normalized = normalizeCascaderValue(selectedValue.value)
+        if (normalized !== null) {
+            const account = findAccountById(accountTree.value, normalized)
+            selectedAccount.value = account
+        }
+    })
 })
 
 onBeforeUnmount(() => {
