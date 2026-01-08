@@ -417,6 +417,11 @@ const handlePhoneLoginByCode = async () => {
 
     ElMessage.success('登录成功')
 
+    // 检查是否是新用户，如果是则设置引导标记
+    if (res.data.is_new_user) {
+      localStorage.setItem('start_tour', 'true')
+    }
+
     // 检查是否需要2FA
     // if (res.data.requires_2fa) {
     //   ElMessage.info('请完成双因素认证')
