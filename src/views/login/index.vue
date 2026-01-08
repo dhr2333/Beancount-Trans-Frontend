@@ -13,6 +13,46 @@
       <!-- 登录表单 -->
       <div class="login-form">
         <el-tabs v-model="loginMethod" class="login-tabs">
+          <el-tab-pane label="手机号登录" name="phone">
+            <el-form ref="phoneLoginFormRef" :model="phoneLoginForm" :rules="phoneLoginRules" label-width="0">
+              <el-form-item prop="phone_number">
+                <el-input v-model="phoneLoginForm.phone_number" placeholder="手机号" size="large" clearable>
+                  <template #prefix>
+                    <el-icon>
+                      <Phone />
+                    </el-icon>
+                  </template>
+                </el-input>
+              </el-form-item>
+              <el-form-item prop="code">
+                <div class="code-input-group">
+                  <el-input v-model="phoneLoginForm.code" placeholder="验证码" size="large" maxlength="6" clearable
+                    @keyup.enter="handlePhoneLoginByCode">
+                    <template #prefix>
+                      <el-icon>
+                        <Message />
+                      </el-icon>
+                    </template>
+                  </el-input>
+                  <el-button :disabled="!canSendCode || codeSending" :loading="codeSending" @click="sendLoginCode">
+                    {{ codeSending ? `${countdown}s` : '发送验证码' }}
+                  </el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" size="large" class="login-button" :loading="loginLoading"
+                  @click="handlePhoneLoginByCode">
+                  验证码登录
+                </el-button>
+                <div class="login-hint">
+                  <el-text type="info" size="small">
+                    温馨提示：未注册手机号验证后将自动完成注册
+                  </el-text>
+                </div>
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+
           <el-tab-pane label="账密登录" name="username">
             <el-form ref="usernameLoginFormRef" :model="usernameLoginForm" :rules="usernameLoginRules" label-width="0"
               @submit.prevent="handleUsernameLogin">
@@ -49,41 +89,6 @@
                 <el-button type="primary" size="large" class="login-button" :loading="loginLoading"
                   @click="handleUsernameLogin">
                   登录
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </el-tab-pane>
-
-          <el-tab-pane label="手机号登录" name="phone">
-            <el-form ref="phoneLoginFormRef" :model="phoneLoginForm" :rules="phoneLoginRules" label-width="0">
-              <el-form-item prop="phone_number">
-                <el-input v-model="phoneLoginForm.phone_number" placeholder="手机号" size="large" clearable>
-                  <template #prefix>
-                    <el-icon>
-                      <Phone />
-                    </el-icon>
-                  </template>
-                </el-input>
-              </el-form-item>
-              <el-form-item prop="code">
-                <div class="code-input-group">
-                  <el-input v-model="phoneLoginForm.code" placeholder="验证码" size="large" maxlength="6" clearable
-                    @keyup.enter="handlePhoneLoginByCode">
-                    <template #prefix>
-                      <el-icon>
-                        <Message />
-                      </el-icon>
-                    </template>
-                  </el-input>
-                  <el-button :disabled="!canSendCode || codeSending" :loading="codeSending" @click="sendLoginCode">
-                    {{ codeSending ? `${countdown}s` : '发送验证码' }}
-                  </el-button>
-                </div>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" size="large" class="login-button" :loading="loginLoading"
-                  @click="handlePhoneLoginByCode">
-                  验证码登录
                 </el-button>
               </el-form-item>
             </el-form>
@@ -153,7 +158,7 @@ import router from '~/routers'
 const apiUrl = import.meta.env.VITE_API_URL
 
 // 登录相关
-const loginMethod = ref('username')
+const loginMethod = ref('phone')
 const loginLoading = ref(false)
 
 // 验证码相关
@@ -554,6 +559,11 @@ const loginWithGitHub = () => {
 .login-button {
   width: 100%;
   margin-top: 10px;
+}
+
+.login-hint {
+  margin-top: 12px;
+  text-align: center;
 }
 
 .oauth-buttons {
