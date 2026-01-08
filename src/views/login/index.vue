@@ -3,15 +3,15 @@
     <el-card class="login-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <h2>{{ isLogin ? '账户登录' : '手机号注册' }}</h2>
+          <h2>账户登录</h2>
           <el-text type="info" size="small">
-            {{ isLogin ? '请登录继续管理您的财务报告' : '立即注册，AI 帮您 3 分钟生成专业财务报表' }}
+            请登录继续管理您的财务报告
           </el-text>
         </div>
       </template>
 
       <!-- 登录表单 -->
-      <div v-if="isLogin" class="login-form">
+      <div class="login-form">
         <el-tabs v-model="loginMethod" class="login-tabs">
           <el-tab-pane label="账密登录" name="username">
             <el-form ref="usernameLoginFormRef" :model="usernameLoginForm" :rules="usernameLoginRules" label-width="0"
@@ -138,83 +138,6 @@
           </el-button>
         </div>
       </div>
-
-      <!-- 注册表单 -->
-      <div v-else class="register-form">
-        <el-form ref="registerFormRef" :model="registerForm" :rules="registerRules" label-width="0"
-          @submit.prevent="handleRegister">
-          <el-form-item prop="phone_number">
-            <el-input v-model="registerForm.phone_number" placeholder="手机号（必填）" size="large" clearable>
-              <template #prefix>
-                <el-icon>
-                  <Phone />
-                </el-icon>
-              </template>
-            </el-input>
-          </el-form-item>
-          <el-form-item prop="code">
-            <div class="code-input-group">
-              <el-input v-model="registerForm.code" placeholder="验证码" size="large" maxlength="6" clearable>
-                <template #prefix>
-                  <el-icon>
-                    <Message />
-                  </el-icon>
-                </template>
-              </el-input>
-              <el-button :disabled="!canSendRegisterCode || codeSending" :loading="codeSending"
-                @click="sendRegisterCode">
-                {{ codeSending ? `${countdown}s` : '发送验证码' }}
-              </el-button>
-            </div>
-          </el-form-item>
-          <el-form-item prop="username">
-            <el-input v-model="registerForm.username" placeholder="用户名（选填）" size="large" clearable>
-              <template #prefix>
-                <el-icon>
-                  <User />
-                </el-icon>
-              </template>
-            </el-input>
-          </el-form-item>
-          <el-form-item prop="password">
-            <el-input v-model="registerForm.password" type="password" placeholder="密码（选填）" size="large" show-password
-              clearable>
-              <template #prefix>
-                <el-icon>
-                  <Lock />
-                </el-icon>
-              </template>
-            </el-input>
-          </el-form-item>
-          <!-- <el-form-item prop="email">
-            <el-input v-model="registerForm.email" type="email" placeholder="邮箱（选填）" size="large" clearable>
-              <template #prefix>
-                <el-icon>
-                  <Message />
-                </el-icon>
-              </template>
-            </el-input>
-          </el-form-item> -->
-          <el-form-item>
-            <el-button type="primary" size="large" class="register-button" :loading="registerLoading"
-              @click="handleRegister">
-              注册
-            </el-button>
-          </el-form-item>
-        </el-form>
-      </div>
-
-      <!-- 切换登录/注册 -->
-      <div class="form-footer">
-        <el-text v-if="isLogin">
-          还没有账户？
-          <el-link type="primary" @click="switchToRegister">立即注册</el-link>
-        </el-text>
-        <el-text v-else>
-          已有账户？
-          <el-link type="primary" @click="switchToLogin">立即登录</el-link>
-        </el-text>
-      </div>
     </el-card>
   </div>
 </template>
@@ -229,11 +152,9 @@ import router from '~/routers'
 
 const apiUrl = import.meta.env.VITE_API_URL
 
-// 登录/注册切换
-const isLogin = ref(true)
+// 登录相关
 const loginMethod = ref('username')
 const loginLoading = ref(false)
-const registerLoading = ref(false)
 
 // 验证码相关
 const codeSending = ref(false)
@@ -247,7 +168,6 @@ let emailCountdownTimer: number | null = null
 const usernameLoginFormRef = ref<FormInstance>()
 const phoneLoginFormRef = ref<FormInstance>()
 const emailLoginFormRef = ref<FormInstance>()
-const registerFormRef = ref<FormInstance>()
 
 // 用户名登录表单
 const usernameLoginForm = reactive({
@@ -266,15 +186,6 @@ const phoneLoginForm = reactive({
 const emailLoginForm = reactive({
   email: '',
   code: ''
-})
-
-// 注册表单
-const registerForm = reactive({
-  phone_number: '',
-  code: '',
-  username: '',
-  password: '',
-  email: ''
 })
 
 // 验证规则
@@ -309,54 +220,6 @@ const emailLoginRules: FormRules = {
   ]
 }
 
-const registerRules: FormRules = {
-  phone_number: [
-    { required: true, message: '请输入手机号', trigger: 'blur' },
-    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
-  ],
-  code: [
-    { required: true, message: '请输入验证码', trigger: 'blur' },
-    { pattern: /^\d{6}$/, message: '验证码为6位数字', trigger: 'blur' }
-  ],
-  username: [
-    {
-      validator: (_rule, value, callback) => {
-        const trimmed = (value || '').trim()
-        if (!trimmed) {
-          callback()
-          return
-        }
-        if (trimmed.length < 3 || trimmed.length > 150) {
-          callback(new Error('用户名长度为3-150个字符'))
-          return
-        }
-        callback()
-      },
-      trigger: 'blur'
-    }
-  ],
-  password: [
-    {
-      validator: (_rule, value, callback) => {
-        const trimmed = (value || '').trim()
-        if (!trimmed) {
-          callback()
-          return
-        }
-        if (trimmed.length < 8) {
-          callback(new Error('密码长度至少8个字符'))
-          return
-        }
-        callback()
-      },
-      trigger: 'blur'
-    }
-  ],
-  email: [
-    { type: 'email', message: '请输入正确的邮箱地址', trigger: ['blur', 'change'] }
-  ]
-}
-
 // 手机号格式化
 const normalizePhone = (phone: string): string => {
   const trimmed = phone.trim()
@@ -368,11 +231,6 @@ const normalizePhone = (phone: string): string => {
 // 是否可以发送验证码（登录）
 const canSendCode = computed(() => {
   return phoneLoginForm.phone_number.length === 11
-})
-
-// 是否可以发送验证码（注册）
-const canSendRegisterCode = computed(() => {
-  return registerForm.phone_number.length === 11
 })
 
 // 是否可以发送邮箱验证码
@@ -415,24 +273,6 @@ const sendLoginCode = async () => {
   try {
     const resp = await axios.post(apiUrl + '/auth/phone/send-code/', {
       phone_number: normalizePhone(phoneLoginForm.phone_number)
-    })
-    if (resp.status === 200) {
-      ElMessage.success('验证码已发送')
-      startCountdown()
-    }
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || '发送失败')
-  }
-}
-
-// 发送注册验证码
-const sendRegisterCode = async () => {
-  if (!registerFormRef.value) return
-  await registerFormRef.value.validateField('phone_number')
-
-  try {
-    const resp = await axios.post(apiUrl + '/auth/phone/send-code/', {
-      phone_number: normalizePhone(registerForm.phone_number)
     })
     if (resp.status === 200) {
       ElMessage.success('验证码已发送')
@@ -620,55 +460,6 @@ const handleEmailLogin = async () => {
   }
 }
 
-// 注册
-const handleRegister = async () => {
-  if (!registerFormRef.value) return
-  await registerFormRef.value.validate()
-
-  registerLoading.value = true
-  try {
-    const payload: Record<string, string> = {
-      phone_number: normalizePhone(registerForm.phone_number),
-      code: registerForm.code
-    }
-
-    const username = registerForm.username.trim()
-    if (username) {
-      payload.username = username
-    }
-
-    const password = registerForm.password.trim()
-    if (password) {
-      payload.password = password
-    }
-
-    const email = registerForm.email.trim()
-    if (email) {
-      payload.email = email
-    }
-
-    const res = await axios.post(apiUrl + '/auth/phone/register/', payload)
-
-    const { setAuthTokens } = await import('../../utils/auth')
-    setAuthTokens(
-      res.data.access,
-      res.data.refresh,
-      res.data.user.username
-    )
-
-    ElMessage.success('注册成功')
-
-    // 标记为新用户
-    localStorage.setItem('start_tour', 'true')
-
-    router.push('/file')
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.error || '注册失败')
-  } finally {
-    registerLoading.value = false
-  }
-}
-
 // GitHub OAuth登录
 const loginWithGitHub = () => {
   const providerId = 'github'
@@ -701,30 +492,6 @@ const loginWithGitHub = () => {
   form.submit()
 }
 
-// 切换登录/注册
-const switchToLogin = () => {
-  isLogin.value = true
-  loginMethod.value = 'username'
-  // 清空表单
-  Object.assign(registerForm, {
-    phone_number: '',
-    code: '',
-    username: '',
-    password: '',
-    email: ''
-  })
-  Object.assign(usernameLoginForm, { username: '', password: '', totp_code: '' })
-  Object.assign(emailLoginForm, { email: '', code: '' })
-}
-
-const switchToRegister = () => {
-  isLogin.value = false
-  // 清空表单
-  Object.assign(usernameLoginForm, { username: '', password: '', totp_code: '' })
-  Object.assign(phoneLoginForm, { phone_number: '', code: '' })
-  Object.assign(emailLoginForm, { email: '', code: '' })
-  Object.assign(registerForm, { phone_number: '', code: '', username: '', password: '', email: '' })
-}
 </script>
 
 <style scoped>
@@ -784,8 +551,7 @@ const switchToRegister = () => {
   flex: 1;
 }
 
-.login-button,
-.register-button {
+.login-button {
   width: 100%;
   margin-top: 10px;
 }
@@ -798,17 +564,6 @@ const switchToRegister = () => {
 
 .oauth-button {
   width: 100%;
-}
-
-.form-footer {
-  text-align: center;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--ep-border-color);
-}
-
-:deep(html.dark) .form-footer {
-  border-top-color: var(--ep-border-color-extra-light, var(--ep-border-color));
 }
 
 :deep(.el-tabs__item) {
