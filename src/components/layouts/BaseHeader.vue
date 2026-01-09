@@ -172,6 +172,7 @@ const cleanToken = async () => {
   } finally {
     // 清除本地存储和Cookie
     localStorage.removeItem("access");
+    localStorage.removeItem("refresh");
     localStorage.removeItem("username");
     document.cookie = 'csrftoken=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     document.cookie = 'sessionid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';

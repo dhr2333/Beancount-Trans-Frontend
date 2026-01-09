@@ -345,11 +345,10 @@
                 <el-alert title="警告" type="error" :closable="false" style="margin-bottom: 20px">
                     <template #default>
                         <p>此操作将永久删除您的账户和所有相关数据，包括：</p>
-                        <ul>
-                            <li>所有账单文件</li>
-                            <li>所有账户配置</li>
-                            <li>所有映射规则</li>
-                            <li>所有模板</li>
+                        <ul class="danger-list">
+                            <li>所有已上传的账单文件</li>
+                            <li>Git 远程仓库</li>
+                            <li>所有平台配置（映射、账户等）</li>
                         </ul>
                         <p><strong>此操作不可恢复！</strong></p>
                         <el-text type="warning" size="small">建议在删除前导出或备份重要数据。</el-text>
@@ -1241,5 +1240,21 @@ onMounted(() => {
 
 :global(.settings-confirm-danger:hover) {
     filter: brightness(0.92);
+}
+
+.danger-list {
+    text-align: left;
+    padding-left: 24px;
+    margin: 12px 0;
+    list-style-type: disc;
+}
+
+.danger-list li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.danger-list li:last-child {
+    margin-bottom: 0;
 }
 </style>
