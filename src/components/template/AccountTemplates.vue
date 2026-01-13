@@ -103,7 +103,8 @@
         <el-dialog v-model="applyDialogVisible" title="应用账户模板" width="500px">
             <div v-if="selectedTemplate">
                 <el-alert title="注意" type="warning" :closable="false" show-icon style="margin-bottom: 20px;">
-                    <p>应用模板将会影响您的账户结构，请谨慎选择应用策略。</p>
+                    <p>应用模板将会影响您的账户结构，请谨慎选择应用策略</p>
+                    <p>覆盖操作会导致现有映射无法匹配到账户，请及时更新映射规则</p>
                 </el-alert>
 
                 <el-form :model="applyForm" label-width="120px">
@@ -123,7 +124,7 @@
                                 保留现有账户，只添加不存在的账户
                             </el-text>
                             <el-text v-else size="small" type="warning">
-                                清空现有账户，完全替换为模板账户（危险操作！）
+                                清空现有账户，完全替换为模板账户
                             </el-text>
                         </div>
                     </el-form-item>

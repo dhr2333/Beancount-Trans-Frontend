@@ -69,7 +69,7 @@
                                 prop="payee"></el-table-column>
                             <el-table-column v-if="template.type === 'expense'" label="支出账户">
                                 <template #default="{ row }">
-                                    {{ row.expend?.account || row.account.account }}
+                                    {{ row.account || '-' }}
                                 </template>
                             </el-table-column>
                             <el-table-column v-if="template.type === 'expense'" label="货币" width="80">
@@ -82,7 +82,7 @@
                             <!-- <el-table-column v-if="template.type === 'income'" label="付款方" prop="payer"></el-table-column> -->
                             <el-table-column v-if="template.type === 'income'" label="收入账户">
                                 <template #default="{ row }">
-                                    {{ row.income?.account || row.account.account }}
+                                    {{ row.account || '-' }}
                                 </template>
                             </el-table-column>
 
@@ -91,7 +91,7 @@
                                 prop="full"></el-table-column>
                             <el-table-column v-if="template.type === 'assets'" label="资产账户">
                                 <template #default="{ row }">
-                                    {{ row.assets?.account || row.account.account }}
+                                    {{ row.account || '-' }}
                                 </template>
                             </el-table-column>
                         </el-table>
@@ -142,7 +142,7 @@
                                 保留现有映射，只添加不存在的映射
                             </el-text>
                             <el-text v-else size="small" type="warning">
-                                清空现有{{ getTypeText(selectedTemplate.type) }}映射，完全替换为模板映射（危险操作！）
+                                清空现有{{ getTypeText(selectedTemplate.type) }}映射，完全替换为模板映射
                             </el-text>
                         </div>
                     </el-form-item>
@@ -172,10 +172,34 @@
 
 <script lang="ts" setup>
 import { ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { User, Clock, DocumentDelete, Loading, Download } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import type { TagProps } from 'element-plus'
+
+interface TemplateItemDetail {
+    id: number;
+    key: string;
+    account: string | null; // 账户路径字符串，可能为 null
+    payee?: string | null;
+    payer?: string | null;
+    full?: string | null;
+    currency?: string | null;
+    created?: string;
+    modified?: string;
+}
+
+interface MissingAccount {
+    key: string;
+    account: string;
+}
+
+interface TemplateApplyResult {
+    created: number;
+    skipped: number;
+    overwritten: number;
+    missing_accounts?: MissingAccount[];
+}
 
 interface TemplateItem {
     id: number;
@@ -187,7 +211,7 @@ interface TemplateItem {
     modified: string;
     description?: string;
     update_notes?: string;
-    items?: any[]; // 可以根据实际结构进一步定义
+    items?: TemplateItemDetail[];
 }
 
 // 响应式数据
@@ -286,19 +310,38 @@ const confirmApply = async () => {
             conflict_resolution: applyForm.value.conflict_resolution
         })
 
-        const result = response.data.result
+        const result: TemplateApplyResult = response.data.result
+        const missingAccounts: MissingAccount[] = result.missing_accounts || []
+
+        // 构建成功消息
+        let successMessage = `${getTypeText(selectedTemplate.value.type)}模板应用成功！创建: ${result.created}, 跳过: ${result.skipped}, 覆盖: ${result.overwritten}`
+
+        if (missingAccounts.length > 0) {
+            successMessage += `。注意：有 ${missingAccounts.length} 个映射的账户不存在，已设置为空，请及时处理。`
+        }
+
         ElMessage.success({
-            message: `${getTypeText(selectedTemplate.value.type)}模板应用成功！创建: ${result.created}, 跳过: ${result.skipped}, 覆盖: ${result.overwritten}`,
-            duration: 5000
+            message: successMessage,
+            duration: missingAccounts.length > 0 ? 7000 : 5000
         })
 
         applyDialogVisible.value = false
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('应用模板失败:', error)
-        if (error.response?.status === 401) {
-            ElMessage.error('未登录，请先登录')
+
+        // 类型安全的错误处理
+        if (error && typeof error === 'object' && 'response' in error) {
+            const axiosError = error as { response?: { status?: number; data?: { error?: string; message?: string } } }
+            const status = axiosError.response?.status
+            const errorMessage = axiosError.response?.data?.error || axiosError.response?.data?.message
+
+            if (status === 401) {
+                ElMessage.error('未登录，请先登录')
+            } else {
+                ElMessage.error(errorMessage || '应用模板失败')
+            }
         } else {
-            ElMessage.error(error.response?.data?.error || '应用模板失败')
+            ElMessage.error('网络错误，请稍后重试')
         }
     } finally {
         applyLoading.value = false
