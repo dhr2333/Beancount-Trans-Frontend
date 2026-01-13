@@ -47,9 +47,11 @@
                                         @click="showBindPhoneDialog = true">
                                         绑定
                                     </el-button>
-                                    <el-button v-else type="danger" plain @click="handleUnbindPhone">
-                                        解绑
-                                    </el-button>
+                                    <el-tooltip v-else content="暂不支持解绑" placement="top">
+                                        <el-button type="danger" plain disabled>
+                                            解绑
+                                        </el-button>
+                                    </el-tooltip>
                                 </div>
                             </div>
 
