@@ -62,7 +62,7 @@
                 <template #default="{ row }">
                     <div class="account-cell">
                         <el-text type="primary">{{ typeof row.income === 'object' ? row.income?.account : row.income
-                        }}</el-text>
+                            }}</el-text>
                         <el-tag v-if="typeof row.income === 'object' && row.income?.account_type"
                             :type="getAccountTypeColor(row.income.account_type)" size="small">
                             {{ row.income.account_type }}
@@ -455,7 +455,7 @@ const rules = ref<FormRules>({
         { max: 32, message: '长度应控制在32个字符以内', trigger: 'blur' },
     ],
     income: [
-        { required: true, message: '请选择映射账户', trigger: 'change' },
+        { required: false, message: '请选择映射账户', trigger: 'change' },
     ],
     // currency_id: [
     //     { required: false, message: '请选择货币', trigger: 'change' },
