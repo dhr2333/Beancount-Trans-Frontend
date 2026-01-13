@@ -1,3 +1,10 @@
+## [5.4.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.4.0...5.4.1) (2026-01-13)
+
+### Bug Fixes
+
+* Disable unbinding phone feature with tooltip notification in settings index.vue ([#42](https://github.com/dhr2333/Beancount-Trans-Frontend/issues/42)) ([bef5aae](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/bef5aae429a08505b5a0c8c5118b1461ac991a59))
+* Update income validation rule to make account selection optional and clean up template formatting in Income.vue ([#41](https://github.com/dhr2333/Beancount-Trans-Frontend/issues/41)) ([20810f2](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/20810f2a61020e69156a7a86c56b369da839e88f))
+
 ## 1.0.0 (2025-11-12)
 
 ### Features
