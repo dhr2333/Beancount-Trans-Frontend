@@ -142,7 +142,7 @@
                                 保留现有映射，只添加不存在的映射
                             </el-text>
                             <el-text v-else size="small" type="warning">
-                                清空现有{{ getTypeText(selectedTemplate.type) }}映射，完全替换为模板映射（危险操作！）
+                                清空现有{{ getTypeText(selectedTemplate.type) }}映射，完全替换为模板映射
                             </el-text>
                         </div>
                     </el-form-item>
