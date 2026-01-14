@@ -1,3 +1,9 @@
+## [5.5.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.4.1...5.5.0) (2026-01-14)
+
+### Features
+
+* Implemented a case-insensitive custom filter method in account ([#43](https://github.com/dhr2333/Beancount-Trans-Frontend/issues/43)) ([5febe9b](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/5febe9bed7889b7dd69717b326c71cafe503a80f))
+
 ## [5.4.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.4.0...5.4.1) (2026-01-13)
 
 ### Bug Fixes
