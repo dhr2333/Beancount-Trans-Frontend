@@ -124,6 +124,12 @@
       <!-- <router-link to="" class="no-underline">
         <el-menu-item index="" @click="user()">个人中心</el-menu-item>
       </router-link> -->
+      <router-link to="/reconciliation" class="no-underline">
+        <el-menu-item index="/reconciliation">
+          <span>待办列表</span>
+          <el-badge v-if="pendingTaskCount > 0" :value="pendingTaskCount" class="menu-badge" />
+        </el-menu-item>
+      </router-link>
       <el-menu-item>
         <a href="https://trans.dhr2333.cn/docs/quick-start" class="help-link" target="_blank">用户手册</a>
       </el-menu-item>
@@ -136,15 +142,19 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, watchEffect } from "vue";
+import { ref, onMounted, watchEffect, onUnmounted } from "vue";
 import axios from '../../utils/request'
 import router from "~/routers";
 import { ElMessage, ElLoading } from 'element-plus';
 import { isDark } from "~/composables";
 import { Moon, Sunny } from "@element-plus/icons-vue";
+import { getTasks } from '../../api/reconciliation';
 
 // 定义响应式的用户名
 const username = ref(localStorage.getItem("username") || "未登录");
+
+// 待办任务数量
+const pendingTaskCount = ref(0);
 
 // 获取 API 基础 URL
 const apiUrl = import.meta.env.VITE_API_URL;
@@ -212,15 +222,82 @@ const openExternal = (url: string) => {
   window.open(url, '_blank', 'noopener,noreferrer');
 };
 
-// 在组件挂载时检查令牌
+// 获取待办任务数量
+async function loadPendingTasks() {
+  const accessToken = localStorage.getItem("access");
+  if (!accessToken) {
+    pendingTaskCount.value = 0;
+    return;
+  }
+
+  try {
+    const response = await getTasks({
+      due: true,
+      status: 'pending',
+    });
+
+    const data = response.data;
+    if (Array.isArray(data)) {
+      pendingTaskCount.value = data.length;
+    } else if (data && typeof data === 'object' && 'results' in data) {
+      pendingTaskCount.value = (data as { results: unknown[], count: number }).count || 0;
+    } else {
+      pendingTaskCount.value = 0;
+    }
+  } catch (error) {
+    // 静默失败，不影响其他功能
+    console.warn('获取待办数量失败:', error);
+    pendingTaskCount.value = 0;
+  }
+}
+
+// 在组件挂载时检查令牌并加载待办数量
 onMounted(async () => {
   const accessToken = localStorage.getItem("access");
   if (accessToken) {
     // 简单检查令牌是否存在，不再验证有效性
     // JWT 令牌的有效性会在 API 调用时自动验证
     username.value = localStorage.getItem("username") || "未登录";
+    // 加载待办数量
+    await loadPendingTasks();
   } else {
     username.value = "未登录";
+    pendingTaskCount.value = 0;
+  }
+});
+
+// 定期刷新待办数量（每30秒）
+let taskRefreshInterval: ReturnType<typeof setInterval> | null = null;
+watchEffect(() => {
+  const accessToken = localStorage.getItem("access");
+  if (accessToken) {
+    // 清除旧的定时器
+    if (taskRefreshInterval) {
+      clearInterval(taskRefreshInterval);
+    }
+    // 设置新的定时器
+    taskRefreshInterval = setInterval(() => {
+      loadPendingTasks();
+    }, 30000); // 30秒刷新一次
+  } else {
+    pendingTaskCount.value = 0;
+    if (taskRefreshInterval) {
+      clearInterval(taskRefreshInterval);
+      taskRefreshInterval = null;
+    }
+  }
+
+  return () => {
+    if (taskRefreshInterval) {
+      clearInterval(taskRefreshInterval);
+    }
+  };
+});
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  if (taskRefreshInterval) {
+    clearInterval(taskRefreshInterval);
   }
 });
 watchEffect(() => {
@@ -295,6 +372,10 @@ const openFavaInstance = async () => {
 
 .no-left-padding {
   padding-left: 0px;
+}
+
+.menu-badge {
+  margin-left: 8px;
 }
 
 .help-link {

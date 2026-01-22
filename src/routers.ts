@@ -14,6 +14,9 @@ import AuthenticateByGithubToken from './components/GitHubCallback.vue';
 // 模板管理
 import AccountTemplates from "./components/template/AccountTemplates.vue"
 import MappingTemplates from "./components/template/MappingTemplates.vue"
+// 对账功能
+import ReconciliationList from "./views/reconciliation/ReconciliationList.vue"
+import ReconciliationForm from "./views/reconciliation/ReconciliationForm.vue"
 
 // 配置路由
 const router = createRouter({
@@ -31,6 +34,9 @@ const router = createRouter({
     // 模板管理
     { path: '/template/accounts', name: "accountTemplates", component: AccountTemplates },
     { path: '/template/mappings', name: "mappingTemplates", component: MappingTemplates },
+    // 对账功能
+    { path: '/reconciliation', name: "reconciliationList", component: ReconciliationList },
+    { path: '/reconciliation/:id', name: "reconciliationForm", component: ReconciliationForm },
     { path: '/login', name: "login", component: Login },
     { path: '/phone-binding', name: "phoneBinding", component: PhoneBinding },
     { path: '/settings', name: "settings", component: Settings },
