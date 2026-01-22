@@ -61,9 +61,10 @@ export interface ScheduledTask {
  * Transaction 条目接口（用于差额处理）
  */
 export interface TransactionItem {
-  account: string
-  amount: number | null
-  is_auto: boolean
+  account: string  // 账户路径（字符串）
+  accountId?: number | null  // 账户 ID（用于 AccountSelector）
+  amount?: number | null  // 金额（留空时为自动计算）
+  is_auto?: boolean  // 是否为自动计算（前端提交时，如果 amount 为空，自动设置为 true）
 }
 
 /**
@@ -79,9 +80,8 @@ export interface CurrencyBalance {
  */
 export interface ReconciliationFormData {
   expectedBalance: number
-  actualBalance: number
+  actualBalance: number | undefined
   currency: string
-  difference: number
   transactionItems: TransactionItem[]
 }
 
@@ -119,5 +119,3 @@ export interface ReconciliationExecuteResponse {
 export interface ScheduledTaskUpdateRequest {
   scheduled_date: string
 }
-
-

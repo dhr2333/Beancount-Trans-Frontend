@@ -7,11 +7,11 @@
             <template #default="{ node, data }">
                 <div class="cascader-node">
                     <span class="node-label">{{ data.account }}</span>
-                    <el-tag v-if="data.account_type" :type="getAccountTypeColor(data.account_type)" size="small"
+                    <el-tag v-if="showDetails && data.account_type" :type="getAccountTypeColor(data.account_type)" size="small"
                         class="node-tag">
                         {{ data.account_type }}
                     </el-tag>
-                    <el-tag v-if="data.mapping_count && data.mapping_count.total > 0" type="info" size="small"
+                    <el-tag v-if="showDetails && data.mapping_count && data.mapping_count.total > 0" type="info" size="small"
                         class="mapping-tag">
                         {{ data.mapping_count.total }}映射
                     </el-tag>
@@ -20,7 +20,7 @@
         </el-cascader>
 
         <!-- 账户详情预览 -->
-        <div v-if="selectedAccount" class="account-preview">
+        <div v-if="showDetails && selectedAccount" class="account-preview">
             <el-card size="small">
                 <div class="preview-content">
                     <div class="account-info">
@@ -74,13 +74,15 @@ interface Props {
     accountType?: string // 过滤账户类型：'Expenses', 'Income', 'Assets'
     placeholder?: string
     disabled?: boolean
+    showDetails?: boolean // 是否显示账户类型、映射统计等详细信息
 }
 
 const props = withDefaults(defineProps<Props>(), {
     modelValue: null,
     accountType: '',
     placeholder: '请选择账户',
-    disabled: false
+    disabled: false,
+    showDetails: true
 })
 
 // Emits

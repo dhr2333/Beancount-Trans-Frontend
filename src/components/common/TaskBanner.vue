@@ -1,6 +1,7 @@
 <template>
   <transition name="banner-slide">
-    <div v-if="visible && pendingTaskCount > 0" class="task-banner" :class="{ 'has-overdue': overdueCount > 0 }">
+    <div v-if="visible && pendingTaskCount > 0 && !isReconciliationPage" class="task-banner"
+      :class="{ 'has-overdue': overdueCount > 0 }">
       <div class="banner-content">
         <div class="banner-left">
           <el-icon class="banner-icon" :size="20">
@@ -21,7 +22,9 @@
             稍后提醒
           </el-button>
           <el-button text size="small" @click="handleClose">
-            <el-icon><Close /></el-icon>
+            <el-icon>
+              <Close />
+            </el-icon>
           </el-button>
         </div>
       </div>
@@ -30,23 +33,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { Bell, Close } from '@element-plus/icons-vue'
 import { getTasks } from '../../api/reconciliation'
 import type { ScheduledTask } from '../../types/reconciliation'
 
 const router = useRouter()
+const route = useRoute()
 
 const visible = ref(true)
 const pendingTaskCount = ref(0)
 const overdueCount = ref(0)
 
+// 检查是否在待办列表或对账表单页面
+const isReconciliationPage = computed(() => {
+  return route.path.startsWith('/reconciliation')
+})
+
 // 检查是否已关闭（存储在 localStorage）
 const isDismissed = () => {
   const dismissed = localStorage.getItem('taskBannerDismissed')
   if (!dismissed) return false
-  
+
   const dismissedTime = parseInt(dismissed, 10)
   const now = Date.now()
   // 如果关闭时间超过 1 小时，重新显示
@@ -70,7 +79,7 @@ async function loadPendingTasks() {
 
     const data = response.data
     let tasks: ScheduledTask[] = []
-    
+
     if (Array.isArray(data)) {
       tasks = data as ScheduledTask[]
       pendingTaskCount.value = data.length
@@ -125,7 +134,7 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
 // 组件挂载时加载
 onMounted(() => {
   loadPendingTasks()
-  
+
   // 定期刷新（每30秒）
   refreshInterval = setInterval(() => {
     loadPendingTasks()
@@ -263,4 +272,3 @@ watch(pendingTaskCount, (newCount) => {
   }
 }
 </style>
-
