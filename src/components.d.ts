@@ -90,7 +90,6 @@ declare module '@vue/runtime-core' {
     RegisterPrompt: typeof import('./components/common/RegisterPrompt.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    Show_log_dates: typeof import('./components/owntracks/show_log_dates.vue')['default']
     TagManagement: typeof import('./components/config/TagManagement.vue')['default']
     TagSelector: typeof import('./components/common/TagSelector.vue')['default']
     TagSelectorTest: typeof import('./components/debug/TagSelectorTest.vue')['default']
