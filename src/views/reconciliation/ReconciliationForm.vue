@@ -30,7 +30,7 @@
               <div class="balance-separator">→</div>
               <div class="balance-item">
                 <div class="balance-label">实际余额</div>
-                <el-input-number v-model="formData.actualBalance" :controls="false" :precision="2" placeholder="请输入实际余额"
+                <el-input-number v-model="formData.actualBalance" :controls="false" :precision="2" placeholder="输入实际余额"
                   style="width: 100%" />
               </div>
               <div

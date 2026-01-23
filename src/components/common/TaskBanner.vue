@@ -38,6 +38,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { Bell, Close } from '@element-plus/icons-vue'
 import { getTasks } from '../../api/reconciliation'
 import type { ScheduledTask } from '../../types/reconciliation'
+import { subscribeTaskBannerRefresh } from '../../utils/accountEvents'
 
 const router = useRouter()
 const route = useRoute()
@@ -130,6 +131,8 @@ function handleClose() {
 
 // 定时器引用
 let refreshInterval: ReturnType<typeof setInterval> | null = null
+// 事件监听取消订阅函数
+let unsubscribeTaskBannerRefresh: (() => void) | null = null
 
 // 组件挂载时加载
 onMounted(() => {
@@ -143,13 +146,26 @@ onMounted(() => {
       visible.value = true
     }
   }, 30000)
+
+  // 监听待办任务刷新事件（账户开启对账周期时触发）
+  unsubscribeTaskBannerRefresh = subscribeTaskBannerRefresh(() => {
+    loadPendingTasks()
+    // 如果任务数量变化，重新显示横幅（如果之前关闭了）
+    if (pendingTaskCount.value > 0 && !isDismissed()) {
+      visible.value = true
+    }
+  })
 })
 
-// 组件卸载时清理定时器
+// 组件卸载时清理定时器和事件监听
 onUnmounted(() => {
   if (refreshInterval) {
     clearInterval(refreshInterval)
     refreshInterval = null
+  }
+  if (unsubscribeTaskBannerRefresh) {
+    unsubscribeTaskBannerRefresh()
+    unsubscribeTaskBannerRefresh = null
   }
 })
 

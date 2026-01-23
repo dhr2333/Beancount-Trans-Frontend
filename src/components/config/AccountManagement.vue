@@ -364,7 +364,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
-import { emitAccountTreeUpdated } from '~/utils/accountEvents'
+import { emitAccountTreeUpdated, emitTaskBannerRefresh } from '~/utils/accountEvents'
 import type {
     CascaderOption,
     CascaderProps,
@@ -681,6 +681,11 @@ const createAccount = async () => {
         addAccountDialog.value = false
         await fetchAccountTree()
         emitAccountTreeUpdated()
+        
+        // 如果创建账户时设置了对账周期，触发横幅刷新
+        if (newAccount.value.reconciliation_cycle_unit) {
+            emitTaskBannerRefresh()
+        }
     } catch (error: any) {
         console.error('创建账户失败:', error)
         if (error.response?.status === 401) {
@@ -711,11 +716,23 @@ const updateAccount = async () => {
 
     try {
         await editAccountFormRef.value.validate()
+        
+        // 检查对账周期配置是否发生变化
+        const oldCycleUnit = selectedAccount.value.reconciliation_cycle_unit
+        const newCycleUnit = editAccountForm.value.reconciliation_cycle_unit
+        // 开启对账周期（从无到有）或删除对账周期（从有到无）时，待办任务会变化，需要刷新横幅
+        const cycleConfigChanged = (oldCycleUnit && !newCycleUnit) || (!oldCycleUnit && newCycleUnit)
+        
         await axios.put(`/account/${selectedAccount.value.id}/`, editAccountForm.value)
         ElMessage.success('账户更新成功')
         editAccountDialog.value = false
         await fetchAccountTree()
         emitAccountTreeUpdated()
+        
+        // 如果对账周期配置发生变化（开启或删除），触发横幅刷新
+        if (cycleConfigChanged) {
+            emitTaskBannerRefresh()
+        }
     } catch (error: any) {
         console.error('更新账户失败:', error)
         if (error.response?.status === 401) {
