@@ -92,7 +92,7 @@
                             <!-- <el-descriptions-item label="父账户" v-if="selectedAccount.parent_account">
                                 {{ selectedAccount.parent_account }}
                             </el-descriptions-item> -->
-                            <el-descriptions-item label="对账周期">
+                            <el-descriptions-item label="对账周期" v-if="shouldShowReconciliationCycle(selectedAccount)">
                                 <span
                                     v-if="selectedAccount.reconciliation_cycle_unit && selectedAccount.reconciliation_cycle_interval">
                                     每 {{ selectedAccount.reconciliation_cycle_interval }} {{
@@ -205,22 +205,24 @@
                 <el-form-item label="账户路径" prop="account">
                     <el-input v-model="newAccount.account" placeholder="Assets:Savings:Bank" />
                 </el-form-item>
-                <el-divider content-position="left">对账周期设置（可选）</el-divider>
-                <el-form-item label="周期单位">
-                    <el-select :model-value="newAccount.reconciliation_cycle_unit || undefined"
-                        @update:model-value="newAccount.reconciliation_cycle_unit = $event || null"
-                        placeholder="请选择周期单位" clearable>
-                        <el-option label="天" value="days" />
-                        <el-option label="周" value="weeks" />
-                        <el-option label="月" value="months" />
-                        <el-option label="年" value="years" />
-                    </el-select>
-                </el-form-item>
-                <el-form-item label="周期间隔">
-                    <el-input-number :model-value="newAccount.reconciliation_cycle_interval || undefined"
-                        @update:model-value="newAccount.reconciliation_cycle_interval = $event || null" :min="1"
-                        :disabled="!newAccount.reconciliation_cycle_unit" placeholder="请输入间隔" style="width: 100%" />
-                </el-form-item>
+                <template v-if="shouldShowReconciliationCycleForNewAccount()">
+                    <el-divider content-position="left">对账周期设置（可选）</el-divider>
+                    <el-form-item label="周期单位">
+                        <el-select :model-value="newAccount.reconciliation_cycle_unit || undefined"
+                            @update:model-value="newAccount.reconciliation_cycle_unit = $event || null"
+                            placeholder="请选择周期单位" clearable>
+                            <el-option label="天" value="days" />
+                            <el-option label="周" value="weeks" />
+                            <el-option label="月" value="months" />
+                            <el-option label="年" value="years" />
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="周期间隔">
+                        <el-input-number :model-value="newAccount.reconciliation_cycle_interval || undefined"
+                            @update:model-value="newAccount.reconciliation_cycle_interval = $event || null" :min="1"
+                            :disabled="!newAccount.reconciliation_cycle_unit" placeholder="请输入间隔" style="width: 100%" />
+                    </el-form-item>
+                </template>
             </el-form>
             <template #footer>
                 <el-button @click="addAccountDialog = false">取消</el-button>
@@ -234,23 +236,25 @@
                 <el-form-item label="账户路径" prop="account">
                     <el-input v-model="editAccountForm.account" />
                 </el-form-item>
-                <el-divider content-position="left">对账周期设置（可选）</el-divider>
-                <el-form-item label="周期单位">
-                    <el-select :model-value="editAccountForm.reconciliation_cycle_unit || undefined"
-                        @update:model-value="editAccountForm.reconciliation_cycle_unit = $event || null"
-                        placeholder="请选择周期单位" clearable>
-                        <el-option label="天" value="days" />
-                        <el-option label="周" value="weeks" />
-                        <el-option label="月" value="months" />
-                        <el-option label="年" value="years" />
-                    </el-select>
-                </el-form-item>
-                <el-form-item label="周期间隔">
-                    <el-input-number :model-value="editAccountForm.reconciliation_cycle_interval || undefined"
-                        @update:model-value="editAccountForm.reconciliation_cycle_interval = $event || null" :min="1"
-                        :disabled="!editAccountForm.reconciliation_cycle_unit" placeholder="请输入间隔"
-                        style="width: 100%" />
-                </el-form-item>
+                <template v-if="shouldShowReconciliationCycle(selectedAccount)">
+                    <el-divider content-position="left">对账周期设置（可选）</el-divider>
+                    <el-form-item label="周期单位">
+                        <el-select :model-value="editAccountForm.reconciliation_cycle_unit || undefined"
+                            @update:model-value="editAccountForm.reconciliation_cycle_unit = $event || null"
+                            placeholder="请选择周期单位" clearable>
+                            <el-option label="天" value="days" />
+                            <el-option label="周" value="weeks" />
+                            <el-option label="月" value="months" />
+                            <el-option label="年" value="years" />
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="周期间隔">
+                        <el-input-number :model-value="editAccountForm.reconciliation_cycle_interval || undefined"
+                            @update:model-value="editAccountForm.reconciliation_cycle_interval = $event || null"
+                            :min="1" :disabled="!editAccountForm.reconciliation_cycle_unit" placeholder="请输入间隔"
+                            style="width: 100%" />
+                    </el-form-item>
+                </template>
             </el-form>
             <template #footer>
                 <el-button @click="editAccountDialog = false">取消</el-button>
@@ -681,7 +685,7 @@ const createAccount = async () => {
         addAccountDialog.value = false
         await fetchAccountTree()
         emitAccountTreeUpdated()
-        
+
         // 如果创建账户时设置了对账周期，触发横幅刷新
         if (newAccount.value.reconciliation_cycle_unit) {
             emitTaskBannerRefresh()
@@ -716,19 +720,40 @@ const updateAccount = async () => {
 
     try {
         await editAccountFormRef.value.validate()
-        
+
+        // 构建更新数据
+        const updateData: {
+            account: string
+            reconciliation_cycle_unit?: string | null
+            reconciliation_cycle_interval?: number | null
+        } = {
+            account: editAccountForm.value.account
+        }
+
+        // 如果账户应该显示对账周期，则包含这些字段；否则清除这些字段
+        const shouldShow = shouldShowReconciliationCycle(selectedAccount.value)
+        if (shouldShow) {
+            // 账户可以对账，包含对账周期字段
+            updateData.reconciliation_cycle_unit = editAccountForm.value.reconciliation_cycle_unit
+            updateData.reconciliation_cycle_interval = editAccountForm.value.reconciliation_cycle_interval
+        } else {
+            // 账户不能对账，清除对账周期字段
+            updateData.reconciliation_cycle_unit = null
+            updateData.reconciliation_cycle_interval = null
+        }
+
         // 检查对账周期配置是否发生变化
         const oldCycleUnit = selectedAccount.value.reconciliation_cycle_unit
-        const newCycleUnit = editAccountForm.value.reconciliation_cycle_unit
+        const newCycleUnit = updateData.reconciliation_cycle_unit
         // 开启对账周期（从无到有）或删除对账周期（从有到无）时，待办任务会变化，需要刷新横幅
         const cycleConfigChanged = (oldCycleUnit && !newCycleUnit) || (!oldCycleUnit && newCycleUnit)
-        
-        await axios.put(`/account/${selectedAccount.value.id}/`, editAccountForm.value)
+
+        await axios.put(`/account/${selectedAccount.value.id}/`, updateData)
         ElMessage.success('账户更新成功')
         editAccountDialog.value = false
         await fetchAccountTree()
         emitAccountTreeUpdated()
-        
+
         // 如果对账周期配置发生变化（开启或删除），触发横幅刷新
         if (cycleConfigChanged) {
             emitTaskBannerRefresh()
@@ -902,6 +927,44 @@ const getCycleUnitLabel = (unit: string): string => {
         'years': '年'
     }
     return labels[unit] || unit
+}
+
+// 判断是否应该显示对账周期字段
+const shouldShowReconciliationCycle = (account: AccountOption | null): boolean => {
+    if (!account) return false
+
+    // 如果账户有子账户，不显示
+    if (account.children && account.children.length > 0) {
+        return false
+    }
+
+    // 从账户路径获取账户类型（第一个部分）
+    const accountType = account.account.split(':')[0]
+
+    // 权益账户、支出账户、收入账户不显示对账周期
+    const hiddenTypes = ['Equity', 'Expenses', 'Income']
+    if (hiddenTypes.includes(accountType)) {
+        return false
+    }
+
+    return true
+}
+
+// 判断新增账户时是否应该显示对账周期设置
+const shouldShowReconciliationCycleForNewAccount = (): boolean => {
+    const accountPath = newAccount.value.account.trim()
+    if (!accountPath) return true // 如果还没有输入账户路径，默认显示
+
+    // 从账户路径获取账户类型（第一个部分）
+    const accountType = accountPath.split(':')[0]
+
+    // 权益账户、支出账户、收入账户不显示对账周期
+    const hiddenTypes = ['Equity', 'Expenses', 'Income']
+    if (hiddenTypes.includes(accountType)) {
+        return false
+    }
+
+    return true
 }
 
 // 切换映射详情显示
