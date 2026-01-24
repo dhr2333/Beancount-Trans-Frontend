@@ -327,8 +327,22 @@ async function handleSubmit() {
     router.push('/reconciliation')
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as { response?: { data?: { message?: string } } }
-      ElMessage.error(axiosError.response?.data?.message || '对账失败')
+      const axiosError = error as { 
+        response?: { 
+          data?: { 
+            message?: string
+            non_field_errors?: string[]
+            error?: string
+          } 
+        } 
+      }
+      const errorData = axiosError.response?.data
+      // 处理 DRF ValidationError 格式：优先使用 message，其次使用 non_field_errors，最后使用 error
+      const errorMessage = errorData?.message || 
+        (errorData?.non_field_errors && errorData.non_field_errors[0]) || 
+        errorData?.error || 
+        '对账失败'
+      ElMessage.error(errorMessage)
     } else {
       ElMessage.error('网络错误，请稍后重试')
     }
