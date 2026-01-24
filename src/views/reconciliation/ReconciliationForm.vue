@@ -20,6 +20,13 @@
             </el-select>
           </el-form-item>
 
+          <el-form-item label="对账时间点">
+            <el-radio-group v-model="formData.reconciliationTiming">
+              <el-radio label="end_of_day">当天最后一笔交易后</el-radio>
+              <el-radio label="start_of_next_day">第二天第一笔交易前</el-radio>
+            </el-radio-group>
+          </el-form-item>
+
           <!-- 余额对比区（核心） -->
           <el-form-item label="余额对比">
             <div class="balance-comparison">
@@ -131,6 +138,7 @@ const formData = ref<ReconciliationFormData>({
   expectedBalance: 0,
   actualBalance: undefined,
   currency: 'CNY',
+  reconciliationTiming: 'end_of_day',
   transactionItems: [{ account: '', accountId: null, amount: undefined }]
 })
 
@@ -317,30 +325,46 @@ async function handleSubmit() {
         }
       })
 
+    // 根据对账时间点计算 as_of_date
+    const today = new Date()
+    let asOfDate: Date
+    if (formData.value.reconciliationTiming === 'start_of_next_day') {
+      // 第二天第一笔交易前：提前一天
+      asOfDate = new Date(today)
+      asOfDate.setDate(asOfDate.getDate() - 1)
+    } else {
+      // 当天最后一笔交易后：使用今天
+      asOfDate = today
+    }
+
+    // 格式化为 YYYY-MM-DD
+    const asOfDateStr = asOfDate.toISOString().split('T')[0]
+
     await executeReconciliation(taskId, {
       actual_balance: formData.value.actualBalance,
       currency: formData.value.currency,
-      transaction_items: validTransactionItems
+      transaction_items: validTransactionItems,
+      as_of_date: asOfDateStr
     })
 
     ElMessage.success('对账完成')
     router.push('/reconciliation')
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as { 
-        response?: { 
-          data?: { 
+      const axiosError = error as {
+        response?: {
+          data?: {
             message?: string
             non_field_errors?: string[]
             error?: string
-          } 
-        } 
+          }
+        }
       }
       const errorData = axiosError.response?.data
       // 处理 DRF ValidationError 格式：优先使用 message，其次使用 non_field_errors，最后使用 error
-      const errorMessage = errorData?.message || 
-        (errorData?.non_field_errors && errorData.non_field_errors[0]) || 
-        errorData?.error || 
+      const errorMessage = errorData?.message ||
+        (errorData?.non_field_errors && errorData.non_field_errors[0]) ||
+        errorData?.error ||
         '对账失败'
       ElMessage.error(errorMessage)
     } else {

@@ -76,12 +76,18 @@ export interface CurrencyBalance {
 }
 
 /**
+ * 对账时间点类型
+ */
+export type ReconciliationTiming = 'end_of_day' | 'start_of_next_day'
+
+/**
  * 对账表单数据接口
  */
 export interface ReconciliationFormData {
   expectedBalance: number
   actualBalance: number | undefined
   currency: string
+  reconciliationTiming: ReconciliationTiming
   transactionItems: TransactionItem[]
 }
 
@@ -102,6 +108,7 @@ export interface ReconciliationExecuteRequest {
   actual_balance: number
   currency: string
   transaction_items: TransactionItem[]
+  as_of_date: string
 }
 
 /**
