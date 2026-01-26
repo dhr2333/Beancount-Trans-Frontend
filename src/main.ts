@@ -1,6 +1,7 @@
 import { createApp } from "vue";
 import App from "./App.vue";
 import ElementPlus from 'element-plus'
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import 'element-plus/dist/index.css'
 import route from "./routers"
 import axios from "axios"
@@ -28,7 +29,9 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
 app.use(route)
-app.use(ElementPlus)
+app.use(ElementPlus, {
+  locale: zhCn,
+})
 // app.use(ElementPlus, { size: 'small', zIndex: 3000 })
 app.config.globalProperties.$axios = axios  // 全局注册 $axios
 app.mount("#app");

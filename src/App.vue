@@ -1,6 +1,7 @@
 <template>
-  <el-config-provider namespace="ep">
+  <el-config-provider namespace="ep" :locale="locale">
     <BaseHeader />
+    <TaskBanner />
     <div class="flex main-container">
       <BaseSide />
       <div w="full" py="4">
@@ -10,6 +11,13 @@
     </div>
   </el-config-provider>
 </template>
+
+<script setup lang="ts">
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
+import TaskBanner from './components/common/TaskBanner.vue'
+
+const locale = zhCn
+</script>
 
 <style>
 #app {

@@ -92,6 +92,14 @@
                             <!-- <el-descriptions-item label="父账户" v-if="selectedAccount.parent_account">
                                 {{ selectedAccount.parent_account }}
                             </el-descriptions-item> -->
+                            <el-descriptions-item label="对账周期" v-if="shouldShowReconciliationCycle(selectedAccount)">
+                                <span
+                                    v-if="selectedAccount.reconciliation_cycle_unit && selectedAccount.reconciliation_cycle_interval">
+                                    每 {{ selectedAccount.reconciliation_cycle_interval }} {{
+                                        getCycleUnitLabel(selectedAccount.reconciliation_cycle_unit) }}
+                                </span>
+                                <span v-else style="color: var(--ep-text-color-secondary);">未开启</span>
+                            </el-descriptions-item>
                             <el-descriptions-item label="创建时间">
                                 {{ formatDateTime(selectedAccount.created) }}
                             </el-descriptions-item>
@@ -103,7 +111,14 @@
                         v-if="showMappingDetails && selectedAccount.mapping_count && selectedAccount.mapping_count.total > 0"
                         class="mapping-details-card">
                         <template #header>
-                            <span>映射详情</span>
+                            <div class="mapping-header">
+                                <span>映射详情</span>
+                                <el-tag
+                                    v-if="accountMappings.reconciliation_cycle_display && accountMappings.reconciliation_cycle_display !== '未设置'"
+                                    type="info" size="small">
+                                    对账周期：{{ accountMappings.reconciliation_cycle_display }}
+                                </el-tag>
+                            </div>
                         </template>
                         <div class="mapping-details-content" v-loading="mappingDetailsLoading">
                             <el-tabs v-model="activeMappingTab" type="card">
@@ -186,10 +201,28 @@
 
         <!-- 新增账户对话框 -->
         <el-dialog v-model="addAccountDialog" title="新增账户" width="500px">
-            <el-form :model="newAccount" :rules="accountRules" ref="accountForm">
+            <el-form :model="newAccount" :rules="accountRules" ref="accountForm" label-width="120px">
                 <el-form-item label="账户路径" prop="account">
                     <el-input v-model="newAccount.account" placeholder="Assets:Savings:Bank" />
                 </el-form-item>
+                <template v-if="shouldShowReconciliationCycleForNewAccount()">
+                    <el-divider content-position="left">对账周期设置（可选）</el-divider>
+                    <el-form-item label="周期单位">
+                        <el-select :model-value="newAccount.reconciliation_cycle_unit || undefined"
+                            @update:model-value="newAccount.reconciliation_cycle_unit = $event || null"
+                            placeholder="请选择周期单位" clearable>
+                            <el-option label="天" value="days" />
+                            <el-option label="周" value="weeks" />
+                            <el-option label="月" value="months" />
+                            <el-option label="年" value="years" />
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="周期间隔">
+                        <el-input-number :model-value="newAccount.reconciliation_cycle_interval || undefined"
+                            @update:model-value="newAccount.reconciliation_cycle_interval = $event || null" :min="1"
+                            :disabled="!newAccount.reconciliation_cycle_unit" placeholder="请输入间隔" style="width: 100%" />
+                    </el-form-item>
+                </template>
             </el-form>
             <template #footer>
                 <el-button @click="addAccountDialog = false">取消</el-button>
@@ -199,10 +232,29 @@
 
         <!-- 编辑账户对话框 -->
         <el-dialog v-model="editAccountDialog" title="编辑账户" width="500px">
-            <el-form :model="editAccountForm" :rules="accountRules" ref="editAccountFormRef">
+            <el-form :model="editAccountForm" :rules="accountRules" ref="editAccountFormRef" label-width="120px">
                 <el-form-item label="账户路径" prop="account">
                     <el-input v-model="editAccountForm.account" />
                 </el-form-item>
+                <template v-if="shouldShowReconciliationCycle(selectedAccount)">
+                    <el-divider content-position="left">对账周期设置（可选）</el-divider>
+                    <el-form-item label="周期单位">
+                        <el-select :model-value="editAccountForm.reconciliation_cycle_unit || undefined"
+                            @update:model-value="editAccountForm.reconciliation_cycle_unit = $event || null"
+                            placeholder="请选择周期单位" clearable>
+                            <el-option label="天" value="days" />
+                            <el-option label="周" value="weeks" />
+                            <el-option label="月" value="months" />
+                            <el-option label="年" value="years" />
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="周期间隔">
+                        <el-input-number :model-value="editAccountForm.reconciliation_cycle_interval || undefined"
+                            @update:model-value="editAccountForm.reconciliation_cycle_interval = $event || null"
+                            :min="1" :disabled="!editAccountForm.reconciliation_cycle_unit" placeholder="请输入间隔"
+                            style="width: 100%" />
+                    </el-form-item>
+                </template>
             </el-form>
             <template #footer>
                 <el-button @click="editAccountDialog = false">取消</el-button>
@@ -235,8 +287,9 @@
 
                     <div class="account-selector">
                         <el-cascader v-model="migrationCascaderValue" :options="migrationCandidates"
-                            :props="cascaderProps" placeholder="请选择迁移目标账户" :filterable="true" :filter-method="customFilterMethod" :clearable="true"
-                            :show-all-levels="false" :separator="' > '" @change="handleMigrationAccountChange"
+                            :props="cascaderProps" placeholder="请选择迁移目标账户" :filterable="true"
+                            :filter-method="customFilterMethod" :clearable="true" :show-all-levels="false"
+                            :separator="' > '" @change="handleMigrationAccountChange"
                             @visible-change="handleMigrationVisibleChange" class="account-cascader" style="width: 100%;"
                             v-loading="migrationCandidatesLoading">
                             <template #default="{ node, data }">
@@ -270,10 +323,10 @@
                                             selectedMigrationAccountInfo.mapping_count.expense }}支出</el-tag>
                                         <el-tag type="success" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.assets
-                                            }}资产</el-tag>
+                                        }}资产</el-tag>
                                         <el-tag type="primary" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.income
-                                            }}收入</el-tag>
+                                        }}收入</el-tag>
                                     </div>
                                 </div>
                             </el-card>
@@ -315,7 +368,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
-import { emitAccountTreeUpdated } from '~/utils/accountEvents'
+import { emitAccountTreeUpdated, emitTaskBannerRefresh } from '~/utils/accountEvents'
 import type {
     CascaderOption,
     CascaderProps,
@@ -338,6 +391,8 @@ interface Account {
     enable: boolean
     created: string
     modified: string
+    reconciliation_cycle_unit?: string | null
+    reconciliation_cycle_interval?: number | null
     children?: Account[]
     mapping_count?: {
         expense: number
@@ -345,6 +400,28 @@ interface Account {
         income: number
         total: number
     }
+}
+
+interface AccountMapping {
+    id: number
+    key: string
+    enable: boolean
+    payee?: string
+    currency?: string
+    full?: string
+    payer?: string
+}
+
+interface AccountMappingsResponse {
+    account: string
+    account_id: number
+    reconciliation_cycle_unit: string | null
+    reconciliation_cycle_interval: number | null
+    reconciliation_cycle_display: string
+    expense_mappings: AccountMapping[]
+    assets_mappings: AccountMapping[]
+    income_mappings: AccountMapping[]
+    total_count: number
 }
 
 type AccountOption = Omit<Account, 'children'> & CascaderOption & {
@@ -372,20 +449,30 @@ const showAnonymousPrompt = ref(false)
 // 映射详情相关
 const showMappingDetails = ref(false)
 const mappingDetailsLoading = ref(false)
-const accountMappings = ref<any>({
+const accountMappings = ref<AccountMappingsResponse>({
+    account: '',
+    account_id: 0,
+    reconciliation_cycle_unit: null,
+    reconciliation_cycle_interval: null,
+    reconciliation_cycle_display: '未设置',
     expense_mappings: [],
     assets_mappings: [],
-    income_mappings: []
+    income_mappings: [],
+    total_count: 0
 })
 const activeMappingTab = ref('expense')
 
 // 表单数据
 const newAccount = ref({
-    account: ''
+    account: '',
+    reconciliation_cycle_unit: null as string | null,
+    reconciliation_cycle_interval: null as number | null
 })
 
 const editAccountForm = ref({
-    account: ''
+    account: '',
+    reconciliation_cycle_unit: null as string | null,
+    reconciliation_cycle_interval: null as number | null
 })
 
 // 删除账户相关
@@ -580,7 +667,9 @@ const updateAccountStatus = async (account: AccountOption) => {
 // 显示新增账户对话框
 const showAddAccountDialog = () => {
     newAccount.value = {
-        account: ''
+        account: '',
+        reconciliation_cycle_unit: null,
+        reconciliation_cycle_interval: null
     }
     addAccountDialog.value = true
 }
@@ -596,6 +685,11 @@ const createAccount = async () => {
         addAccountDialog.value = false
         await fetchAccountTree()
         emitAccountTreeUpdated()
+
+        // 如果创建账户时设置了对账周期，触发横幅刷新
+        if (newAccount.value.reconciliation_cycle_unit) {
+            emitTaskBannerRefresh()
+        }
     } catch (error: any) {
         console.error('创建账户失败:', error)
         if (error.response?.status === 401) {
@@ -613,7 +707,9 @@ const editAccount = () => {
     if (!selectedAccount.value) return
 
     editAccountForm.value = {
-        account: selectedAccount.value.account
+        account: selectedAccount.value.account,
+        reconciliation_cycle_unit: selectedAccount.value.reconciliation_cycle_unit || null,
+        reconciliation_cycle_interval: selectedAccount.value.reconciliation_cycle_interval || null
     }
     editAccountDialog.value = true
 }
@@ -624,11 +720,44 @@ const updateAccount = async () => {
 
     try {
         await editAccountFormRef.value.validate()
-        await axios.put(`/account/${selectedAccount.value.id}/`, editAccountForm.value)
+
+        // 构建更新数据
+        const updateData: {
+            account: string
+            reconciliation_cycle_unit?: string | null
+            reconciliation_cycle_interval?: number | null
+        } = {
+            account: editAccountForm.value.account
+        }
+
+        // 如果账户应该显示对账周期，则包含这些字段；否则清除这些字段
+        const shouldShow = shouldShowReconciliationCycle(selectedAccount.value)
+        if (shouldShow) {
+            // 账户可以对账，包含对账周期字段
+            updateData.reconciliation_cycle_unit = editAccountForm.value.reconciliation_cycle_unit
+            updateData.reconciliation_cycle_interval = editAccountForm.value.reconciliation_cycle_interval
+        } else {
+            // 账户不能对账，清除对账周期字段
+            updateData.reconciliation_cycle_unit = null
+            updateData.reconciliation_cycle_interval = null
+        }
+
+        // 检查对账周期配置是否发生变化
+        const oldCycleUnit = selectedAccount.value.reconciliation_cycle_unit
+        const newCycleUnit = updateData.reconciliation_cycle_unit
+        // 开启对账周期（从无到有）或删除对账周期（从有到无）时，待办任务会变化，需要刷新横幅
+        const cycleConfigChanged = (oldCycleUnit && !newCycleUnit) || (!oldCycleUnit && newCycleUnit)
+
+        await axios.put(`/account/${selectedAccount.value.id}/`, updateData)
         ElMessage.success('账户更新成功')
         editAccountDialog.value = false
         await fetchAccountTree()
         emitAccountTreeUpdated()
+
+        // 如果对账周期配置发生变化（开启或删除），触发横幅刷新
+        if (cycleConfigChanged) {
+            emitTaskBannerRefresh()
+        }
     } catch (error: any) {
         console.error('更新账户失败:', error)
         if (error.response?.status === 401) {
@@ -789,6 +918,55 @@ const formatDateTime = (dateString: string): string => {
         `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
+// 获取周期单位标签
+const getCycleUnitLabel = (unit: string): string => {
+    const labels: Record<string, string> = {
+        'days': '天',
+        'weeks': '周',
+        'months': '月',
+        'years': '年'
+    }
+    return labels[unit] || unit
+}
+
+// 判断是否应该显示对账周期字段
+const shouldShowReconciliationCycle = (account: AccountOption | null): boolean => {
+    if (!account) return false
+
+    // 如果账户有子账户，不显示
+    if (account.children && account.children.length > 0) {
+        return false
+    }
+
+    // 从账户路径获取账户类型（第一个部分）
+    const accountType = account.account.split(':')[0]
+
+    // 权益账户、支出账户、收入账户不显示对账周期
+    const hiddenTypes = ['Equity', 'Expenses', 'Income']
+    if (hiddenTypes.includes(accountType)) {
+        return false
+    }
+
+    return true
+}
+
+// 判断新增账户时是否应该显示对账周期设置
+const shouldShowReconciliationCycleForNewAccount = (): boolean => {
+    const accountPath = newAccount.value.account.trim()
+    if (!accountPath) return true // 如果还没有输入账户路径，默认显示
+
+    // 从账户路径获取账户类型（第一个部分）
+    const accountType = accountPath.split(':')[0]
+
+    // 权益账户、支出账户、收入账户不显示对账周期
+    const hiddenTypes = ['Equity', 'Expenses', 'Income']
+    if (hiddenTypes.includes(accountType)) {
+        return false
+    }
+
+    return true
+}
+
 // 切换映射详情显示
 const toggleMappingDetails = () => {
     showMappingDetails.value = !showMappingDetails.value
@@ -800,8 +978,14 @@ const fetchAccountMappings = async () => {
 
     try {
         mappingDetailsLoading.value = true
-        const response = await axios.get(`/account/${selectedAccount.value.id}/mappings/`)
+        const response = await axios.get<AccountMappingsResponse>(`/account/${selectedAccount.value.id}/mappings/`)
         accountMappings.value = response.data
+
+        // 同步对账周期信息到 selectedAccount
+        if (selectedAccount.value) {
+            selectedAccount.value.reconciliation_cycle_unit = response.data.reconciliation_cycle_unit
+            selectedAccount.value.reconciliation_cycle_interval = response.data.reconciliation_cycle_interval
+        }
 
         // 设置默认激活的标签页
         if (response.data.expense_mappings && response.data.expense_mappings.length > 0) {
@@ -811,9 +995,18 @@ const fetchAccountMappings = async () => {
         } else if (response.data.income_mappings && response.data.income_mappings.length > 0) {
             activeMappingTab.value = 'income'
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('获取映射详情失败:', error)
-        ElMessage.error('获取映射详情失败')
+        if (error && typeof error === 'object' && 'response' in error) {
+            const axiosError = error as { response?: { status?: number, data?: { message?: string } } }
+            if (axiosError.response?.status === 401) {
+                ElMessage.info('未认证，请登录后重试')
+            } else {
+                ElMessage.error(axiosError.response?.data?.message || '获取映射详情失败')
+            }
+        } else {
+            ElMessage.error('获取映射详情失败')
+        }
     } finally {
         mappingDetailsLoading.value = false
     }
@@ -825,7 +1018,7 @@ const getExpenseMappingTooltip = () => {
         return '暂无支出映射'
     }
     return accountMappings.value.expense_mappings
-        .map((m: any) => `${m.key} → ${selectedAccount.value?.account || '未知账户'}`)
+        .map((m: AccountMapping) => `${m.key} → ${selectedAccount.value?.account || '未知账户'}`)
         .join('\n')
 }
 
@@ -835,7 +1028,7 @@ const getAssetsMappingTooltip = () => {
         return '暂无资产映射'
     }
     return accountMappings.value.assets_mappings
-        .map((m: any) => `${m.key} → ${selectedAccount.value?.account || '未知账户'}`)
+        .map((m: AccountMapping) => `${m.key} → ${selectedAccount.value?.account || '未知账户'}`)
         .join('\n')
 }
 
@@ -845,7 +1038,7 @@ const getIncomeMappingTooltip = () => {
         return '暂无收入映射'
     }
     return accountMappings.value.income_mappings
-        .map((m: any) => `${m.key} → ${selectedAccount.value?.account || '未知账户'}`)
+        .map((m: AccountMapping) => `${m.key} → ${selectedAccount.value?.account || '未知账户'}`)
         .join('\n')
 }
 
@@ -1024,6 +1217,12 @@ onMounted(() => {
 /* 映射详情样式 */
 .mapping-details-card {
     margin-bottom: 20px;
+}
+
+.mapping-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .mapping-details-content {
