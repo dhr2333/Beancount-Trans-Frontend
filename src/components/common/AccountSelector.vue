@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { CascaderProps, CascaderValue, CascaderOption } from 'element-plus'
 import axios from '../../utils/request'
@@ -308,21 +308,36 @@ onMounted(() => {
         fetchAccountTree()
     })
 
-    // 立即预加载账户树，确保用户操作时数据已就绪
-    fetchAccountTree().then(() => {
-        // 如果组件有初始值，设置对应的账户对象
-        if (props.modelValue) {
-            const account = findAccountById(accountTree.value, props.modelValue!)
-            if (account) {
+    // 异步预加载账户树，不阻塞页面渲染
+    // 优先使用 requestIdleCallback，在浏览器空闲时加载
+    // 如果不支持，则使用 setTimeout 作为降级方案
+    const loadAccountTreeAsync = () => {
+        fetchAccountTree().then(() => {
+            // 如果组件有初始值，设置对应的账户对象
+            if (props.modelValue) {
+                const account = findAccountById(accountTree.value, props.modelValue!)
+                if (account) {
+                    selectedAccount.value = account
+                }
+            }
+
+            // 处理 selectedValue 中的值
+            const normalized = normalizeCascaderValue(selectedValue.value)
+            if (normalized !== null) {
+                const account = findAccountById(accountTree.value, normalized)
                 selectedAccount.value = account
             }
-        }
+        })
+    }
 
-        // 处理 selectedValue 中的值
-        const normalized = normalizeCascaderValue(selectedValue.value)
-        if (normalized !== null) {
-            const account = findAccountById(accountTree.value, normalized)
-            selectedAccount.value = account
+    // 使用 nextTick 确保 DOM 更新完成
+    nextTick(() => {
+        if (typeof requestIdleCallback !== 'undefined') {
+            // 浏览器空闲时加载（推荐）
+            requestIdleCallback(loadAccountTreeAsync, { timeout: 2000 })
+        } else {
+            // 降级方案：延迟 100ms 加载
+            setTimeout(loadAccountTreeAsync, 100)
         }
     })
 })

@@ -548,7 +548,7 @@ const selectedMigrationAccountId = computed(() => normalizeCascaderValue(selecte
 const accountRules: FormRules = {
     account: [
         { required: true, message: '请输入账户路径', trigger: 'blur' },
-        { pattern: /^[A-Z][A-Za-z0-9:]*$/, message: '账户路径必须以大写字母开头，只能包含字母、数字和冒号', trigger: 'blur' }
+        { pattern: /^[A-Z][A-Za-z0-9:-]*$/, message: '账户路径必须以大写字母开头，只能包含字母、数字、冒号和连字符', trigger: 'blur' }
     ]
 }
 
