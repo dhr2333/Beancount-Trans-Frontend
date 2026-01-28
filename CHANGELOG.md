@@ -1,3 +1,9 @@
+## [5.5.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.5.0...5.5.1) (2026-01-28)
+
+### Bug Fixes
+
+* 实现账户对账周期与待办管理的闭环 ([#46](https://github.com/dhr2333/Beancount-Trans-Frontend/issues/46)) ([1b7750a](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/1b7750affef83e98fd225d20475673c601ec251a))
+
 ## [5.5.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.4.1...5.5.0) (2026-01-14)
 
 ### Features
