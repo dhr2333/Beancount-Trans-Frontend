@@ -208,17 +208,24 @@
                 <template v-if="shouldShowReconciliationCycleForNewAccount()">
                     <el-divider content-position="left">对账周期设置（可选）</el-divider>
                     <el-form-item label="周期单位">
-                        <el-select :model-value="newAccount.reconciliation_cycle_unit || undefined"
-                            @update:model-value="newAccount.reconciliation_cycle_unit = $event || null"
-                            placeholder="请选择周期单位" clearable>
+                        <el-select :model-value="newAccount.reconciliation_cycle_unit || undefined" @update:model-value="(value) => {
+                            newAccount.reconciliation_cycle_unit = value || null
+                            // 当周期单位被清空时，清空周期间隔
+                            if (!value) {
+                                newAccount.reconciliation_cycle_interval = null
+                            } else if (!newAccount.reconciliation_cycle_interval) {
+                                // 如果周期单位有值但周期间隔为空，设置为默认值1
+                                newAccount.reconciliation_cycle_interval = 1
+                            }
+                        }" placeholder="请选择周期单位" clearable>
                             <el-option label="天" value="days" />
                             <el-option label="周" value="weeks" />
                             <el-option label="月" value="months" />
                             <el-option label="年" value="years" />
                         </el-select>
                     </el-form-item>
-                    <el-form-item label="周期间隔">
-                        <el-input-number :model-value="newAccount.reconciliation_cycle_interval || undefined"
+                    <el-form-item label="周期间隔" prop="reconciliation_cycle_interval">
+                        <el-input-number :model-value="newAccount.reconciliation_cycle_interval || 1"
                             @update:model-value="newAccount.reconciliation_cycle_interval = $event || null" :min="1"
                             :disabled="!newAccount.reconciliation_cycle_unit" placeholder="请输入间隔" style="width: 100%" />
                     </el-form-item>
@@ -240,16 +247,24 @@
                     <el-divider content-position="left">对账周期设置（可选）</el-divider>
                     <el-form-item label="周期单位">
                         <el-select :model-value="editAccountForm.reconciliation_cycle_unit || undefined"
-                            @update:model-value="editAccountForm.reconciliation_cycle_unit = $event || null"
-                            placeholder="请选择周期单位" clearable>
+                            @update:model-value="(value) => {
+                                editAccountForm.reconciliation_cycle_unit = value || null
+                                // 当周期单位被清空时，清空周期间隔
+                                if (!value) {
+                                    editAccountForm.reconciliation_cycle_interval = null
+                                } else if (!editAccountForm.reconciliation_cycle_interval) {
+                                    // 如果周期单位有值但周期间隔为空，设置为默认值1
+                                    editAccountForm.reconciliation_cycle_interval = 1
+                                }
+                            }" placeholder="请选择周期单位" clearable>
                             <el-option label="天" value="days" />
                             <el-option label="周" value="weeks" />
                             <el-option label="月" value="months" />
                             <el-option label="年" value="years" />
                         </el-select>
                     </el-form-item>
-                    <el-form-item label="周期间隔">
-                        <el-input-number :model-value="editAccountForm.reconciliation_cycle_interval || undefined"
+                    <el-form-item label="周期间隔" prop="reconciliation_cycle_interval">
+                        <el-input-number :model-value="editAccountForm.reconciliation_cycle_interval || 1"
                             @update:model-value="editAccountForm.reconciliation_cycle_interval = $event || null"
                             :min="1" :disabled="!editAccountForm.reconciliation_cycle_unit" placeholder="请输入间隔"
                             style="width: 100%" />
@@ -323,10 +338,10 @@
                                             selectedMigrationAccountInfo.mapping_count.expense }}支出</el-tag>
                                         <el-tag type="success" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.assets
-                                        }}资产</el-tag>
+                                            }}资产</el-tag>
                                         <el-tag type="primary" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.income
-                                        }}收入</el-tag>
+                                            }}收入</el-tag>
                                     </div>
                                 </div>
                             </el-card>
@@ -549,6 +564,26 @@ const accountRules: FormRules = {
     account: [
         { required: true, message: '请输入账户路径', trigger: 'blur' },
         { pattern: /^[A-Z][A-Za-z0-9:-]*$/, message: '账户路径必须以大写字母开头，只能包含字母、数字、冒号和连字符', trigger: 'blur' }
+    ],
+    reconciliation_cycle_interval: [
+        {
+            validator: (rule, value, callback) => {
+                // 检查新增表单或编辑表单中的周期单位
+                const newCycleUnit = newAccount.value.reconciliation_cycle_unit
+                const editCycleUnit = editAccountForm.value.reconciliation_cycle_unit
+                const cycleUnit = newCycleUnit || editCycleUnit
+
+                // 如果设置了对账周期单位，周期间隔必须填写
+                if (cycleUnit && (value === null || value === undefined || value === '')) {
+                    callback(new Error('如果设置了对账周期单位，周期间隔必须填写'))
+                } else if (cycleUnit && value !== null && value !== undefined && value <= 0) {
+                    callback(new Error('对账周期间隔必须大于 0'))
+                } else {
+                    callback()
+                }
+            },
+            trigger: 'blur'
+        }
     ]
 }
 
@@ -652,6 +687,8 @@ const updateAccountStatus = async (account: AccountOption) => {
         })
         ElMessage.success('账户状态更新成功')
         emitAccountTreeUpdated()
+        // 账户状态变更后，触发横幅刷新
+        emitTaskBannerRefresh()
     } catch (error: any) {
         // 回滚状态
         account.enable = !account.enable
@@ -890,6 +927,8 @@ const confirmDeleteAccount = async () => {
         currentSelectedAccountId.value = null
         await fetchAccountTree()
         emitAccountTreeUpdated()
+        // 账户删除后，触发横幅刷新
+        emitTaskBannerRefresh()
     } catch (error: any) {
         console.error('删除账户失败:', error)
         if (error.response?.status === 401) {
