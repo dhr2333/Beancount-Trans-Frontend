@@ -1,3 +1,9 @@
+## [5.6.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.5.1...5.6.0) (2026-01-28)
+
+### Features
+
+* 增加自动兜底账户，首次开启对账默认使用 `Equity:Opening-Balances`，后续对账默认使用 `Equity:Adjustments` ([#47](https://github.com/dhr2333/Beancount-Trans-Frontend/issues/47)) ([89f08b8](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/89f08b8a131ddfccb682454c56c6ba80982e4545))
+
 ## [5.5.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.5.0...5.5.1) (2026-01-28)
 
 ### Bug Fixes
