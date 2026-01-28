@@ -120,11 +120,29 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { startReconciliation, executeReconciliation } from '../../api/reconciliation'
 import AccountSelector from '../../components/common/AccountSelector.vue'
+import axios from '../../utils/request'
 import type {
   ReconciliationFormData,
   TransactionItem,
   CurrencyBalance
 } from '../../types/reconciliation'
+
+// 账户选项类型定义（与 AccountSelector 保持一致）
+interface AccountOption {
+  id: number
+  account: string
+  parent?: number
+  parent_account?: string
+  account_type: string
+  enable: boolean
+  mapping_count?: {
+    expense: number
+    assets: number
+    income: number
+    total: number
+  }
+  children?: AccountOption[]
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -133,6 +151,7 @@ const loading = ref(false)
 const submitting = ref(false)
 const accountName = ref('')
 const availableCurrencies = ref<Array<{ currency: string, expected_balance: number }>>([])
+const accountTree = ref<AccountOption[]>([])
 
 const formData = ref<ReconciliationFormData>({
   expectedBalance: 0,
@@ -170,6 +189,28 @@ async function loadReconciliationData() {
     formData.value.expectedBalance = balanceInfo?.expected_balance || 0
 
     accountName.value = response.data.account_name
+
+    // 根据是否首次对账设置默认账户
+    const defaultEquityAccountName = response.data.is_first_reconciliation
+      ? 'Equity:Opening-Balances'
+      : 'Equity:Adjustments'
+
+    // 确保账户树已加载
+    if (accountTree.value.length === 0) {
+      await loadAccounts()
+    }
+
+    // 查找默认账户
+    const defaultAccount = findAccountByName(accountTree.value, defaultEquityAccountName)
+
+    // 设置第一个差额分配条目的默认账户
+    if (formData.value.transactionItems.length > 0 && defaultAccount) {
+      formData.value.transactionItems[0].account = defaultAccount.account
+      formData.value.transactionItems[0].accountId = defaultAccount.id
+    } else if (formData.value.transactionItems.length > 0) {
+      // 如果找不到账户，至少设置账户名称，AccountSelector 可能会自动匹配
+      formData.value.transactionItems[0].account = defaultEquityAccountName
+    }
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as { response?: { data?: { message?: string } } }
@@ -183,8 +224,35 @@ async function loadReconciliationData() {
   }
 }
 
+// 获取账户树形数据
 async function loadAccounts() {
-  // AccountSelector 组件会自动加载账户树，不需要手动加载
+  try {
+    const response = await axios.get('/account/tree/')
+    if (Array.isArray(response.data)) {
+      accountTree.value = response.data as AccountOption[]
+    } else if (response.data && Array.isArray(response.data.results)) {
+      accountTree.value = response.data.results as AccountOption[]
+    } else {
+      accountTree.value = []
+    }
+  } catch (error: any) {
+    console.error('获取账户树失败:', error)
+    accountTree.value = []
+  }
+}
+
+// 根据账户名称查找账户
+function findAccountByName(accounts: AccountOption[], accountName: string): AccountOption | null {
+  for (const account of accounts) {
+    if (account.account === accountName) {
+      return account
+    }
+    if (account.children) {
+      const found = findAccountByName(account.children, accountName)
+      if (found) return found
+    }
+  }
+  return null
 }
 
 // 处理账户选择变化

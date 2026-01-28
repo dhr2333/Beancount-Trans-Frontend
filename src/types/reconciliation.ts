@@ -99,6 +99,7 @@ export interface ReconciliationStartResponse {
   account_name: string
   as_of_date: string
   default_currency: string | null
+  is_first_reconciliation: boolean
 }
 
 /**
