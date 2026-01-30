@@ -73,10 +73,23 @@
                                 </h4>
                                 <div class="account-items">
                                     <div v-for="item in group" :key="item.id" class="account-item">
-                                        <span class="account-path">{{ item.account_path }}</span>
-                                        <el-tag :type="item.enable ? 'success' : 'info'" size="small">
-                                            {{ item.enable ? '启用' : '禁用' }}
-                                        </el-tag>
+                                        <div class="account-item-left">
+                                            <span class="account-path">{{ item.account_path }}</span>
+                                            <span
+                                                v-if="item.reconciliation_cycle_unit && item.reconciliation_cycle_interval"
+                                                class="reconciliation-cycle">
+                                                <el-icon>
+                                                    <Clock />
+                                                </el-icon>
+                                                <span>每 {{ item.reconciliation_cycle_interval }} {{
+                                                    getCycleUnitName(item.reconciliation_cycle_unit) }}</span>
+                                            </span>
+                                        </div>
+                                        <div class="account-item-right">
+                                            <el-tag :type="item.enable ? 'success' : 'info'" size="small">
+                                                {{ item.enable ? '启用' : '禁用' }}
+                                            </el-tag>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -163,6 +176,8 @@ interface AccountTemplateItem {
     id: number
     account_path: string
     enable: boolean
+    reconciliation_cycle_unit?: string | null
+    reconciliation_cycle_interval?: number | null
 }
 
 interface AccountTemplate {
@@ -202,6 +217,17 @@ const getAccountTypeName = (type: string) => {
         'Expenses': '支出账户'
     }
     return nameMap[type] || type
+}
+
+// 获取周期单位名称
+const getCycleUnitName = (unit: string) => {
+    const unitMap: Record<string, string> = {
+        'days': '天',
+        'weeks': '周',
+        'months': '月',
+        'years': '年'
+    }
+    return unitMap[unit] || unit
 }
 
 // 按账户类型分组
@@ -407,18 +433,42 @@ onMounted(() => {
 
 .account-item {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
+    gap: 12px;
     padding: 8px 12px;
     background-color: var(--ep-fill-color-light);
     border-radius: 4px;
     border-left: 3px solid var(--ep-color-primary);
 }
 
+.account-item-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    align-items: flex-start;
+}
+
+.account-item-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
 .account-path {
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
     font-size: 13px;
     color: var(--ep-text-color-regular);
+}
+
+.reconciliation-cycle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--ep-text-color-secondary);
 }
 
 .template-actions {

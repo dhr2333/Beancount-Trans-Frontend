@@ -154,6 +154,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { User, Lock, Phone, Message } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import router from '~/routers'
+import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 
 const apiUrl = import.meta.env.VITE_API_URL
 
@@ -350,6 +351,14 @@ const handleUsernameLogin = async () => {
       )
 
       ElMessage.success('登录成功')
+
+      // 检查是否是新用户，如果是则延迟触发待办横幅刷新
+      if (res.data.is_new_user) {
+        setTimeout(() => {
+          emitTaskBannerRefresh()
+        }, 2000) // 延迟2秒，确保后端完成账户和待办的创建
+      }
+
       router.push('/file')
     } else {
       // 用户名/邮箱+密码登录（支持TOTP）
@@ -371,6 +380,13 @@ const handleUsernameLogin = async () => {
       )
 
       ElMessage.success('登录成功')
+
+      // 检查是否是新用户，如果是则延迟触发待办横幅刷新
+      if (res.data.is_new_user) {
+        setTimeout(() => {
+          emitTaskBannerRefresh()
+        }, 2000) // 延迟2秒，确保后端完成账户和待办的创建
+      }
 
       // 检查手机号绑定状态
       if (!res.data.user.phone_number) {
@@ -417,9 +433,13 @@ const handlePhoneLoginByCode = async () => {
 
     ElMessage.success('登录成功')
 
-    // 检查是否是新用户，如果是则设置引导标记
+    // 检查是否是新用户，如果是则设置引导标记并触发待办横幅刷新
     if (res.data.is_new_user) {
       localStorage.setItem('start_tour', 'true')
+      // 延迟触发待办横幅刷新，确保后端完成账户和待办的创建
+      setTimeout(() => {
+        emitTaskBannerRefresh()
+      }, 2000) // 延迟2秒
     }
 
     // 检查是否需要2FA
@@ -456,6 +476,13 @@ const handleEmailLogin = async () => {
     )
 
     ElMessage.success('登录成功')
+
+    // 检查是否是新用户，如果是则延迟触发待办横幅刷新
+    if (res.data.is_new_user) {
+      setTimeout(() => {
+        emitTaskBannerRefresh()
+      }, 2000) // 延迟2秒，确保后端完成账户和待办的创建
+    }
 
     // if (res.data.requires_2fa) {
     //   ElMessage.info('请完成双因素认证')
