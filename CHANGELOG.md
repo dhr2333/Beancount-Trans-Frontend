@@ -1,3 +1,9 @@
+## [5.7.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.6.0...5.7.0) (2026-01-30)
+
+### Features
+
+* Automatically generate reconciliation tasks when creating a new user. ([#48](https://github.com/dhr2333/Beancount-Trans-Frontend/issues/48)) ([f9e4e09](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/f9e4e09991126a3fb84571381248b39962509255))
+
 ## [5.6.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.5.1...5.6.0) (2026-01-28)
 
 ### Features
