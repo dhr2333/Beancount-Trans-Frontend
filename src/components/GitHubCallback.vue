@@ -10,6 +10,7 @@ import { onMounted } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
+import { emitTaskBannerRefresh } from '../utils/accountEvents';
 
 const router = useRouter();
 const apiUrl = import.meta.env.VITE_API_URL;
@@ -38,6 +39,10 @@ onMounted(async () => {
 
         if (data.is_new_user) {
             localStorage.setItem('start_tour', 'true');
+            // 延迟触发待办横幅刷新，确保后端完成账户和待办的创建
+            setTimeout(() => {
+                emitTaskBannerRefresh();
+            }, 2000); // 延迟2秒
         }
 
         if (data.phone_binding_required) {
