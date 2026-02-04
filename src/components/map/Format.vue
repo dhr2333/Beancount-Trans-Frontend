@@ -92,6 +92,27 @@
                     </template>
                 </div>
             </el-collapse-item>
+            <el-collapse-item title="解析模式设置" name="parsing" class="config-item">
+                <div class="config-group">
+                    <el-divider>解析模式偏好</el-divider>
+                    <el-form-item label="多文件解析模式">
+                        <el-radio-group v-model="parsingModePreference">
+                            <el-radio label="review">审核模式</el-radio>
+                            <el-radio label="direct_write">直接写入模式</el-radio>
+                        </el-radio-group>
+                        <div class="mode-description">
+                            <el-text type="info" size="small">
+                                <template v-if="parsingModePreference === 'review'">
+                                    审核模式：解析完成后需要用户审核，可以选择关键字或直接编辑条目，确认后再写入账本
+                                </template>
+                                <template v-else>
+                                    直接写入模式：解析完成后立即写入账本，适合对AI分类有较高信任度的用户
+                                </template>
+                            </el-text>
+                        </div>
+                    </el-form-item>
+                </div>
+            </el-collapse-item>
         </el-collapse>
     </el-form>
 
@@ -152,10 +173,11 @@ interface Config {
     ai_model?: string
     deepseek_apikey?: string
     enable_realtime?: boolean
+    parsing_mode_preference?: string
 }
 
 // 响应式配置状态
-const activePanels = ref(['basic', 'advanced', 'ai'])
+const activePanels = ref(['basic', 'advanced', 'ai', 'parsing'])
 const formatSettings = ref<string[]>([])
 const incomeTemplate = ref('')
 const commissionTemplate = ref('')
@@ -163,6 +185,7 @@ const currency = ref('')
 const aiModel = ref('BERT') // 默认使用 BERT
 const deepseek_apikey = ref('')
 const flagSymbol = ref('*')
+const parsingModePreference = ref('review') // 默认审核模式
 
 const loading = ref({
     save: false,
@@ -181,6 +204,7 @@ const convertToFrontend = (config: Config) => {
         currency: config.currency || 'CNY',
         aiModel: config.ai_model || 'BERT',
         deepseek_apikey: config.deepseek_apikey || '',
+        parsingModePreference: config.parsing_mode_preference || 'review',
 
         formatSettings: [
             ...(config.show_note ? ['showNote'] : []),
@@ -205,6 +229,7 @@ const loadConfig = async () => {
         commissionTemplate.value = frontendConfig.commissionTemplate
         flagSymbol.value = frontendConfig.flag
         currency.value = frontendConfig.currency
+        parsingModePreference.value = frontendConfig.parsingModePreference
     } catch (error: any) {
         if (error.response && error.response.status == 401) {
             ElMessage.info('未认证，请登录后重试');
@@ -251,7 +276,8 @@ const currentConfig = computed(() => {
         income_template: incomeTemplate.value,
         commission_template: commissionTemplate.value,
         currency: currency.value,
-        ai_model: aiModel.value
+        ai_model: aiModel.value,
+        parsing_mode_preference: parsingModePreference.value
     }
 
     // 只有选择 DeepSeek 时才提交 API 密钥
@@ -304,6 +330,7 @@ const resetToDefault = async () => {
             commission_template: 'Expenses:Finance:Commission',
             currency: 'CNY',
             ai_model: 'BERT',
+            parsing_mode_preference: 'review',
         })
         await loadConfig() // 重新加载最新配置
         ElMessage.success('已恢复默认配置')
@@ -357,5 +384,12 @@ const resetToDefault = async () => {
 
 .el-form-item {
     margin-bottom: 18px;
+}
+
+.mode-description {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background-color: var(--el-fill-color-light);
+    border-radius: 4px;
 }
 </style>

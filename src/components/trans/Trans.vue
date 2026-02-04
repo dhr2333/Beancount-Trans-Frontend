@@ -61,7 +61,7 @@ or
 '></el-input>
   <div class="table-container">
     <el-table :data="responseList" style="width: 100%;" border highlight-current-row>
-      <el-table-column label="账单格式化内容" min-width="400">
+      <el-table-column label="Beancount 条目预览" min-width="400">
         <template #default="scope">
           <pre class="bill-formatted-content" style="white-space: pre-wrap; margin: 0; cursor: pointer;"
             @click="copySingleFormatted(scope.row.formatted)" :title="'点击复制该条账单内容'">{{ scope.row.formatted }}</pre>
