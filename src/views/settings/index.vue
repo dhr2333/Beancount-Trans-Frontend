@@ -406,7 +406,7 @@ const gitRepository = ref<GitRepository | null>(null)
 
 const handleUnauthorized = () => {
     if (!unauthorizedNotified.value) {
-        ElMessage.warning('请登录后访问个人设置')
+        ElMessage.info('未认证，请登录后重试')
         unauthorizedNotified.value = true
     }
     isAuthenticated.value = false

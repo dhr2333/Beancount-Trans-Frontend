@@ -498,12 +498,20 @@ async function loadDirectoryContent() {
             : [];
 
         items.value = [...directory, ...files];
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(error);
-        if (error.response && error.response.status == 401) {
-            ElMessage.info('未认证，请登录后重试');
-        }
-        else {
+        // 类型安全的错误处理
+        if (error && typeof error === 'object' && 'response' in error) {
+            const axiosError = error as { response?: { status?: number, data?: { message?: string } } }
+            const status = axiosError.response?.status
+
+            if (status === 401) {
+                ElMessage.info('未认证，请登录后重试');
+            } else {
+                const message = axiosError.response?.data?.message || '加载文件失败'
+                ElMessage.error(message);
+            }
+        } else {
             ElMessage.error('加载文件失败');
         }
     }

@@ -99,12 +99,8 @@
                   {{ getRemainingTime(task) }}
                 </div>
                 <div class="card-actions" @click.stop>
-                  <el-button 
-                    type="primary" 
-                    size="small" 
-                    :loading="writingTaskIds.has(task.id)"
-                    @click="handleDirectWrite(task)"
-                    class="direct-write-btn">
+                  <el-button type="primary" size="small" :loading="writingTaskIds.has(task.id)"
+                    @click="handleDirectWrite(task)" class="direct-write-btn">
                     跳过
                   </el-button>
                 </div>
@@ -238,6 +234,7 @@ async function loadCounts() {
   } catch (error: unknown) {
     console.error('加载待办数量错误:', error)
     // 静默失败，不影响主流程
+    // 401 错误由 loadTasks 统一处理，避免重复提示
   }
 }
 
@@ -282,8 +279,15 @@ async function loadTasks() {
   } catch (error: unknown) {
     console.error('加载待办列表错误:', error)
     if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as { response?: { data?: { message?: string } } }
-      ElMessage.error(axiosError.response?.data?.message || '加载待办列表失败')
+      const axiosError = error as { response?: { status?: number, data?: { message?: string } } }
+      const status = axiosError.response?.status
+
+      if (status === 401) {
+        ElMessage.info('未认证，请登录后重试')
+      } else {
+        const message = axiosError.response?.data?.message || '加载待办列表失败'
+        ElMessage.error(message)
+      }
     } else {
       ElMessage.error('网络错误，请稍后重试')
     }
@@ -403,15 +407,15 @@ async function handleDirectWrite(task: ScheduledTask) {
     )
 
     writingTaskIds.value.add(task.id)
-    
+
     try {
       await confirmWrite(task.id)
       ElMessage.success('已直接写入账本')
-      
+
       // 刷新列表
       await loadTasks()
       await loadCounts()
-      
+
       // 触发横幅更新
       emitTaskBannerRefresh()
     } finally {
@@ -422,7 +426,7 @@ async function handleDirectWrite(task: ScheduledTask) {
       // 用户取消，不处理
       return
     }
-    
+
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as { response?: { data?: { message?: string } } }
       ElMessage.error(axiosError.response?.data?.message || '直接写入失败')
@@ -629,7 +633,7 @@ async function handleDirectWrite(task: ScheduledTask) {
         height: 28px;
         border-radius: 6px;
         transition: all 0.2s ease;
-        
+
         &:hover {
           transform: translateY(-1px);
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);

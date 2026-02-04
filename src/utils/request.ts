@@ -94,9 +94,10 @@ instance.interceptors.response.use(
                 // 重新发送原始请求
                 return instance(originalRequest);
             } catch (refreshError) {
-                // 刷新失败，重定向到登录页面
+                // 刷新失败，保留原始401错误信息，以便组件能正确识别
                 console.error('Token refresh failed:', refreshError);
-                return Promise.reject(refreshError);
+                // 返回原始401错误，而不是refreshError，这样组件能正确识别认证失败
+                return Promise.reject(error);
             }
         }
 

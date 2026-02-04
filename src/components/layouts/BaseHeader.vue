@@ -214,9 +214,12 @@ const openFavaInstance = async () => {
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as { response?: { status?: number } };
       if (axiosError.response?.status === 401) {
-        ElMessage.info('注册后查看用户专属的财务报表');
+        ElMessage.info('未认证，请登录后重试');
+      } else {
+        ElMessage.error('加载账本失败');
       }
     } else {
+      ElMessage.error('网络错误，请稍后重试');
       console.error('打开Fava实例失败:', error);
     }
   } finally {
