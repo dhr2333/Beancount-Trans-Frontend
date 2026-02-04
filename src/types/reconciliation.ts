@@ -26,6 +26,7 @@ export const CycleUnitLabels: Record<CycleUnit, string> = {
  * 任务状态枚举
  */
 export enum TaskStatus {
+  INACTIVE = 'inactive',
   PENDING = 'pending',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled'
@@ -35,6 +36,7 @@ export enum TaskStatus {
  * 任务状态显示文本映射
  */
 export const TaskStatusLabels: Record<TaskStatus, string> = {
+  [TaskStatus.INACTIVE]: '未激活',
   [TaskStatus.PENDING]: '待执行',
   [TaskStatus.COMPLETED]: '已完成',
   [TaskStatus.CANCELLED]: '已取消'
@@ -47,12 +49,15 @@ export interface ScheduledTask {
   id: number
   task_type: string
   task_type_display: string
-  scheduled_date: string
+  scheduled_date: string | null  // 解析待办可能为 null
   completed_date: string | null
   status: TaskStatus
   status_display: string
   account_name: string | null
   account_type: string | null
+  file_name?: string | null  // 解析待办的文件名
+  file_id?: number | null  // 解析待办的文件ID
+  expires_at?: number | null  // 解析待办的缓存过期时间（Unix 时间戳，秒）
   created: string
   modified: string
 }

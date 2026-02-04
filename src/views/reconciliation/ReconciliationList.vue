@@ -3,8 +3,22 @@
     <!-- 极简头部：只显示待办数量 -->
     <div class="list-header">
       <div class="header-info">
-        <h2 class="header-title">对账待办</h2>
-        <el-badge v-if="total > 0" :value="total" class="badge-count" />
+        <h2 class="header-title">待办列表</h2>
+      </div>
+      <!-- 筛选按钮 -->
+      <div class="filter-buttons">
+        <el-button :type="filterType === 'reconciliation' ? 'primary' : 'default'"
+          @click="filterType = 'reconciliation'" class="filter-button">
+          <span class="button-text">对账</span>
+          <el-badge v-if="reconciliationCount > 0" :value="formatBadgeValue(reconciliationCount)"
+            :type="filterType === 'reconciliation' ? 'danger' : 'info'" class="filter-badge" />
+        </el-button>
+        <el-button :type="filterType === 'parse_review' ? 'primary' : 'default'" @click="filterType = 'parse_review'"
+          class="filter-button">
+          <span class="button-text">解析</span>
+          <el-badge v-if="parseReviewCount > 0" :value="formatBadgeValue(parseReviewCount)"
+            :type="filterType === 'parse_review' ? 'danger' : 'info'" class="filter-badge" />
+        </el-button>
       </div>
     </div>
 
@@ -19,55 +33,83 @@
             </el-icon>
           </template>
           <template #description>
-            <p class="empty-text">所有账户都已对账完成</p>
-            <p class="empty-hint">在「账户管理」中设置对账周期，系统会自动创建待办任务</p>
+            <p class="empty-text" v-if="filterType === 'reconciliation'">所有账户都已对账完成</p>
+            <p class="empty-text" v-else-if="filterType === 'parse_review'">暂无解析待办任务</p>
+            <p class="empty-text" v-else>暂无待办任务</p>
+            <p class="empty-hint" v-if="filterType === 'reconciliation'">在「账户管理」中设置对账周期，系统会自动创建待办任务</p>
+            <p class="empty-hint" v-else-if="filterType === 'parse_review'">在「文件管理」中上传并解析文件，系统会自动创建解析待办任务</p>
           </template>
         </el-empty>
       </div>
 
       <!-- 待办卡片列表 -->
       <div v-else class="tasks-grid">
-        <div v-for="task in tasks" :key="task.id" class="task-card"
-          :class="{ 'task-overdue': isOverdue(task.scheduled_date) }" @click="handleStart(task)">
+        <div v-for="task in tasks" :key="task.id" class="task-card" :class="{
+          'task-overdue': task.task_type === 'reconciliation' && task.scheduled_date && isOverdue(task.scheduled_date)
+        }" @click="handleStart(task)">
           <!-- 卡片主体 -->
           <div class="card-main">
-            <!-- 账户名称（最突出） -->
-            <div class="account-name">
-              {{ task.account_name || '未知账户' }}
-            </div>
+            <!-- 对账待办：显示账户名称和日期选择器 -->
+            <template v-if="task.task_type === 'reconciliation'">
+              <div class="account-name">
+                {{ task.account_name || '未知账户' }}
+              </div>
+              <div class="date-info" @click.stop>
+                <el-date-picker :model-value="task.scheduled_date || undefined"
+                  @update:model-value="(value: string) => handleDateChange(task.id, value)" type="date"
+                  format="YYYY-MM-DD" value-format="YYYY-MM-DD" :clearable="false" placeholder="选择日期"
+                  class="date-picker no-border-date-picker" placement="bottom-start" :teleported="true" :popper-options="{
+                    modifiers: [
+                      {
+                        name: 'offset',
+                        options: {
+                          offset: [0, 4]
+                        }
+                      },
+                      {
+                        name: 'preventOverflow',
+                        options: {
+                          boundary: 'viewport',
+                          padding: 8
+                        }
+                      },
+                      {
+                        name: 'computeStyles',
+                        options: {
+                          adaptive: true,
+                          roundOffsets: true
+                        }
+                      }
+                    ]
+                  }" />
+                <el-tag v-if="task.scheduled_date && isOverdue(task.scheduled_date)" type="danger" size="small"
+                  class="overdue-tag">
+                  逾期
+                </el-tag>
+              </div>
+            </template>
 
-            <!-- 日期选择器（直接嵌入） -->
-            <div class="date-info" @click.stop>
-              <el-date-picker v-model="task.scheduled_date" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD"
-                :clearable="false" placeholder="选择日期" class="date-picker no-border-date-picker" placement="bottom-start"
-                :teleported="true" :popper-options="{
-                  modifiers: [
-                    {
-                      name: 'offset',
-                      options: {
-                        offset: [0, 4]
-                      }
-                    },
-                    {
-                      name: 'preventOverflow',
-                      options: {
-                        boundary: 'viewport',
-                        padding: 8
-                      }
-                    },
-                    {
-                      name: 'computeStyles',
-                      options: {
-                        adaptive: true,
-                        roundOffsets: true
-                      }
-                    }
-                  ]
-                }" @change="(value: string) => handleDateChange(task.id, value)" />
-              <el-tag v-if="isOverdue(task.scheduled_date)" type="danger" size="small" class="overdue-tag">
-                逾期
-              </el-tag>
-            </div>
+            <!-- 解析审核待办：显示文件名和剩余时间 -->
+            <template v-else-if="task.task_type === 'parse_review'">
+              <div class="file-name">
+                {{ task.file_name || `文件 #${task.file_id || task.id}` }}
+              </div>
+              <div class="parse-review-footer">
+                <div class="remaining-time">
+                  {{ getRemainingTime(task) }}
+                </div>
+                <div class="card-actions" @click.stop>
+                  <el-button 
+                    type="primary" 
+                    size="small" 
+                    :loading="writingTaskIds.has(task.id)"
+                    @click="handleDirectWrite(task)"
+                    class="direct-write-btn">
+                    跳过
+                  </el-button>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -77,29 +119,49 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated } from 'vue'
+import { ref, onMounted, onActivated, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Check
 } from '@element-plus/icons-vue'
 import { getTasks, updateTask } from '../../api/reconciliation'
+import { confirmWrite } from '../../api/parse-review'
 import type { ScheduledTask } from '../../types/reconciliation'
+import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 
 const router = useRouter()
 
 const loading = ref(false)
 const tasks = ref<ScheduledTask[]>([])
 const total = ref(0)
+const reconciliationCount = ref(0)
+const parseReviewCount = ref(0)
+const filterType = ref<'reconciliation' | 'parse_review'>('parse_review')
+const writingTaskIds = ref<Set<number>>(new Set())
 
-onMounted(() => {
-  loadTasks()
+onMounted(async () => {
   // 动态注入样式，确保清除日期选择器的边框
   injectDatePickerStyles()
+  // 先加载数量，然后根据数量决定默认显示哪个分类
+  await loadCounts()
+  // 如果解析待办不存在，则显示对账待办
+  if (parseReviewCount.value === 0 && reconciliationCount.value > 0) {
+    filterType.value = 'reconciliation'
+  }
+  await loadTasks()
 })
 
-// 页面激活时刷新列表（从对账表单返回时）
-onActivated(() => {
+// 页面激活时刷新列表（从对账表单或解析审核详情返回时）
+onActivated(async () => {
+  await loadCounts()
+  await loadTasks()
+  // 触发横幅更新，确保能检测到任务数量变化（用于导览步骤5）
+  emitTaskBannerRefresh()
+})
+
+// 监听筛选类型变化
+watch(filterType, () => {
   loadTasks()
 })
 
@@ -144,13 +206,59 @@ function injectDatePickerStyles() {
   document.head.appendChild(style)
 }
 
+// 加载各分类的数量
+async function loadCounts() {
+  try {
+    // 加载对账待办数量
+    const reconciliationParams = {
+      status: 'pending',
+      task_type: 'reconciliation',
+      due: true
+    }
+    const reconciliationResponse = await getTasks(reconciliationParams)
+    const reconciliationData = reconciliationResponse.data
+    if (Array.isArray(reconciliationData)) {
+      reconciliationCount.value = reconciliationData.length
+    } else if (reconciliationData && typeof reconciliationData === 'object' && 'count' in reconciliationData) {
+      reconciliationCount.value = (reconciliationData as { count: number }).count || 0
+    }
+
+    // 加载解析待办数量
+    const parseReviewParams = {
+      status: 'pending',
+      task_type: 'parse_review'
+    }
+    const parseReviewResponse = await getTasks(parseReviewParams)
+    const parseReviewData = parseReviewResponse.data
+    if (Array.isArray(parseReviewData)) {
+      parseReviewCount.value = parseReviewData.length
+    } else if (parseReviewData && typeof parseReviewData === 'object' && 'count' in parseReviewData) {
+      parseReviewCount.value = (parseReviewData as { count: number }).count || 0
+    }
+  } catch (error: unknown) {
+    console.error('加载待办数量错误:', error)
+    // 静默失败，不影响主流程
+  }
+}
+
 async function loadTasks() {
   loading.value = true
   try {
-    const response = await getTasks({
-      due: true,
+    const params: {
+      due?: boolean
+      status: string
+      task_type: string
+    } = {
       status: 'pending',
-    })
+      task_type: filterType.value
+    }
+
+    // 解析审核待办不需要 due 筛选（基于 status='pending' 直接列出）
+    if (filterType.value === 'reconciliation') {
+      params.due = true
+    }
+
+    const response = await getTasks(params)
 
     const data = response.data
     if (Array.isArray(data)) {
@@ -163,6 +271,13 @@ async function loadTasks() {
       console.error('未知的响应结构:', data)
       tasks.value = []
       total.value = 0
+    }
+
+    // 更新对应分类的数量
+    if (filterType.value === 'reconciliation') {
+      reconciliationCount.value = total.value
+    } else if (filterType.value === 'parse_review') {
+      parseReviewCount.value = total.value
     }
   } catch (error: unknown) {
     console.error('加载待办列表错误:', error)
@@ -187,7 +302,59 @@ function isOverdue(dateString: string | null): boolean {
 }
 
 function handleStart(task: ScheduledTask) {
-  router.push(`/reconciliation/${task.id}`)
+  if (task.task_type === 'parse_review') {
+    router.push(`/parse-review/${task.id}`)
+  } else {
+    router.push(`/reconciliation/${task.id}`)
+  }
+}
+
+// 计算剩余时间（基于 expires_at 或 created）
+function getRemainingTime(task: ScheduledTask): string {
+  // 优先使用 expires_at（如果存在）- 这是缓存的实际过期时间
+  if (task.expires_at) {
+    const expiryTime = task.expires_at * 1000  // expires_at 是 Unix 时间戳（秒），转换为毫秒
+    const now = Date.now()
+    const remainingMs = expiryTime - now
+
+    if (remainingMs <= 0) {
+      return '已过期'
+    }
+
+    const remainingHours = Math.floor(remainingMs / (3600 * 1000))
+    const remainingMinutes = Math.floor((remainingMs % (3600 * 1000)) / (60 * 1000))
+
+    if (remainingHours > 0) {
+      return `${remainingHours}小时${remainingMinutes}分钟`
+    } else {
+      return `${remainingMinutes}分钟`
+    }
+  }
+
+  // 回退到使用 created（兼容旧数据或缓存不存在的情况）
+  const createdTime = new Date(task.created).getTime()
+  const now = Date.now()
+  const elapsed = now - createdTime
+  const totalHours = 24
+  const remainingMs = totalHours * 3600 * 1000 - elapsed
+
+  if (remainingMs <= 0) {
+    return '已过期'
+  }
+
+  const remainingHours = Math.floor(remainingMs / (3600 * 1000))
+  const remainingMinutes = Math.floor((remainingMs % (3600 * 1000)) / (60 * 1000))
+
+  if (remainingHours > 0) {
+    return `${remainingHours}小时${remainingMinutes}分钟`
+  } else {
+    return `${remainingMinutes}分钟`
+  }
+}
+
+// 格式化 badge 显示值（超过 99 显示 99+）
+function formatBadgeValue(count: number): string {
+  return count > 99 ? '99+' : String(count)
 }
 
 async function handleDateChange(taskId: number, newDate: string) {
@@ -219,6 +386,51 @@ async function handleDateChange(taskId: number, newDate: string) {
     }
   }
 }
+
+// 跳过审核直接写入
+async function handleDirectWrite(task: ScheduledTask) {
+  if (task.task_type !== 'parse_review') return
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要跳过审核，直接将解析结果写入账本吗？`,
+      '确认直接写入',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    writingTaskIds.value.add(task.id)
+    
+    try {
+      await confirmWrite(task.id)
+      ElMessage.success('已直接写入账本')
+      
+      // 刷新列表
+      await loadTasks()
+      await loadCounts()
+      
+      // 触发横幅更新
+      emitTaskBannerRefresh()
+    } finally {
+      writingTaskIds.value.delete(task.id)
+    }
+  } catch (error: unknown) {
+    if (error === 'cancel') {
+      // 用户取消，不处理
+      return
+    }
+    
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { data?: { message?: string } } }
+      ElMessage.error(axiosError.response?.data?.message || '直接写入失败')
+    } else {
+      ElMessage.error('网络错误，请稍后重试')
+    }
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -229,6 +441,7 @@ async function handleDateChange(taskId: number, newDate: string) {
 
   .list-header {
     display: flex;
+    justify-content: space-between;
     align-items: center;
     margin-bottom: 24px;
 
@@ -248,6 +461,69 @@ async function handleDateChange(taskId: number, newDate: string) {
         :deep(.el-badge__content) {
           font-size: 12px;
           font-weight: 600;
+        }
+      }
+    }
+
+    .filter-buttons {
+      display: flex;
+      gap: 12px;
+
+      .filter-button {
+        position: relative;
+        padding: 8px 20px;
+        min-width: 80px;
+        transition: all 0.3s ease;
+
+        .button-text {
+          display: inline-block;
+          position: relative;
+          z-index: 1;
+        }
+
+        .filter-badge {
+          position: absolute;
+          top: -6px;
+          right: -6px;
+          z-index: 2;
+          transform: scale(1);
+          transition: transform 0.2s ease;
+
+          :deep(.el-badge__content) {
+            font-size: 11px;
+            font-weight: 700;
+            height: 20px;
+            line-height: 20px;
+            padding: 0 7px;
+            min-width: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            border: 2px solid var(--ep-bg-color);
+            letter-spacing: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          }
+
+          // 悬停时轻微放大
+          &:hover {
+            transform: scale(1.1);
+          }
+        }
+
+        // 按钮悬停时 badge 也跟随变化
+        &:hover {
+          .filter-badge {
+            transform: scale(1.1);
+          }
+        }
+
+        // 激活状态下的 badge 样式
+        &.el-button--primary {
+          .filter-badge {
+            :deep(.el-badge__content) {
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+              animation: pulse 2s ease-in-out infinite;
+            }
+          }
         }
       }
     }
@@ -319,13 +595,46 @@ async function handleDateChange(taskId: number, newDate: string) {
       min-width: 0;
     }
 
-    .account-name {
+    .account-name,
+    .file-name {
       font-size: 18px;
       font-weight: 600;
       color: var(--ep-text-color-primary);
       margin-bottom: 12px;
       word-break: break-word;
       transition: color 0.2s;
+    }
+
+    .remaining-time {
+      font-size: 14px;
+      color: var(--ep-text-color-regular);
+      margin-top: 4px;
+    }
+
+    .parse-review-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .card-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+
+      .direct-write-btn {
+        font-size: 13px;
+        padding: 6px 16px;
+        height: 28px;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        
+        &:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+      }
     }
 
     .date-info {
@@ -436,6 +745,22 @@ async function handleDateChange(taskId: number, newDate: string) {
   }
 }
 
+// Badge 脉冲动画（仅在激活状态）
+@keyframes pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+
 // 响应式设计
 @media (max-width: 768px) {
   .reconciliation-list {
@@ -443,6 +768,32 @@ async function handleDateChange(taskId: number, newDate: string) {
 
     .tasks-grid {
       grid-template-columns: 1fr;
+    }
+
+    .list-header {
+      .filter-buttons {
+        gap: 8px;
+
+        .filter-button {
+          padding: 6px 16px;
+          min-width: 70px;
+          font-size: 14px;
+
+          .filter-badge {
+            top: -4px;
+            right: -4px;
+
+            :deep(.el-badge__content) {
+              font-size: 10px;
+              height: 18px;
+              line-height: 18px;
+              padding: 0 6px;
+              min-width: 18px;
+              border-radius: 9px;
+            }
+          }
+        }
+      }
     }
   }
 }
@@ -519,6 +870,34 @@ async function handleDateChange(taskId: number, newDate: string) {
     border: none !important;
     box-shadow: none !important;
     outline: none !important;
+  }
+}
+
+// 暗色模式适配
+html.dark {
+  .reconciliation-list {
+    .filter-buttons {
+      .filter-button {
+        .filter-badge {
+
+          .el-badge__content,
+          [class*="badge__content"] {
+            border-color: var(--ep-bg-color-page) !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+          }
+        }
+
+        &.el-button--primary {
+          .filter-badge {
+
+            .el-badge__content,
+            [class*="badge__content"] {
+              border-color: var(--ep-color-primary-dark-2) !important;
+            }
+          }
+        }
+      }
+    }
   }
 }
 </style>

@@ -205,6 +205,7 @@ import { ElMessage } from 'element-plus'
 import type { TagProps } from 'element-plus'
 import { parse } from 'path'
 import { startUserTour, continueUserTour } from '../../utils/userTour'
+import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 
 
 interface FileItem {
@@ -908,31 +909,44 @@ function startPollingTaskStatus() {
             completedTasks.value = 0;
 
             // 更新任务状态
+            let hasNewPendingReview = false;
             taskDetails.value = taskDetails.value.map(task => {
                 const taskStatus = statusData.tasks.find((t: any) => t.file_id === task.file_id);
                 if (taskStatus) {
-                    if (taskStatus.status === 'parsed' || taskStatus.status === 'failed' || taskStatus.status === 'cancelled') {
+                    const oldStatus = task.status;
+                    const newStatus = taskStatus.status;
+
+                    // 检测是否有新进入 pending_review 状态的任务
+                    if (oldStatus !== 'pending_review' && newStatus === 'pending_review') {
+                        hasNewPendingReview = true;
+                    }
+
+                    // pending_review 表示解析已完成，只是需要审核，应该计入已完成
+                    if (newStatus === 'parsed' || newStatus === 'failed' || newStatus === 'cancelled' || newStatus === 'pending_review') {
                         completedTasks.value++;
                     }
-                    return { ...task, status: taskStatus.status };
+                    return { ...task, status: newStatus };
                 }
                 return task;
             });
 
+            // 如果有新任务进入待审核状态，触发横幅更新
+            if (hasNewPendingReview) {
+                emitTaskBannerRefresh();
+            }
+
             // 检查任务组是否完成
-            if (statusData.status === 'completed') {
+            // 如果任务组状态为 completed，或者所有任务都是已完成状态（包括 pending_review），则关闭弹窗
+            const allTasksCompleted = statusData.tasks.every((task: any) =>
+                ['parsed', 'failed', 'cancelled', 'pending_review'].includes(task.status)
+            );
+
+            if (statusData.status === 'completed' || allTasksCompleted) {
                 stopPolling();
                 ElMessage.success('所有文件解析完成');
 
-                // 检查是否在引导中
-                if (sessionStorage.getItem('tour_in_progress') === 'true') {
-                    sessionStorage.removeItem('tour_in_progress');
-
-                    // 延迟继续引导
-                    setTimeout(() => {
-                        continueUserTour(); // 继续到步骤 4
-                    }, 1000);
-                }
+                // 注意：导览步骤由横幅更新时自动触发，不需要在这里调用
+                // 横幅更新会检测到新任务并触发导览步骤4（立即处理按钮）
 
                 setTimeout(() => {
                     parseDialogVisible.value = false;
@@ -983,7 +997,8 @@ function translateStatus(status: string | undefined): string {
         'processing': '解析中',
         'parsed': '已解析',
         'failed': '解析失败',
-        'cancelled': '取消解析'
+        'cancelled': '取消解析',
+        'pending_review': '待审核'
     };
     return statusMap[status] || status;
 }
