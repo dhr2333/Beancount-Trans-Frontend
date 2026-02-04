@@ -1,3 +1,9 @@
+## [5.8.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.7.0...5.8.0) (2026-02-04)
+
+### Features
+
+* 文件解析支持审核功能 ([#50](https://github.com/dhr2333/Beancount-Trans-Frontend/issues/50)) ([5413548](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/541354806996314179fab628ccfc82c23f365353))
+
 ## [5.7.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.6.0...5.7.0) (2026-01-30)
 
 ### Features
