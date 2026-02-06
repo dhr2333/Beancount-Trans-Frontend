@@ -393,11 +393,11 @@ const validationErrors = computed(() => {
     const itemsWithAmount = formData.value.transactionItems.filter(
       (item: TransactionItem) => item.account && (item.amount !== undefined && item.amount !== null)
     )
-    
+
     if (itemsWithAmount.length > 0) {
       errors.push('预期余额和实际余额相等时，差额分配中的金额需留空')
     }
-    
+
     return errors
   }
 
@@ -521,6 +521,20 @@ async function handleSubmit() {
 
     // 格式化为 YYYY-MM-DD
     const asOfDateStr = asOfDate.toISOString().split('T')[0]
+
+    // 验证 as_of_date 必须大于上一次对账日期
+    if (lastReconciliationDate.value) {
+      const lastDate = new Date(lastReconciliationDate.value)
+      lastDate.setHours(0, 0, 0, 0)
+      const currentAsOfDate = new Date(asOfDateStr)
+      currentAsOfDate.setHours(0, 0, 0, 0)
+
+      if (currentAsOfDate <= lastDate) {
+        ElMessage.error(`对账日期 ${asOfDateStr} 不能早于或等于上一次对账日期 ${lastReconciliationDate.value}，只能对账未来的日期`)
+        submitting.value = false
+        return
+      }
+    }
 
     await executeReconciliation(taskId, {
       actual_balance: formData.value.actualBalance,
