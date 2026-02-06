@@ -106,6 +106,7 @@ export interface ReconciliationStartResponse {
   as_of_date: string
   default_currency: string | null
   is_first_reconciliation: boolean
+  last_reconciliation_date: string | null
 }
 
 /**

@@ -87,7 +87,8 @@
                   <div v-if="row.amount !== undefined && row.amount !== null" class="date-picker-wrapper">
                     <el-date-picker v-model="row.date" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD"
                       :clearable="true" placeholder="默认为对账日期" :max-date="asOfDate ? new Date(asOfDate) : undefined"
-                      class="no-border-date-picker" placement="bottom-start" :teleported="true" :popper-options="{
+                      :min-date="getMinDate()" class="no-border-date-picker" placement="bottom-start" :teleported="true"
+                      :popper-options="{
                         modifiers: [
                           {
                             name: 'offset',
@@ -184,6 +185,7 @@ const accountName = ref('')
 const availableCurrencies = ref<Array<{ currency: string, expected_balance: number }>>([])
 const accountTree = ref<AccountOption[]>([])
 const asOfDate = ref<string>('')  // 对账截止日期，用于限制日期选择器的最大日期
+const lastReconciliationDate = ref<string | null>(null)  // 上一次对账日期，用于限制日期选择器的最小日期
 
 const formData = ref<ReconciliationFormData>({
   expectedBalance: 0,
@@ -224,6 +226,9 @@ async function loadReconciliationData() {
 
     // 存储 as_of_date（用于限制日期选择器的最大日期）
     asOfDate.value = response.data.as_of_date
+
+    // 存储上一次对账日期（用于限制日期选择器的最小日期）
+    lastReconciliationDate.value = response.data.last_reconciliation_date || null
 
     // 根据是否首次对账设置默认账户
     const defaultEquityAccountName = response.data.is_first_reconciliation
@@ -368,6 +373,16 @@ const hasAllocatedAmount = computed(() => {
   return toCents(Math.abs(totalAllocated.value)) > 0
 })
 
+// 获取日期选择器的最小日期（上一次对账日期的下一天）
+function getMinDate(): Date | undefined {
+  if (!lastReconciliationDate.value) {
+    return undefined
+  }
+  const lastDate = new Date(lastReconciliationDate.value)
+  lastDate.setDate(lastDate.getDate() + 1)  // 下一天
+  return lastDate
+}
+
 const validationErrors = computed(() => {
   const errors: string[] = []
 
@@ -397,6 +412,26 @@ const validationErrors = computed(() => {
     if (item.account === accountName.value) {
       errors.push(`差额分配账户不能与对账账户相同（${accountName.value}）`)
       break
+    }
+  }
+
+  // 检查日期不能早于上一次对账日期
+  if (lastReconciliationDate.value) {
+    const minDate = new Date(lastReconciliationDate.value)
+    minDate.setDate(minDate.getDate() + 1)  // 下一天
+
+    for (let i = 0; i < formData.value.transactionItems.length; i++) {
+      const item = formData.value.transactionItems[i]
+      const itemDate = item.date
+
+      // 只检查有日期的条目（is_auto=false 的条目）
+      if (itemDate && item.amount !== undefined && item.amount !== null) {
+        const date = new Date(itemDate)
+        if (date <= new Date(lastReconciliationDate.value)) {
+          const minDateStr = minDate.toISOString().split('T')[0]
+          errors.push(`条目 ${i + 1} 的日期 ${itemDate} 不能早于或等于上一次对账日期 ${lastReconciliationDate.value}（必须在 ${minDateStr} 或之后）`)
+        }
+      }
     }
   }
 
