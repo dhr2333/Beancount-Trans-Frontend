@@ -1,7 +1,7 @@
 <template>
   <el-menu class="el-menu-demo" mode="horizontal" :ellipsis="false" @select="handleSelect">
     <el-sub-menu index="account" id="tour-ledger-menu">
-      <template #title>账本管理</template>
+      <template #title>图表分析</template>
       <el-menu-item index="platform-ledger" @click="openFavaInstance">
         平台账本
       </el-menu-item>
@@ -20,7 +20,7 @@
     </router-link>
 
     <el-sub-menu index="template">
-      <template #title>模板管理</template>
+      <template #title>模板应用</template>
       <router-link to="/template/accounts" class="no-underline">
         <el-menu-item index="/template/accounts">账户模板</el-menu-item>
       </router-link>
@@ -30,7 +30,7 @@
     </el-sub-menu>
 
     <el-sub-menu index="config">
-      <template #title>配置管理</template>
+      <template #title>基础配置</template>
       <router-link to="/config/accounts" class="no-underline">
         <el-menu-item index="/config/accounts">账户管理</el-menu-item>
       </router-link>
