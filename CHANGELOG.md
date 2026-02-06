@@ -1,3 +1,9 @@
+## [5.9.2](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.1...5.9.2) (2026-02-06)
+
+### Bug Fixes
+
+* balance ([#55](https://github.com/dhr2333/Beancount-Trans-Frontend/issues/55)) ([b3c068d](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/b3c068d1205060ce19ca73bb3785d4635fce7bec))
+
 ## [5.9.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.0...5.9.1) (2026-02-06)
 
 ### Bug Fixes
