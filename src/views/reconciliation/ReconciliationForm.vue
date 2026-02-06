@@ -386,9 +386,18 @@ function getMinDate(): Date | undefined {
 const validationErrors = computed(() => {
   const errors: string[] = []
 
-  // 如果无基础差额，不需要验证差额分配
+  // 如果无基础差额，检查是否填写了差额分配
   // 使用整数比较避免浮点数精度问题
   if (toCents(Math.abs(baseDifference.value)) === 0) {
+    // 检查是否有填写了金额的差额分配条目
+    const itemsWithAmount = formData.value.transactionItems.filter(
+      (item: TransactionItem) => item.account && (item.amount !== undefined && item.amount !== null)
+    )
+    
+    if (itemsWithAmount.length > 0) {
+      errors.push('预期余额和实际余额相等时，差额分配中的金额需留空')
+    }
+    
     return errors
   }
 
