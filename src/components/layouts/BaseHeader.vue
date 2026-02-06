@@ -1,13 +1,13 @@
 <template>
   <el-menu class="el-menu-demo" mode="horizontal" :ellipsis="false" @select="handleSelect">
     <el-sub-menu index="account" id="tour-ledger-menu">
-      <template #title>图表分析</template>
+      <template #title>财务报表</template>
       <el-menu-item index="platform-ledger" @click="openFavaInstance">
         平台账本
       </el-menu-item>
       <el-menu-item index="official-ledger"
         @click="openExternal('https://fava.pythonanywhere.com/example-beancount-file/income_statement/')">
-        官方账本
+        案例账本
       </el-menu-item>
     </el-sub-menu>
 
