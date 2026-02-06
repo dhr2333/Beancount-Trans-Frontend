@@ -386,9 +386,18 @@ function getMinDate(): Date | undefined {
 const validationErrors = computed(() => {
   const errors: string[] = []
 
-  // 如果无基础差额，不需要验证差额分配
+  // 如果无基础差额，检查是否填写了差额分配
   // 使用整数比较避免浮点数精度问题
   if (toCents(Math.abs(baseDifference.value)) === 0) {
+    // 检查是否有填写了金额的差额分配条目
+    const itemsWithAmount = formData.value.transactionItems.filter(
+      (item: TransactionItem) => item.account && (item.amount !== undefined && item.amount !== null)
+    )
+
+    if (itemsWithAmount.length > 0) {
+      errors.push('预期余额和实际余额相等时，差额分配中的金额需留空')
+    }
+
     return errors
   }
 
@@ -512,6 +521,24 @@ async function handleSubmit() {
 
     // 格式化为 YYYY-MM-DD
     const asOfDateStr = asOfDate.toISOString().split('T')[0]
+
+    // 验证 as_of_date 必须大于上一次对账日期
+    if (lastReconciliationDate.value) {
+      const lastDate = new Date(lastReconciliationDate.value)
+      lastDate.setHours(0, 0, 0, 0)
+      const currentAsOfDate = new Date(asOfDateStr)
+      currentAsOfDate.setHours(0, 0, 0, 0)
+
+      if (currentAsOfDate.getTime() === lastDate.getTime()) {
+        ElMessage.error(`该账户已有 ${asOfDateStr} 的对账记录，不允许重复对账同一日期`)
+        submitting.value = false
+        return
+      } else if (currentAsOfDate < lastDate) {
+        ElMessage.error(`对账日期 ${asOfDateStr} 不能早于上一次对账日期 ${lastReconciliationDate.value}，只能对账未来的日期`)
+        submitting.value = false
+        return
+      }
+    }
 
     await executeReconciliation(taskId, {
       actual_balance: formData.value.actualBalance,
