@@ -40,18 +40,17 @@
                 <el-input-number v-model="formData.actualBalance" :controls="false" :precision="2" placeholder="输入实际余额"
                   style="width: 100%" />
               </div>
-              <div
-                v-if="formData.actualBalance !== undefined && formData.actualBalance !== null && Math.abs(baseDifference) >= 0.01"
+              <div v-if="formData.actualBalance !== undefined && formData.actualBalance !== null && hasBaseDifference"
                 class="difference-badge" :class="{ 'positive': baseDifference > 0, 'negative': baseDifference < 0 }">
                 <div class="difference-main">
                   差额：{{ baseDifference > 0 ? '+' : '' }}{{ baseDifference.toFixed(2) }}
                 </div>
-                <div v-if="Math.abs(totalAllocated) >= 0.01" class="difference-detail">
+                <div v-if="hasAllocatedAmount" class="difference-detail">
                   已分配：{{ totalAllocated > 0 ? '+' : '' }}{{ totalAllocated.toFixed(2) }}
-                  <span v-if="Math.abs(difference) > 0.01" class="remaining-hint">
+                  <span v-if="!isFullyAllocated" class="remaining-hint">
                     （剩余：{{ difference > 0 ? '+' : '' }}{{ difference.toFixed(2) }}）
                   </span>
-                  <span v-else-if="Math.abs(difference) <= 0.01" class="complete-hint">
+                  <span v-else class="complete-hint">
                     ✓ 已完全分配
                   </span>
                 </div>
@@ -349,11 +348,32 @@ const remainingAmount = computed(() => {
   return difference.value
 })
 
+// 将金额转换为整数（以分为单位）进行精确比较，避免浮点数精度问题
+function toCents(amount: number): number {
+  return Math.round(amount * 100)
+}
+
+// 判断是否完全分配（使用整数比较避免浮点数精度问题）
+const isFullyAllocated = computed(() => {
+  return toCents(Math.abs(difference.value)) === 0
+})
+
+// 判断是否有基础差额（使用整数比较避免浮点数精度问题）
+const hasBaseDifference = computed(() => {
+  return toCents(Math.abs(baseDifference.value)) > 0
+})
+
+// 判断是否有已分配金额（使用整数比较避免浮点数精度问题）
+const hasAllocatedAmount = computed(() => {
+  return toCents(Math.abs(totalAllocated.value)) > 0
+})
+
 const validationErrors = computed(() => {
   const errors: string[] = []
 
   // 如果无基础差额，不需要验证差额分配
-  if (Math.abs(baseDifference.value) < 0.01) {
+  // 使用整数比较避免浮点数精度问题
+  if (toCents(Math.abs(baseDifference.value)) === 0) {
     return errors
   }
 
@@ -386,9 +406,14 @@ const validationErrors = computed(() => {
   }
 
   // 如果没有自动分配账户（所有账户都填写了金额），需要验证金额总和是否匹配
+  // 金额必须完全闭环，不允许任何误差
+  // 使用整数比较避免浮点数精度问题
   if (emptyAmountCount === 0) {
     const targetAllocation = -baseDifference.value
-    if (Math.abs(totalAllocated.value - targetAllocation) > 0.01) {
+    const targetAllocationCents = toCents(targetAllocation)
+    const totalAllocatedCents = toCents(totalAllocated.value)
+
+    if (targetAllocationCents !== totalAllocatedCents) {
       errors.push(`已分配金额与差额不匹配（基础差额：${baseDifference.value.toFixed(2)}，已分配：${totalAllocated.value.toFixed(2)}，应分配：${targetAllocation.toFixed(2)}）`)
     }
   }
