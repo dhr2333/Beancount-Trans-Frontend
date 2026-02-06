@@ -529,8 +529,12 @@ async function handleSubmit() {
       const currentAsOfDate = new Date(asOfDateStr)
       currentAsOfDate.setHours(0, 0, 0, 0)
 
-      if (currentAsOfDate <= lastDate) {
-        ElMessage.error(`对账日期 ${asOfDateStr} 不能早于或等于上一次对账日期 ${lastReconciliationDate.value}，只能对账未来的日期`)
+      if (currentAsOfDate.getTime() === lastDate.getTime()) {
+        ElMessage.error(`该账户已有 ${asOfDateStr} 的对账记录，不允许重复对账同一日期`)
+        submitting.value = false
+        return
+      } else if (currentAsOfDate < lastDate) {
+        ElMessage.error(`对账日期 ${asOfDateStr} 不能早于上一次对账日期 ${lastReconciliationDate.value}，只能对账未来的日期`)
         submitting.value = false
         return
       }
