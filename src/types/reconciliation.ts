@@ -70,6 +70,7 @@ export interface TransactionItem {
   accountId?: number | null  // 账户 ID（用于 AccountSelector）
   amount?: number | null  // 金额（留空时为自动计算）
   is_auto?: boolean  // 是否为自动计算（前端提交时，如果 amount 为空，自动设置为 true）
+  date?: string | null  // 交易日期（可选，仅 is_auto=false 时可指定，不能超过 as_of_date）
 }
 
 /**

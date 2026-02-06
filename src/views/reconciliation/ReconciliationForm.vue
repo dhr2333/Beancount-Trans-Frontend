@@ -81,12 +81,44 @@
                   style="width: 100%" />
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="120" align="center">
-              <template #default="{ $index }">
-                <el-button type="danger" size="small" text :disabled="formData.transactionItems.length === 1"
-                  @click="removeItem($index)">
-                  删除
-                </el-button>
+            <el-table-column label="操作" width="180" align="center">
+              <template #default="{ row, $index }">
+                <div class="action-cell">
+                  <!-- 日期选择器（仅当金额有值时显示） -->
+                  <div v-if="row.amount !== undefined && row.amount !== null" class="date-picker-wrapper">
+                    <el-date-picker v-model="row.date" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD"
+                      :clearable="true" placeholder="默认为对账日期" :max-date="asOfDate ? new Date(asOfDate) : undefined"
+                      class="no-border-date-picker" placement="bottom-start" :teleported="true" :popper-options="{
+                        modifiers: [
+                          {
+                            name: 'offset',
+                            options: {
+                              offset: [0, 4]
+                            }
+                          },
+                          {
+                            name: 'preventOverflow',
+                            options: {
+                              boundary: 'viewport',
+                              padding: 8
+                            }
+                          },
+                          {
+                            name: 'computeStyles',
+                            options: {
+                              adaptive: true,
+                              roundOffsets: true
+                            }
+                          }
+                        ]
+                      }" />
+                  </div>
+                  <!-- 删除按钮 -->
+                  <el-button type="danger" size="small" text :disabled="formData.transactionItems.length === 1"
+                    @click="removeItem($index)">
+                    删除
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -152,13 +184,14 @@ const submitting = ref(false)
 const accountName = ref('')
 const availableCurrencies = ref<Array<{ currency: string, expected_balance: number }>>([])
 const accountTree = ref<AccountOption[]>([])
+const asOfDate = ref<string>('')  // 对账截止日期，用于限制日期选择器的最大日期
 
 const formData = ref<ReconciliationFormData>({
   expectedBalance: 0,
   actualBalance: undefined,
   currency: 'CNY',
   reconciliationTiming: 'end_of_day',
-  transactionItems: [{ account: '', accountId: null, amount: undefined }]
+  transactionItems: [{ account: '', accountId: null, amount: undefined, date: null }]
 })
 
 onMounted(async () => {
@@ -190,6 +223,9 @@ async function loadReconciliationData() {
 
     accountName.value = response.data.account_name
 
+    // 存储 as_of_date（用于限制日期选择器的最大日期）
+    asOfDate.value = response.data.as_of_date
+
     // 根据是否首次对账设置默认账户
     const defaultEquityAccountName = response.data.is_first_reconciliation
       ? 'Equity:Opening-Balances'
@@ -207,9 +243,11 @@ async function loadReconciliationData() {
     if (formData.value.transactionItems.length > 0 && defaultAccount) {
       formData.value.transactionItems[0].account = defaultAccount.account
       formData.value.transactionItems[0].accountId = defaultAccount.id
+      formData.value.transactionItems[0].date = null  // 初始化日期字段
     } else if (formData.value.transactionItems.length > 0) {
       // 如果找不到账户，至少设置账户名称，AccountSelector 可能会自动匹配
       formData.value.transactionItems[0].account = defaultEquityAccountName
+      formData.value.transactionItems[0].date = null  // 初始化日期字段
     }
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
@@ -274,7 +312,8 @@ function addItem() {
   formData.value.transactionItems.push({
     account: '',
     accountId: null,
-    amount: undefined
+    amount: undefined,
+    date: null
   })
 }
 
@@ -385,11 +424,12 @@ async function handleSubmit() {
             is_auto: true
           }
         }
-        // 如果金额不为空，正常提交
+        // 如果金额不为空，正常提交（包含日期字段）
         return {
           account: item.account,
           amount: item.amount,
-          is_auto: false
+          is_auto: false,
+          date: item.date || null  // 日期字段，如果未指定则为 null
         }
       })
 
@@ -587,6 +627,20 @@ async function handleSubmit() {
       :deep(.el-table__cell) {
         padding: 12px 8px;
       }
+
+      // 操作列样式
+      .action-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+
+        .date-picker-wrapper {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+        }
+      }
     }
 
     .allocation-actions {
@@ -664,6 +718,111 @@ async function handleSubmit() {
     background: var(--ep-bg-color);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
     border-color: var(--ep-border-color);
+  }
+}
+</style>
+
+<!-- 非 scoped 样式，用于覆盖 Element Plus 日期选择器默认样式（复用 ReconciliationList.vue 的样式） -->
+<style lang="scss">
+.reconciliation-form .allocation-table .no-border-date-picker {
+  width: 140px;
+
+  // 清除所有边框和阴影（同时匹配 el- 和 ep- 命名空间）
+  .ep-input__wrapper,
+  .el-input__wrapper,
+  [class*="input__wrapper"] {
+    border: none !important;
+    border-width: 0 !important;
+    border-style: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    outline-width: 0 !important;
+    background-color: transparent !important;
+    padding: 4px 8px !important;
+    transition: all 0.2s;
+
+    &::before,
+    &::after {
+      display: none !important;
+      content: none !important;
+      border: none !important;
+      border-width: 0 !important;
+      box-shadow: none !important;
+      background: none !important;
+    }
+
+    &:hover {
+      background-color: var(--ep-fill-color) !important;
+      border: none !important;
+      border-width: 0 !important;
+      box-shadow: none !important;
+      outline: none !important;
+    }
+
+    &.is-focus,
+    &[class*="is-focus"] {
+      background-color: var(--ep-fill-color) !important;
+      border: none !important;
+      border-width: 0 !important;
+      box-shadow: none !important;
+      outline: none !important;
+    }
+  }
+
+  // 清除输入框内部样式
+  .ep-input__inner,
+  .el-input__inner,
+  [class*="input__inner"] {
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--ep-text-color-regular);
+    text-align: center;
+    border: none !important;
+    outline: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
+  // 移除日期选择器右侧的图标
+  .ep-input__suffix,
+  .el-input__suffix,
+  [class*="input__suffix"] {
+    display: none !important;
+  }
+
+  // 清除整个输入框容器的边框
+  .ep-input,
+  .el-input,
+  [class*="input"] {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  // 清除日期选择器外层容器的所有视觉效果
+  .ep-date-editor,
+  .el-date-editor,
+  [class*="date-editor"] {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: transparent !important;
+
+    &::before,
+    &::after {
+      display: none !important;
+      content: none !important;
+    }
+  }
+
+  // 使用属性选择器匹配所有可能的变体
+  [class*="ep-input"],
+  [class*="el-input"] {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
   }
 }
 </style>
