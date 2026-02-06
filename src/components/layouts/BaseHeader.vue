@@ -86,18 +86,15 @@ import axios from '../../utils/request'
 import router from "~/routers";
 import { isDark } from "~/composables";
 
-// 4. 导入 API 和类型
-import { getTasks } from '../../api/reconciliation';
-import type { ScheduledTask } from '../../types/reconciliation';
+// 4. 常量
+const apiUrl = import.meta.env.VITE_API_URL;
+const USERNAME_CHECK_INTERVAL = 1000; // 1秒
 
 // 5. 响应式数据
 const username = ref<string>(localStorage.getItem("username") || "未登录");
-const pendingTaskCount = ref<number>(0);
 
-// 6. 常量
-const apiUrl = import.meta.env.VITE_API_URL;
-const TASK_REFRESH_INTERVAL = 30000; // 30秒
-const USERNAME_CHECK_INTERVAL = 1000; // 1秒
+// 6. 定时器管理
+let usernameCheckInterval: ReturnType<typeof setInterval> | null = null;
 
 // 7. 方法定义
 
@@ -141,42 +138,6 @@ const cleanToken = async () => {
 const openExternal = (url: string) => {
   window.open(url, '_blank', 'noopener,noreferrer');
 };
-
-/**
- * 获取待办任务数量
- */
-async function loadPendingTasks() {
-  const accessToken = localStorage.getItem("access");
-  if (!accessToken) {
-    pendingTaskCount.value = 0;
-    return;
-  }
-
-  try {
-    const response = await getTasks({
-      due: true,
-      status: 'pending',
-    });
-
-    const data = response.data;
-    if (Array.isArray(data)) {
-      pendingTaskCount.value = data.length;
-    } else if (data && typeof data === 'object' && 'results' in data) {
-      const paginatedData = data as { results: ScheduledTask[], count: number };
-      pendingTaskCount.value = paginatedData.count || 0;
-    } else {
-      pendingTaskCount.value = 0;
-    }
-  } catch (error: unknown) {
-    // 静默失败，不影响其他功能
-    console.warn('获取待办数量失败:', error);
-    pendingTaskCount.value = 0;
-  }
-}
-
-// 8. 定时器管理
-let taskRefreshInterval: ReturnType<typeof setInterval> | null = null;
-let usernameCheckInterval: ReturnType<typeof setInterval> | null = null;
 
 /**
  * 处理菜单选择事件
@@ -227,42 +188,18 @@ const openFavaInstance = async () => {
   }
 };
 
-// 9. 生命周期钩子
+// 8. 生命周期钩子
 
 /**
  * 组件挂载时初始化
  */
-onMounted(async () => {
+onMounted(() => {
   const accessToken = localStorage.getItem("access");
   if (accessToken) {
     // JWT 令牌的有效性会在 API 调用时自动验证
     username.value = localStorage.getItem("username") || "未登录";
-    await loadPendingTasks();
   } else {
     username.value = "未登录";
-    pendingTaskCount.value = 0;
-  }
-});
-
-/**
- * 监听访问令牌变化，管理待办任务刷新定时器
- */
-watchEffect(() => {
-  const accessToken = localStorage.getItem("access");
-
-  // 清理旧的定时器
-  if (taskRefreshInterval) {
-    clearInterval(taskRefreshInterval);
-    taskRefreshInterval = null;
-  }
-
-  if (accessToken) {
-    // 设置新的定时器
-    taskRefreshInterval = setInterval(() => {
-      loadPendingTasks();
-    }, TASK_REFRESH_INTERVAL);
-  } else {
-    pendingTaskCount.value = 0;
   }
 });
 
@@ -289,10 +226,6 @@ watchEffect(() => {
  * 组件卸载时清理所有定时器
  */
 onUnmounted(() => {
-  if (taskRefreshInterval) {
-    clearInterval(taskRefreshInterval);
-    taskRefreshInterval = null;
-  }
   if (usernameCheckInterval) {
     clearInterval(usernameCheckInterval);
     usernameCheckInterval = null;
