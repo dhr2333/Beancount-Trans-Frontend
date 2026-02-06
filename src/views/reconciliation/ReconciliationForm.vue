@@ -530,11 +530,52 @@ async function handleSubmit() {
             message?: string
             non_field_errors?: string[]
             error?: string
+            transaction_items?: string[] | string
+            [key: string]: unknown
           }
         }
       }
       const errorData = axiosError.response?.data
-      // 处理 DRF ValidationError 格式：优先使用 message，其次使用 non_field_errors，最后使用 error
+
+      // 处理 DRF ValidationError 格式
+      // 1. 优先处理字段级别的错误（如 transaction_items）
+      if (errorData?.transaction_items) {
+        const transactionErrors = Array.isArray(errorData.transaction_items)
+          ? errorData.transaction_items
+          : [errorData.transaction_items]
+        // 显示所有 transaction_items 相关的错误
+        transactionErrors.forEach((err: string) => {
+          ElMessage.error(err)
+        })
+        return
+      }
+
+      // 2. 处理其他字段级别的错误（遍历所有字段）
+      const fieldErrors: string[] = []
+      if (errorData) {
+        for (const key in errorData) {
+          // 跳过已处理的字段和通用错误字段
+          if (key === 'message' || key === 'non_field_errors' || key === 'error') {
+            continue
+          }
+          const fieldValue = errorData[key]
+          if (Array.isArray(fieldValue)) {
+            fieldErrors.push(...fieldValue.map((err: string) => `${key}: ${err}`))
+          } else if (typeof fieldValue === 'string') {
+            fieldErrors.push(`${key}: ${fieldValue}`)
+          }
+        }
+      }
+
+      if (fieldErrors.length > 0) {
+        // 显示所有字段错误
+        fieldErrors.forEach((err: string) => {
+          ElMessage.error(err)
+        })
+        return
+      }
+
+      // 3. 处理通用错误：优先使用 message，其次使用 non_field_errors，最后使用 error
       const errorMessage = errorData?.message ||
         (errorData?.non_field_errors && errorData.non_field_errors[0]) ||
         errorData?.error ||
