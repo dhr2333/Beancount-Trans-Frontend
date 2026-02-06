@@ -1,3 +1,9 @@
+## [5.9.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.8.0...5.9.0) (2026-02-06)
+
+### Features
+
+* Enhance reconciliation form with date selection and UI improvements ([#52](https://github.com/dhr2333/Beancount-Trans-Frontend/issues/52)) ([8752393](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/875239390e933a7996d75bc4cf20e47c10f1686e))
+
 ## [5.8.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.7.0...5.8.0) (2026-02-04)
 
 ### Features
