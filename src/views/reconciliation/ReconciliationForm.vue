@@ -393,6 +393,11 @@ const validationErrors = computed(() => {
       errors.push('所有条目必须选择账户')
       break
     }
+    // 检查账户不能与对账账户相同
+    if (item.account === accountName.value) {
+      errors.push(`差额分配账户不能与对账账户相同（${accountName.value}）`)
+      break
+    }
   }
 
   // 检查是否有多个账户金额为空（只允许一个账户金额为空，由后端自动分配）
