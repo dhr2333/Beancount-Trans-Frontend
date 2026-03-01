@@ -15,7 +15,7 @@
 
 
         <!-- 映射分析面板 -->
-        <div class="analytics-panel">
+        <!-- <div class="analytics-panel">
             <el-card>
                 <template #header>
                     <div class="card-header">
@@ -80,7 +80,7 @@
                     </el-row>
                 </div>
             </el-card>
-        </div>
+        </div> -->
 
         <!-- 映射类型标签页 -->
         <div class="mapping-tabs">

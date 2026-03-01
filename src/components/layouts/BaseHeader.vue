@@ -3,23 +3,23 @@
     <el-sub-menu index="account" id="tour-ledger-menu">
       <template #title>财务报表</template>
       <el-menu-item index="platform-ledger" @click="openFavaInstance">
-        平台账本
+        Fava 专业报表
       </el-menu-item>
-      <el-menu-item index="official-ledger"
+      <!-- <el-menu-item index="official-ledger"
         @click="openExternal('https://fava.pythonanywhere.com/example-beancount-file/income_statement/')">
         案例账本
-      </el-menu-item>
+      </el-menu-item> -->
     </el-sub-menu>
 
     <router-link to="/trans" class="no-underline">
-      <el-menu-item index="/trans">格式转换</el-menu-item>
+      <el-menu-item index="/trans">账单解析</el-menu-item>
     </router-link>
 
     <router-link to="/file" class="no-underline">
       <el-menu-item index="/file">文件管理</el-menu-item>
     </router-link>
 
-    <el-sub-menu index="template">
+    <!-- <el-sub-menu index="template">
       <template #title>模板应用</template>
       <router-link to="/template/accounts" class="no-underline">
         <el-menu-item index="/template/accounts">账户模板</el-menu-item>
@@ -27,21 +27,21 @@
       <router-link to="/template/mappings" class="no-underline">
         <el-menu-item index="/template/mappings">映射模板</el-menu-item>
       </router-link>
-    </el-sub-menu>
+    </el-sub-menu> -->
 
     <el-sub-menu index="config">
-      <template #title>基础配置</template>
+      <template #title>解析配置</template>
       <router-link to="/config/accounts" class="no-underline">
-        <el-menu-item index="/config/accounts">账户管理</el-menu-item>
+        <el-menu-item index="/config/accounts">账本账户</el-menu-item>
       </router-link>
       <router-link to="/config/mappings" class="no-underline">
-        <el-menu-item index="/config/mappings">映射管理</el-menu-item>
+        <el-menu-item index="/config/mappings">关键字映射</el-menu-item>
       </router-link>
       <router-link to="/config/tags" class="no-underline">
         <el-menu-item index="/config/tags">标签管理</el-menu-item>
       </router-link>
       <router-link to="/format" class="no-underline">
-        <el-menu-item index="/format">格式化输出</el-menu-item>
+        <el-menu-item index="/format">输出配置</el-menu-item>
       </router-link>
     </el-sub-menu>
 
