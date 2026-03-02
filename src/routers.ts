@@ -51,10 +51,40 @@ const router = createRouter({
   ]
 })
 
-// 路由守卫：检查手机号绑定状态
+// 路由守卫：检查手机号绑定状态和导览恢复
 router.beforeEach(async (to, from, next) => {
   const token = localStorage.getItem('access');
   const username = localStorage.getItem('username');
+
+  // 检查是否需要恢复导览（在认证检查之前，因为导览恢复可能需要跳转）
+  try {
+    const { shouldResumeTour, getTourProgress } = await import('./utils/userTour');
+    const { getRequiredRouteForStep, ensureCorrectRoute } = await import('./utils/tourRecovery');
+    
+    if (shouldResumeTour()) {
+      const progress = getTourProgress();
+      if (progress) {
+        const { currentStep } = progress;
+        const requiredRoute = getRequiredRouteForStep(currentStep);
+        
+        // 如果步骤5，可以在任何页面，不需要跳转
+        if (currentStep === 4 && requiredRoute === '') {
+          // 继续正常路由流程
+        }
+        // 如果当前路由不匹配所需路由，需要跳转
+        else if (to.path !== requiredRoute && requiredRoute !== '') {
+          // 排除登录、手机绑定、OAuth回调等页面，这些页面不应该被导览跳转影响
+          if (to.path !== '/login' && to.path !== '/phone-binding' && to.path !== '/auth/github/token') {
+            next(requiredRoute);
+            return;
+          }
+        }
+      }
+    }
+  } catch (error) {
+    // 如果导入失败，继续正常流程
+    console.warn('导览恢复检查失败:', error);
+  }
 
   // 处理根路径重定向
   if (to.path === '/') {

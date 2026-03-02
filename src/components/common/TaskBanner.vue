@@ -39,7 +39,8 @@ import { Bell, Close } from '@element-plus/icons-vue'
 import { getTasks } from '../../api/reconciliation'
 import type { ScheduledTask } from '../../types/reconciliation'
 import { subscribeTaskBannerRefresh } from '../../utils/accountEvents'
-import { continueUserTour } from '../../utils/userTour'
+import { continueUserTour, shouldResumeTour, getTourProgress, resumeTourFromStep, continueUserTourToStep5, saveTourProgress, destroyUserTour } from '../../utils/userTour'
+import { isRouteMatchForStep, ensureCorrectRoute } from '../../utils/tourRecovery'
 
 const router = useRouter()
 const route = useRoute()
@@ -119,21 +120,29 @@ async function loadPendingTasks() {
     // 保存旧值用于比较（在更新之前）
     const oldParseReviewCount = previousParseReviewCount.value
 
+    // 检查导览状态（使用新的状态管理）
+    const isInTour = shouldResumeTour()
+    const tourProgress = getTourProgress()
+    const currentStep = tourProgress?.currentStep ?? -1
+    
     // 检查是否有新的解析审核任务（用于导览触发步骤4）
     // 条件：1) 在导览中 2) 之前没有解析审核任务(0) 3) 现在有解析审核任务(>0) 4) 还没有触发过步骤4
-    const isInTour = sessionStorage.getItem('tour_in_progress') === 'true'
-    const hasNewParseReviewTask = isInTour &&
+    // 或者：需要恢复导览且当前步骤为3（步骤4）
+    const hasNewParseReviewTask = (isInTour &&
       !tourStep4Triggered.value &&
       oldParseReviewCount === 0 &&
-      newParseReviewCount > 0
+      newParseReviewCount > 0) ||
+      (isInTour && currentStep === 3 && newParseReviewCount > 0 && !tourStep4Triggered.value)
 
     // 检查是否有解析审核任务完成（用于导览触发步骤5）
     // 条件：1) 在导览中 2) 之前有解析审核任务(>0) 3) 现在减少了 4) 已经触发过步骤4 5) 还没有触发过步骤5
-    const hasCompletedParseReviewTask = isInTour &&
+    // 或者：需要恢复导览且当前步骤为4（步骤5）且任务已完成
+    const hasCompletedParseReviewTask = (isInTour &&
       !tourStep5Triggered.value &&
       tourStep4Triggered.value &&
       oldParseReviewCount > 0 &&
-      newParseReviewCount < oldParseReviewCount
+      newParseReviewCount < oldParseReviewCount) ||
+      (isInTour && currentStep === 4 && newParseReviewCount === 0 && !tourStep5Triggered.value)
 
     // 调试日志
     if (isInTour) {
@@ -171,8 +180,19 @@ async function loadPendingTasks() {
       console.log('检测到新的解析审核任务，准备触发导览步骤4', {
         oldCount: oldParseReviewCount,
         newCount: newParseReviewCount,
-        isInTour
+        isInTour,
+        currentStep
       })
+      
+      // 检查当前页面是否正确（步骤4需要在 /file 页面）
+      const currentPath = route.path
+      if (!isRouteMatchForStep(3, currentPath)) {
+        // 不在正确页面，跳转到 /file
+        ensureCorrectRoute(3, router, currentPath)
+        // 跳转后，在目标页面的 onMounted 中会再次触发
+        return
+      }
+      
       // 标记已触发，避免重复触发
       tourStep4Triggered.value = true
       // 等待DOM渲染完成
@@ -188,17 +208,18 @@ async function loadPendingTasks() {
       console.log('检测到解析审核任务完成，准备触发导览步骤5', {
         oldCount: oldParseReviewCount,
         newCount: newParseReviewCount,
-        isInTour
+        isInTour,
+        currentStep
       })
+      
+      // 步骤5可以在任何有 BaseHeader 的页面显示，不需要检查页面
       // 标记已触发，避免重复触发
       tourStep5Triggered.value = true
       // 等待DOM渲染完成
       await nextTick()
       // 延迟一点时间确保页面渲染完成
       setTimeout(() => {
-        import('../../utils/userTour').then(({ continueUserTourToStep5 }) => {
-          continueUserTourToStep5()
-        })
+        continueUserTourToStep5()
       }, 1000)
     }
   } catch (error) {
@@ -210,6 +231,16 @@ async function loadPendingTasks() {
 
 // 跳转到待办列表
 function handleGoToTasks() {
+  // 检查是否在导览步骤4
+  if (shouldResumeTour()) {
+    const progress = getTourProgress();
+    if (progress && progress.currentStep === 3) {
+      // 用户在步骤4点击"立即处理"按钮，更新进度到步骤5（索引4）
+      saveTourProgress(4);
+      sessionStorage.setItem('tour_in_progress', 'true');
+      destroyUserTour();
+    }
+  }
   router.push('/reconciliation')
   handleClose()
 }
@@ -232,8 +263,40 @@ let tourStatusInterval: ReturnType<typeof setInterval> | null = null
 let unsubscribeTaskBannerRefresh: (() => void) | null = null
 
 // 组件挂载时加载
-onMounted(() => {
+onMounted(async () => {
   loadPendingTasks()
+
+  // 检查是否需要恢复导览（步骤4或5）
+  if (shouldResumeTour()) {
+    const progress = getTourProgress()
+    if (progress) {
+      const { currentStep } = progress
+      const currentPath = route.path
+      
+      // 步骤4需要在 /file 页面
+      if (currentStep === 3) {
+        if (currentPath === '/file') {
+          // 在正确页面，等待任务出现后恢复（由 loadPendingTasks 处理）
+          // 这里先加载任务
+          await loadPendingTasks()
+        } else {
+          // 不在正确页面，跳转（路由守卫会处理）
+          router.push('/file')
+        }
+      }
+      // 步骤5可以在任何页面
+      else if (currentStep === 4) {
+        // 检查任务是否已完成（数量为0）
+        await loadPendingTasks()
+        // 如果任务已完成，立即恢复步骤5
+        if (previousParseReviewCount.value === 0) {
+          setTimeout(() => {
+            continueUserTourToStep5()
+          }, 1000)
+        }
+      }
+    }
+  }
 
   // 定期刷新（每30秒）
   refreshInterval = setInterval(() => {
@@ -256,7 +319,7 @@ onMounted(() => {
 
   // 监听导览状态变化，重置标记
   const checkTourStatus = () => {
-    const isInTour = sessionStorage.getItem('tour_in_progress') === 'true'
+    const isInTour = shouldResumeTour()
     if (!isInTour) {
       // 如果不在导览中，重置标记
       tourStep4Triggered.value = false

@@ -11,6 +11,7 @@ import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { emitTaskBannerRefresh } from '../utils/accountEvents';
+import { initTourState } from '../utils/userTour';
 
 const router = useRouter();
 const apiUrl = import.meta.env.VITE_API_URL;
@@ -39,6 +40,7 @@ onMounted(async () => {
 
         if (data.is_new_user) {
             localStorage.setItem('start_tour', 'true');
+            initTourState(); // 初始化导览状态
             // 延迟触发待办横幅刷新，确保后端完成账户和待办的创建
             setTimeout(() => {
                 emitTaskBannerRefresh();

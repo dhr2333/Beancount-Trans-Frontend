@@ -149,22 +149,24 @@
                     <el-tooltip
                         v-if="row.node_type === 'file' && (row.parse_status === 'pending' || row.parse_status === 'processing' || row.parse_status === 'parsed')"
                         :content="row.parse_status === 'parsed' ? '清除解析结果' : '取消解析'" placement="top">
-                        <el-button icon="Tickets" circle size="small" @click="cancelSingleFile(row)">
+                        <el-button icon="Tickets" circle size="small" :disabled="isTourStep2"
+                            @click="cancelSingleFile(row)">
                         </el-button>
                     </el-tooltip>
                     <el-tooltip v-else-if="row.node_type === 'file'" content="解析" placement="top">
                         <el-button icon="Tickets" circle size="small" :class="{ 'tour-parse-first-file': $index === 0 }"
-                            @click="parseSingleFile(row)">
+                            :disabled="isTourStep2" @click="parseSingleFile(row)">
                         </el-button>
                     </el-tooltip>
 
                     <el-button v-if="row.node_type === 'file'" icon="Download" circle size="small"
-                        @click="downloadFile(row.id)" />
+                        :disabled="shouldDisableDownloadAndDelete" @click="downloadFile(row.id)" />
 
                     <el-tooltip content="删除" placement="top">
                         <el-popconfirm title="将同时清除此文件的解析结果，是否继续？" @confirm="deleteItem(row)">
                             <template #reference>
-                                <el-button icon="Delete" circle size="small" />
+                                <el-button icon="Delete" circle size="small"
+                                    :disabled="shouldDisableDownloadAndDelete" />
                             </template>
                         </el-popconfirm>
                     </el-tooltip>
@@ -199,13 +201,15 @@
 
 <script setup lang="ts">
 import { Folder, Document, Plus } from '@element-plus/icons-vue'
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import axios from '../../utils/request'
 import { ElMessage } from 'element-plus'
 import type { TagProps } from 'element-plus'
 import { parse } from 'path'
-import { startUserTour, continueUserTour } from '../../utils/userTour'
+import { startUserTour, continueUserTour, shouldResumeTour, getTourProgress, resumeTourFromStep, initTourState, saveTourProgress } from '../../utils/userTour'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
+import { useRouter, useRoute } from 'vue-router'
+import { checkAndResumeTour, isRouteMatchForStep } from '../../utils/tourRecovery'
 
 
 interface FileItem {
@@ -218,6 +222,10 @@ interface FileItem {
     updated_at?: string
     created_at?: string
 }
+
+// 路由
+const router = useRouter()
+const route = useRoute()
 
 // 状态管理
 const items = ref<FileItem[]>([])
@@ -375,6 +383,70 @@ function formatFileSize(bytes: number): string {
 
 
 // 认证头部
+// 使用响应式 ref 跟踪当前导览步骤，确保步骤切换时 UI 能及时更新
+const currentTourStep = ref<number | null>(null);
+const isInTourRef = ref(false);
+
+// 检查导览状态的函数
+function checkTourState() {
+    // 检查是否在导览中
+    let inTour = false;
+    if (shouldResumeTour()) {
+        inTour = true;
+    } else {
+        const tourInProgress = sessionStorage.getItem('tour_in_progress');
+        if (tourInProgress === 'true') {
+            inTour = true;
+        } else {
+            const tourStatus = localStorage.getItem('tour_status');
+            if (tourStatus === 'in_progress') {
+                inTour = true;
+            }
+        }
+    }
+    isInTourRef.value = inTour;
+
+    // 获取当前步骤
+    if (inTour) {
+        const progress = getTourProgress();
+        currentTourStep.value = progress?.currentStep ?? null;
+    } else {
+        currentTourStep.value = null;
+    }
+}
+
+// 初始化检查
+checkTourState();
+
+// 定期检查导览状态变化（每500ms检查一次）
+let tourStateCheckInterval: ReturnType<typeof setInterval> | null = null;
+
+// 检查是否在导览中（通过多种方式检查）
+const isInTour = computed(() => {
+    return isInTourRef.value;
+});
+
+// 检查是否在导览步骤2（需要禁用所有文件操作：解析、下载、删除）
+const isTourStep2 = computed(() => {
+    if (!isInTourRef.value) {
+        return false;
+    }
+    return currentTourStep.value === 1; // 步骤2对应索引1
+});
+
+// 检查是否在导览步骤3（只禁用下载和删除，不禁用解析）
+const isTourStep3 = computed(() => {
+    if (!isInTourRef.value) {
+        return false;
+    }
+    return currentTourStep.value === 2; // 步骤3对应索引2
+});
+
+// 检查是否应该禁用下载和删除（步骤2或步骤3）
+const shouldDisableDownloadAndDelete = computed(() => {
+    return isTourStep2.value || isTourStep3.value;
+});
+
 const headers = computed(() => ({
     Authorization: `Bearer ${localStorage.getItem('access')}`
 }))
@@ -430,21 +502,85 @@ const filteredItems = computed(() => {
 onMounted(async () => {
     await loadDirectoryContent()
 
-    // 检查引导标记
-    const shouldStartTour = localStorage.getItem('start_tour');
-    if (shouldStartTour === 'true') {
-        localStorage.removeItem('start_tour'); // 立即清除标记
+    // 等待 DOM 渲染
+    await nextTick();
 
-        // 等待 DOM 渲染
-        await nextTick();
+    // 检查是否需要启动或恢复导览
+    const shouldStartTour = localStorage.getItem('start_tour');
+    const needsResume = shouldResumeTour();
+    const currentPath = route.path;
+
+    if (shouldStartTour === 'true') {
+        // 新用户首次启动导览
+        localStorage.removeItem('start_tour');
+        initTourState();
 
         // 确保文件列表已加载
         if (items.value.length > 0) {
-            startUserTour();
+            // 延迟一点确保所有元素都已渲染
+            setTimeout(() => {
+                startUserTour();
+            }, 300);
+        }
+    } else if (needsResume) {
+        // 刷新后恢复导览
+        const progress = getTourProgress();
+        if (progress) {
+            const { currentStep } = progress;
+
+            // 步骤 1-3 需要在 /file 页面
+            if (currentStep >= 0 && currentStep <= 2) {
+                if (currentPath === '/file') {
+                    // 在正确页面，恢复导览
+                    if (items.value.length > 0) {
+                        setTimeout(() => {
+                            resumeTourFromStep(currentStep);
+                        }, 300);
+                    }
+                } else {
+                    // 不在正确页面，跳转（路由守卫会处理）
+                    router.push('/file');
+                }
+            }
+            // 步骤 4 由 TaskBanner 处理，不需要在这里处理
+            // 步骤 5 可以在任何页面，由 TaskBanner 处理
         }
     }
 
     stopPolling();
+
+    // 启动定期检查导览状态（每500ms检查一次）
+    tourStateCheckInterval = setInterval(() => {
+        checkTourState();
+    }, 500);
+
+    // 监听 storage 事件，实时响应 localStorage 变化（跨标签页）
+    window.addEventListener('storage', handleStorageChange);
+
+    // 监听自定义事件，用于同标签页内的状态同步
+    window.addEventListener('tour-step-changed', handleTourStepChanged);
+})
+
+// 处理 storage 事件（跨标签页）
+function handleStorageChange(e: StorageEvent) {
+    if (e.key === 'tour_current_step' || e.key === 'tour_status' || e.key === 'tour_in_progress') {
+        checkTourState();
+    }
+}
+
+// 处理自定义事件（同标签页）
+function handleTourStepChanged() {
+    checkTourState();
+}
+
+// 组件卸载时清理
+onUnmounted(() => {
+    if (tourStateCheckInterval) {
+        clearInterval(tourStateCheckInterval);
+        tourStateCheckInterval = null;
+    }
+    window.removeEventListener('storage', handleStorageChange);
+    window.removeEventListener('tour-step-changed', handleTourStepChanged);
 })
 
 // 加载当前目录内容
@@ -591,6 +727,12 @@ async function createFolder() {
 
 // 文件下载
 async function downloadFile(fileId: string) {
+    // 检查是否在导览步骤2或步骤3，如果是则阻止下载
+    if (shouldDisableDownloadAndDelete.value) {
+        ElMessage.warning('导览进行中，请先完成导览步骤');
+        return;
+    }
+
     try {
         const response = await axios.get(`/files/${fileId}/download/`, {
             headers: headers.value,
@@ -631,6 +773,12 @@ async function downloadFile(fileId: string) {
 
 // 删除项目
 async function deleteItem(item: FileItem) {
+    // 检查是否在导览步骤2或步骤3，如果是则阻止删除
+    if (shouldDisableDownloadAndDelete.value) {
+        ElMessage.warning('导览进行中，请先完成导览步骤');
+        return;
+    }
+
     try {
         if (item.node_type === 'directory') {
             await axios.delete(`/directories/${item.id}/`, { headers: headers.value });
@@ -778,8 +926,28 @@ async function parseSingleFile(fileItem: FileItem) {
         return;
     }
 
+    // 检查是否在导览步骤2，如果是则阻止解析
+    if (isTourStep2.value) {
+        ElMessage.warning('导览进行中，请先完成当前步骤');
+        return;
+    }
+
+    // 检查是否在导览步骤三
+    const progress = getTourProgress();
+    const isStep3 = progress?.currentStep === 2; // 步骤三对应索引2
+
     // 调用解析方法，传入单个文件ID
     await submitParseTask([fileItem.id]);
+
+    // 如果在导览步骤三，解析开始后销毁导览并保存进度
+    if (isStep3) {
+        const { destroyUserTour } = await import('../../utils/userTour');
+        // 保存进度到步骤3（索引2），表示用户已点击解析，等待解析完成
+        // 解析完成后，TaskBanner 会检测到新任务并触发步骤4
+        saveTourProgress(2);
+        sessionStorage.setItem('tour_in_progress', 'true');
+        destroyUserTour();
+    }
 }
 
 async function submitParseTask(fileIds: string[]) {
@@ -887,6 +1055,12 @@ async function cancelParse(fileIds: string[]) {
 async function cancelSingleFile(fileItem: FileItem) {
     if (fileItem.node_type !== 'file') {
         ElMessage.warning('只能取消文件的解析');
+        return;
+    }
+
+    // 检查是否在导览步骤2，如果是则阻止取消解析
+    if (isTourStep2.value) {
+        ElMessage.warning('导览进行中，请先完成当前步骤');
         return;
     }
 

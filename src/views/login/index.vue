@@ -155,6 +155,7 @@ import { User, Lock, Phone, Message } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import router from '~/routers'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
+import { initTourState } from '../../utils/userTour'
 
 const apiUrl = import.meta.env.VITE_API_URL
 
@@ -436,6 +437,7 @@ const handlePhoneLoginByCode = async () => {
     // 检查是否是新用户，如果是则设置引导标记并触发待办横幅刷新
     if (res.data.is_new_user) {
       localStorage.setItem('start_tour', 'true')
+      initTourState() // 初始化导览状态
       // 延迟触发待办横幅刷新，确保后端完成账户和待办的创建
       setTimeout(() => {
         emitTaskBannerRefresh()

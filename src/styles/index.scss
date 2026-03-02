@@ -129,3 +129,16 @@ html.dark {
     width: fit-content;
   }
 }
+
+// 导览步骤三时，确保解析按钮可以点击（高于 driver.js 遮罩层）
+.tour-parse-first-file {
+  position: relative !important;
+  z-index: 10001 !important;
+  pointer-events: auto !important;
+  
+  // 确保按钮在 driver.js 遮罩层之上
+  &::before,
+  &::after {
+    pointer-events: none !important;
+  }
+}
