@@ -1,3 +1,9 @@
+## [5.9.3](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.2...5.9.3) (2026-03-05)
+
+### Bug Fixes
+
+* Add description field to account management and templates ([#56](https://github.com/dhr2333/Beancount-Trans-Frontend/issues/56)) ([94fc69e](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/94fc69e09f06ca1014d1a22f72731d656c775794))
+
 ## [5.9.2](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.1...5.9.2) (2026-02-06)
 
 ### Bug Fixes
