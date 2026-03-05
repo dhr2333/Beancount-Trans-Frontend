@@ -100,6 +100,9 @@
                                 </span>
                                 <span v-else style="color: var(--ep-text-color-secondary);">未开启</span>
                             </el-descriptions-item>
+                            <el-descriptions-item label="描述">
+                                {{ selectedAccount.description || '-' }}
+                            </el-descriptions-item>
                             <el-descriptions-item label="创建时间">
                                 {{ formatDateTime(selectedAccount.created) }}
                             </el-descriptions-item>
@@ -205,6 +208,9 @@
                 <el-form-item label="账户路径" prop="account">
                     <el-input v-model="newAccount.account" placeholder="Assets:Savings:Bank" />
                 </el-form-item>
+                <el-form-item label="描述">
+                    <el-input v-model="newAccount.description" maxlength="256" placeholder="早餐" />
+                </el-form-item>
                 <template v-if="shouldShowReconciliationCycleForNewAccount()">
                     <el-divider content-position="left">对账周期设置（可选）</el-divider>
                     <el-form-item label="周期单位">
@@ -242,6 +248,10 @@
             <el-form :model="editAccountForm" :rules="accountRules" ref="editAccountFormRef" label-width="120px">
                 <el-form-item label="账户路径" prop="account">
                     <el-input v-model="editAccountForm.account" />
+                </el-form-item>
+                <el-form-item label="描述">
+                    <el-input v-model="editAccountForm.description" maxlength="256"
+                        placeholder="早餐" />
                 </el-form-item>
                 <template v-if="shouldShowReconciliationCycle(selectedAccount)">
                     <el-divider content-position="left">对账周期设置（可选）</el-divider>
@@ -408,6 +418,7 @@ interface Account {
     modified: string
     reconciliation_cycle_unit?: string | null
     reconciliation_cycle_interval?: number | null
+    description?: string
     children?: Account[]
     mapping_count?: {
         expense: number
@@ -480,12 +491,14 @@ const activeMappingTab = ref('expense')
 // 表单数据
 const newAccount = ref({
     account: '',
+    description: '',
     reconciliation_cycle_unit: null as string | null,
     reconciliation_cycle_interval: null as number | null
 })
 
 const editAccountForm = ref({
     account: '',
+    description: '',
     reconciliation_cycle_unit: null as string | null,
     reconciliation_cycle_interval: null as number | null
 })
@@ -705,6 +718,7 @@ const updateAccountStatus = async (account: AccountOption) => {
 const showAddAccountDialog = () => {
     newAccount.value = {
         account: '',
+        description: '',
         reconciliation_cycle_unit: null,
         reconciliation_cycle_interval: null
     }
@@ -745,6 +759,7 @@ const editAccount = () => {
 
     editAccountForm.value = {
         account: selectedAccount.value.account,
+        description: selectedAccount.value.description || '',
         reconciliation_cycle_unit: selectedAccount.value.reconciliation_cycle_unit || null,
         reconciliation_cycle_interval: selectedAccount.value.reconciliation_cycle_interval || null
     }
@@ -761,10 +776,12 @@ const updateAccount = async () => {
         // 构建更新数据
         const updateData: {
             account: string
+            description?: string
             reconciliation_cycle_unit?: string | null
             reconciliation_cycle_interval?: number | null
         } = {
-            account: editAccountForm.value.account
+            account: editAccountForm.value.account,
+            description: editAccountForm.value.description || ''
         }
 
         // 如果账户应该显示对账周期，则包含这些字段；否则清除这些字段
