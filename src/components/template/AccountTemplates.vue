@@ -74,7 +74,10 @@
                                 <div class="account-items">
                                     <div v-for="item in group" :key="item.id" class="account-item">
                                         <div class="account-item-left">
-                                            <span class="account-path">{{ item.account_path }}</span>
+                                            <el-tooltip v-if="item.description" :content="item.description" placement="top">
+                                                <span class="account-path">{{ item.account_path }}</span>
+                                            </el-tooltip>
+                                            <span v-else class="account-path">{{ item.account_path }}</span>
                                             <span
                                                 v-if="item.reconciliation_cycle_unit && item.reconciliation_cycle_interval"
                                                 class="reconciliation-cycle">
@@ -178,6 +181,7 @@ interface AccountTemplateItem {
     enable: boolean
     reconciliation_cycle_unit?: string | null
     reconciliation_cycle_interval?: number | null
+    description?: string
 }
 
 interface AccountTemplate {
