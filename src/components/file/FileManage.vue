@@ -154,7 +154,7 @@
                         </el-button>
                     </el-tooltip>
                     <el-tooltip v-else-if="row.node_type === 'file'" content="解析" placement="top">
-                        <el-button icon="Tickets" circle size="small" :class="{ 'tour-parse-first-file': $index === 0 }"
+                        <el-button icon="Tickets" circle size="small" :class="{ 'tour-parse-first-file': row.node_type === 'file' && row.name === tourParseTargetFileName }"
                             :disabled="isTourStep2" @click="parseSingleFile(row)">
                         </el-button>
                     </el-tooltip>
@@ -206,7 +206,7 @@ import axios from '../../utils/request'
 import { ElMessage } from 'element-plus'
 import type { TagProps } from 'element-plus'
 import { parse } from 'path'
-import { startUserTour, continueUserTour, shouldResumeTour, getTourProgress, resumeTourFromStep, initTourState, saveTourProgress } from '../../utils/userTour'
+import { startUserTour, continueUserTour, shouldResumeTour, getTourProgress, resumeTourFromStep, initTourState, saveTourProgress, TOUR_FIRST_PARSE_FILE_NAME } from '../../utils/userTour'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 import { useRouter, useRoute } from 'vue-router'
 import { checkAndResumeTour, isRouteMatchForStep } from '../../utils/tourRecovery'
@@ -497,6 +497,12 @@ const filteredItems = computed(() => {
     return result;
 });
 
+// 导览第三步要高亮的解析按钮对应的文件名（优先 TOUR_FIRST_PARSE_FILE_NAME，否则第一个文件）
+const tourParseTargetFileName = computed(() => {
+  const fileRows = filteredItems.value.filter((item) => item.node_type === 'file');
+  const preferred = fileRows.find((f) => f.name === TOUR_FIRST_PARSE_FILE_NAME);
+  return (preferred && preferred.name) || (fileRows[0] && fileRows[0].name) || '';
+});
 
 // 初始化加载
 onMounted(async () => {

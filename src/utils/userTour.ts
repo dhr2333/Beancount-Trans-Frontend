@@ -13,6 +13,9 @@ const STORAGE_KEYS = {
   IN_PROGRESS: 'tour_in_progress' // sessionStorage
 } as const;
 
+/** 导览第三步默认引导用户解析的案例文件名，可改为 完整测试_微信.csv 以引导解析微信账单 */
+export const TOUR_FIRST_PARSE_FILE_NAME = '完整测试_支付宝.csv';
+
 // 创建引导实例
 type DriverConfig = NonNullable<Parameters<typeof driver>[0]>
 type DriverSteps = NonNullable<DriverConfig['steps']>
