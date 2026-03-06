@@ -104,8 +104,7 @@ VITE_API_BASE_URL="http://localhost:8000/api"
 
 后端提供了完整的 OpenAPI 规范，前端开发时可参考：
 
-- **Swagger UI**: [https://trans.dhr2333.cn/api/docs/](https://trans.dhr2333.cn/api/docs/)
-- **ReDoc**: [https://trans.dhr2333.cn/api/redoc/](https://trans.dhr2333.cn/api/redoc/)
+- **API 文档（ReDoc）**: [https://trans.dhr2333.cn/api/docs/](https://trans.dhr2333.cn/api/docs/)
 
 这些文档详细列出了所有可用的 API 端点、请求参数和响应格式，是前端联调的重要参考。
 
