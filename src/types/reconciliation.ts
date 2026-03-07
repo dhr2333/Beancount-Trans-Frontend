@@ -29,7 +29,8 @@ export enum TaskStatus {
   INACTIVE = 'inactive',
   PENDING = 'pending',
   COMPLETED = 'completed',
-  CANCELLED = 'cancelled'
+  CANCELLED = 'cancelled',
+  REVOKED = 'revoked'
 }
 
 /**
@@ -39,7 +40,8 @@ export const TaskStatusLabels: Record<TaskStatus, string> = {
   [TaskStatus.INACTIVE]: '未激活',
   [TaskStatus.PENDING]: '待执行',
   [TaskStatus.COMPLETED]: '已完成',
-  [TaskStatus.CANCELLED]: '已取消'
+  [TaskStatus.CANCELLED]: '已取消',
+  [TaskStatus.REVOKED]: '已撤销'
 }
 
 /**
@@ -133,4 +135,13 @@ export interface ReconciliationExecuteResponse {
  */
 export interface ScheduledTaskUpdateRequest {
   scheduled_date: string
+}
+
+/**
+ * 撤销对账响应接口
+ */
+export interface RevokeReconciliationResponse {
+  new_task_id: number
+  entries_commented: number
+  message: string
 }
