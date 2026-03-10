@@ -7,7 +7,8 @@ import type {
   ScheduledTaskUpdateRequest,
   ReconciliationStartResponse,
   ReconciliationExecuteRequest,
-  ReconciliationExecuteResponse
+  ReconciliationExecuteResponse,
+  RevokeReconciliationResponse
 } from '../types/reconciliation'
 
 const API_BASE = import.meta.env.VITE_API_URL + '/reconciliation'
@@ -80,6 +81,17 @@ export function executeReconciliation(
   data: ReconciliationExecuteRequest
 ): Promise<{ data: ReconciliationExecuteResponse }> {
   return axios.post(`${API_BASE}/tasks/${id}/execute/`, data)
+}
+
+/**
+ * 撤销对账
+ * @param id 已完成的对账任务 ID
+ * @returns 撤销结果（含新任务 ID、注释行数、提示信息）
+ */
+export function revokeReconciliation(
+  id: number
+): Promise<{ data: RevokeReconciliationResponse }> {
+  return axios.post(`${API_BASE}/tasks/${id}/revoke_reconciliation/`)
 }
 
 

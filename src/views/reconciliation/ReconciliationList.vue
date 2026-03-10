@@ -250,7 +250,7 @@ async function loadTasks() {
       task_type: filterType.value
     }
 
-    // 解析审核待办不需要 due 筛选（基于 status='pending' 直接列出）
+    // 解析审核待办不需要 due 筛选；对账待办使用 due=true
     if (filterType.value === 'reconciliation') {
       params.due = true
     }
@@ -445,9 +445,15 @@ async function handleDirectWrite(task: ScheduledTask) {
 
   .list-header {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
     margin-bottom: 24px;
+
+    .reconciliation-sub-filter {
+      flex-basis: 100%;
+    }
 
     .header-info {
       display: flex;
@@ -558,6 +564,22 @@ async function handleDirectWrite(task: ScheduledTask) {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 16px;
+  }
+
+  .date-info.completed-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+
+    .completed-date {
+      font-size: 14px;
+      color: var(--ep-text-color-secondary);
+    }
+
+    .revoke-btn {
+      margin-top: 4px;
+    }
   }
 
   .task-card {
