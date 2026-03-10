@@ -109,6 +109,13 @@ export interface ReconciliationStartResponse {
   default_currency: string | null
   is_first_reconciliation: boolean
   last_reconciliation_date: string | null
+  last_completed_task_id: number | null
+  last_reconciliation_transaction_items?: Array<{
+    account: string
+    amount?: string | null
+    is_auto?: boolean
+    date?: string | null
+  }>
 }
 
 /**

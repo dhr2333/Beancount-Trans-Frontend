@@ -20,13 +20,6 @@
             :type="filterType === 'parse_review' ? 'danger' : 'info'" class="filter-badge" />
         </el-button>
       </div>
-      <!-- 对账子筛选：待办 / 历史 -->
-      <div v-if="filterType === 'reconciliation'" class="reconciliation-sub-filter">
-        <el-radio-group v-model="reconciliationSubFilter" size="small">
-          <el-radio-button value="pending">待办</el-radio-button>
-          <el-radio-button value="completed">历史</el-radio-button>
-        </el-radio-group>
-      </div>
     </div>
 
     <!-- 待办列表：大卡片设计 -->
@@ -40,11 +33,10 @@
             </el-icon>
           </template>
           <template #description>
-            <p class="empty-text" v-if="filterType === 'reconciliation' && reconciliationSubFilter === 'pending'">所有账户都已对账完成</p>
-            <p class="empty-text" v-else-if="filterType === 'reconciliation' && reconciliationSubFilter === 'completed'">暂无对账历史记录</p>
+            <p class="empty-text" v-if="filterType === 'reconciliation'">所有账户都已对账完成</p>
             <p class="empty-text" v-else-if="filterType === 'parse_review'">暂无解析待办任务</p>
             <p class="empty-text" v-else>暂无待办任务</p>
-            <p class="empty-hint" v-if="filterType === 'reconciliation' && reconciliationSubFilter === 'pending'">在「账户管理」中设置对账周期，系统会自动创建待办任务</p>
+            <p class="empty-hint" v-if="filterType === 'reconciliation'">在「账户管理」中设置对账周期，系统会自动创建待办任务</p>
             <p class="empty-hint" v-else-if="filterType === 'parse_review'">在「文件管理」中上传并解析文件，系统会自动创建解析待办任务</p>
           </template>
         </el-empty>
@@ -54,29 +46,11 @@
       <div v-else class="tasks-grid">
         <div v-for="task in tasks" :key="task.id" class="task-card" :class="{
           'task-overdue': task.task_type === 'reconciliation' && task.scheduled_date && isOverdue(task.scheduled_date)
-        }" @click="showCompletedTask(task) ? undefined : handleStart(task)">
+        }" @click="handleStart(task)">
           <!-- 卡片主体 -->
           <div class="card-main">
-            <!-- 对账已完成：显示账户名称、完成日期和撤销按钮 -->
-            <template v-if="task.task_type === 'reconciliation' && reconciliationSubFilter === 'completed'">
-              <div class="account-name">
-                {{ task.account_name || '未知账户' }}
-              </div>
-              <div class="date-info completed-info">
-                <span class="completed-date">完成于 {{ task.completed_date || '-' }}</span>
-                <el-button
-                  type="warning"
-                  size="small"
-                  :loading="revokingTaskIds.has(task.id)"
-                  @click.stop="handleRevokeReconciliation(task)"
-                  class="revoke-btn"
-                >
-                  撤销对账
-                </el-button>
-              </div>
-            </template>
             <!-- 对账待办：显示账户名称和日期选择器 -->
-            <template v-else-if="task.task_type === 'reconciliation'">
+            <template v-if="task.task_type === 'reconciliation'">
               <div class="account-name">
                 {{ task.account_name || '未知账户' }}
               </div>
@@ -147,7 +121,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Check
 } from '@element-plus/icons-vue'
-import { getTasks, updateTask, revokeReconciliation } from '../../api/reconciliation'
+import { getTasks, updateTask } from '../../api/reconciliation'
 import { confirmWrite } from '../../api/parse-review'
 import type { ScheduledTask } from '../../types/reconciliation'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
@@ -160,9 +134,7 @@ const total = ref(0)
 const reconciliationCount = ref(0)
 const parseReviewCount = ref(0)
 const filterType = ref<'reconciliation' | 'parse_review'>('parse_review')
-const reconciliationSubFilter = ref<'pending' | 'completed'>('pending')
 const writingTaskIds = ref<Set<number>>(new Set())
-const revokingTaskIds = ref<Set<number>>(new Set())
 
 onMounted(async () => {
   // 动态注入样式，确保清除日期选择器的边框
@@ -188,17 +160,6 @@ onActivated(async () => {
 watch(filterType, () => {
   loadTasks()
 })
-
-// 监听对账子筛选变化
-watch(reconciliationSubFilter, () => {
-  loadTasks()
-})
-
-function showCompletedTask(task: ScheduledTask): boolean {
-  return filterType.value === 'reconciliation' &&
-    reconciliationSubFilter.value === 'completed' &&
-    task.status === 'completed'
-}
 
 // 动态注入样式清除日期选择器边框
 function injectDatePickerStyles() {
@@ -285,12 +246,12 @@ async function loadTasks() {
       status: string
       task_type: string
     } = {
-      status: filterType.value === 'reconciliation' ? reconciliationSubFilter.value : 'pending',
+      status: 'pending',
       task_type: filterType.value
     }
 
-    // 解析审核待办不需要 due 筛选；对账待办仅「待办」时使用 due
-    if (filterType.value === 'reconciliation' && reconciliationSubFilter.value === 'pending') {
+    // 解析审核待办不需要 due 筛选；对账待办使用 due=true
+    if (filterType.value === 'reconciliation') {
       params.due = true
     }
 
@@ -427,49 +388,6 @@ async function handleDateChange(taskId: number, newDate: string) {
     } else {
       ElMessage.error('网络错误，请稍后重试')
     }
-  }
-}
-
-// 撤销对账
-async function handleRevokeReconciliation(task: ScheduledTask) {
-  if (task.task_type !== 'reconciliation' || task.status !== 'completed') return
-  try {
-    await ElMessageBox.confirm(
-      '撤销后将作废该次对账，允许对同一日期重新对账。确定要撤销吗？',
-      '撤销对账',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-  } catch {
-    return
-  }
-
-  revokingTaskIds.value.add(task.id)
-  try {
-    const { data } = await revokeReconciliation(task.id)
-    if (data.entries_commented > 0) {
-      ElMessage.success(`已撤销并注释 ${data.entries_commented} 行`)
-    } else {
-      ElMessage.success('已撤销，可对同一日期重新对账')
-    }
-    await loadCounts()
-    await loadTasks()
-    emitTaskBannerRefresh()
-    if (data.new_task_id) {
-      router.push(`/reconciliation/${data.new_task_id}`)
-    }
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as { response?: { data?: { error?: string } } }
-      ElMessage.error(axiosError.response?.data?.error || '撤销对账失败')
-    } else {
-      ElMessage.error('网络错误，请稍后重试')
-    }
-  } finally {
-    revokingTaskIds.value.delete(task.id)
   }
 }
 

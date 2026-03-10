@@ -139,7 +139,15 @@
           <el-button type="primary" @click="handleSubmit" :loading="submitting">
             提交
           </el-button>
-          <el-button @click="$router.back()">返回</el-button>
+          <el-button
+            v-if="showRevokeButton"
+            type="warning"
+            @click="handleRevokeReconciliation"
+            :loading="revoking"
+          >
+            撤销上次对账
+          </el-button>
+          <el-button @click="handleBack">返回</el-button>
         </div>
       </div>
     </el-card>
@@ -147,11 +155,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { startReconciliation, executeReconciliation } from '../../api/reconciliation'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { startReconciliation, executeReconciliation, revokeReconciliation } from '../../api/reconciliation'
 import AccountSelector from '../../components/common/AccountSelector.vue'
+import { useReconciliationDraft } from '../../composables/useReconciliationDraft'
 import axios from '../../utils/request'
 import type {
   ReconciliationFormData,
@@ -179,6 +188,11 @@ interface AccountOption {
 const route = useRoute()
 const router = useRouter()
 
+const taskIdRef = computed(() => {
+  const id = route.params.id
+  return id != null && id !== '' ? Number(id) : null
+})
+
 const loading = ref(false)
 const submitting = ref(false)
 const accountName = ref('')
@@ -186,6 +200,8 @@ const availableCurrencies = ref<Array<{ currency: string, expected_balance: numb
 const accountTree = ref<AccountOption[]>([])
 const asOfDate = ref<string>('')  // 对账截止日期，用于限制日期选择器的最大日期
 const lastReconciliationDate = ref<string | null>(null)  // 上一次对账日期，用于限制日期选择器的最小日期
+const lastCompletedTaskId = ref<number | null>(null)  // 最近一次已完成对账任务 id，用于撤销
+const revoking = ref(false)  // 撤销请求中
 
 const formData = ref<ReconciliationFormData>({
   expectedBalance: 0,
@@ -195,10 +211,29 @@ const formData = ref<ReconciliationFormData>({
   transactionItems: [{ account: '', accountId: null, amount: undefined, date: null }]
 })
 
+const { getDraft, clearDraft, applyDraft, saveDraft } = useReconciliationDraft(taskIdRef, formData)
+
+// 移除确认框，离开时默认保存草稿后直接放行
+onBeforeRouteLeave(async (to, from, next) => {
+  saveDraft()
+  next()
+})
+
 onMounted(async () => {
   await loadReconciliationData()
   await loadAccounts()
 })
+
+// 路由 taskId 变化时（如撤销后跳转到新任务）重新加载数据，使「上次对账」与撤销按钮状态与后端一致
+watch(
+  () => route.params.id,
+  (newId, oldId) => {
+    if (newId != null && newId !== '' && String(newId) !== String(oldId)) {
+      loadReconciliationData()
+      loadAccounts()
+    }
+  }
+)
 
 async function loadReconciliationData() {
   loading.value = true
@@ -229,29 +264,75 @@ async function loadReconciliationData() {
 
     // 存储上一次对账日期（用于限制日期选择器的最小日期）
     lastReconciliationDate.value = response.data.last_reconciliation_date || null
+    lastCompletedTaskId.value = response.data.last_completed_task_id ?? null
 
-    // 根据是否首次对账设置默认账户
-    const defaultEquityAccountName = response.data.is_first_reconciliation
-      ? 'Equity:Opening-Balances'
-      : 'Equity:Adjustments'
-
-    // 确保账户树已加载
+    // 确保账户树已加载（预填差额分配时需要按 account 匹配 accountId）
     if (accountTree.value.length === 0) {
       await loadAccounts()
     }
 
-    // 查找默认账户
-    const defaultAccount = findAccountByName(accountTree.value, defaultEquityAccountName)
+    const prefilled = response.data.last_reconciliation_transaction_items
+    const hasPrefilled = prefilled && Array.isArray(prefilled) && prefilled.length > 0
 
-    // 设置第一个差额分配条目的默认账户
-    if (formData.value.transactionItems.length > 0 && defaultAccount) {
-      formData.value.transactionItems[0].account = defaultAccount.account
-      formData.value.transactionItems[0].accountId = defaultAccount.id
-      formData.value.transactionItems[0].date = null  // 初始化日期字段
-    } else if (formData.value.transactionItems.length > 0) {
-      // 如果找不到账户，至少设置账户名称，AccountSelector 可能会自动匹配
-      formData.value.transactionItems[0].account = defaultEquityAccountName
-      formData.value.transactionItems[0].date = null  // 初始化日期字段
+    const draft = getDraft()
+    const hasSubstantialDraft =
+      draft &&
+      (draft.actualBalance != null ||
+        (draft.transactionItems &&
+          draft.transactionItems.some(
+            (i: { account?: string; amount?: number | null }) =>
+              (i.account && i.account.trim()) || i.amount != null
+          )))
+
+    // 本地草稿与服务端预填协作：有草稿时恢复草稿，有预填时将撤销后的差额分配合并进表单（并随 watch 写入草稿）
+    if (hasSubstantialDraft) {
+      applyDraft(draft!)
+    }
+    if (hasPrefilled) {
+      const prefilledMapped = prefilled.map((item: { account: string; amount?: string | null; is_auto?: boolean; date?: string | null }) => {
+        const acc = findAccountByName(accountTree.value, item.account)
+        return {
+          account: item.account,
+          accountId: acc ? acc.id : null,
+          amount: item.amount != null ? parseFloat(item.amount) : undefined,
+          date: item.date || null
+        }
+      })
+      const appendPrefilledFlag = `reconciliation_append_prefilled_${taskId}`
+      const shouldAppendPrefilled = hasSubstantialDraft && sessionStorage.getItem(appendPrefilledFlag) !== null
+      if (shouldAppendPrefilled) {
+        // 仅当点击撤销对账后首次加载时，将预填条目追加到现有草稿
+        formData.value.transactionItems = [...formData.value.transactionItems, ...prefilledMapped]
+        try {
+          sessionStorage.removeItem(appendPrefilledFlag)
+        } catch {
+          /* ignore */
+        }
+      } else if (!hasSubstantialDraft) {
+        // 无草稿时，使用预填作为差额分配
+        formData.value.transactionItems = prefilledMapped
+      }
+    }
+    if (hasSubstantialDraft) {
+      clearDraft()
+    }
+
+    if (!hasSubstantialDraft && !hasPrefilled) {
+      // 无草稿且无预填时，根据是否首次对账设置默认账户
+      const defaultEquityAccountName = response.data.is_first_reconciliation
+        ? 'Equity:Opening-Balances'
+        : 'Equity:Adjustments'
+
+      const defaultAccount = findAccountByName(accountTree.value, defaultEquityAccountName)
+
+      if (formData.value.transactionItems.length > 0 && defaultAccount) {
+        formData.value.transactionItems[0].account = defaultAccount.account
+        formData.value.transactionItems[0].accountId = defaultAccount.id
+        formData.value.transactionItems[0].date = null
+      } else if (formData.value.transactionItems.length > 0) {
+        formData.value.transactionItems[0].account = defaultEquityAccountName
+        formData.value.transactionItems[0].date = null
+      }
     }
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
@@ -382,6 +463,27 @@ function getMinDate(): Date | undefined {
   lastDate.setDate(lastDate.getDate() + 1)  // 下一天
   return lastDate
 }
+
+// 当前表单对应的 as_of_date（与提交逻辑一致，用于撤销按钮显示条件）
+const computedAsOfDate = computed(() => {
+  const today = new Date()
+  if (formData.value.reconciliationTiming === 'start_of_next_day') {
+    const d = new Date(today)
+    d.setDate(d.getDate() - 1)
+    return d.toISOString().split('T')[0]
+  }
+  return today.toISOString().split('T')[0]
+})
+
+// 仅当「as_of_date 与上次相同」或「某条差额分配日期 ≤ 上次对账日期」时显示撤销按钮
+const showRevokeButton = computed(() => {
+  if (!lastReconciliationDate.value || lastCompletedTaskId.value == null) return false
+  const last = lastReconciliationDate.value
+  if (computedAsOfDate.value === last) return true
+  return formData.value.transactionItems.some(
+    (item: TransactionItem) => item.date && item.date <= last
+  )
+})
 
 const validationErrors = computed(() => {
   const errors: string[] = []
@@ -530,7 +632,7 @@ async function handleSubmit() {
       currentAsOfDate.setHours(0, 0, 0, 0)
 
       if (currentAsOfDate.getTime() === lastDate.getTime()) {
-        ElMessage.error(`该账户已有 ${asOfDateStr} 的对账记录，不允许重复对账同一日期`)
+        ElMessage.error(`该账户已有 ${asOfDateStr} 的对账记录，不允许重复对账同一日期。若需重做该日对账，请点击「撤销上一次对账」后再提交。`)
         submitting.value = false
         return
       } else if (currentAsOfDate < lastDate) {
@@ -547,6 +649,7 @@ async function handleSubmit() {
       as_of_date: asOfDateStr
     })
 
+    clearDraft()
     ElMessage.success('对账完成')
     router.push('/reconciliation')
   } catch (error: unknown) {
@@ -614,6 +717,59 @@ async function handleSubmit() {
   } finally {
     submitting.value = false
   }
+}
+
+async function handleRevokeReconciliation() {
+  const taskId = lastCompletedTaskId.value
+  if (taskId == null) return
+  try {
+    await ElMessageBox.confirm(
+      '撤销后将作废上次对账，仅适用于上次对账金额或条目错误的情况。确定要撤销吗？',
+      '撤销对账',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  revoking.value = true
+  try {
+    const { data } = await revokeReconciliation(taskId)
+    if (data.entries_commented > 0) {
+      ElMessage.success(`已撤销并注释 ${data.entries_commented} 行`)
+    } else {
+      ElMessage.success('已撤销，可对同一日期重新对账')
+    }
+    const currentId = route.params.id != null && route.params.id !== '' ? Number(route.params.id) : null
+    if (data.new_task_id) {
+      // 标记「撤销后首次加载」时需将预填追加到草稿，避免每次打开表单都追加
+      try {
+        sessionStorage.setItem(`reconciliation_append_prefilled_${data.new_task_id}`, '1')
+      } catch {
+        /* ignore */
+      }
+      if (data.new_task_id === currentId) {
+        // 仍为当前任务（后端更新了该待办），重新拉取 start 数据以更新「上次对账」与撤销按钮
+        await loadReconciliationData()
+      } else {
+        router.push(`/reconciliation/${data.new_task_id}`)
+      }
+    } else {
+      router.push('/reconciliation')
+    }
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { data?: { error?: string } } }
+      ElMessage.error(axiosError.response?.data?.error || '撤销对账失败')
+    } else {
+      ElMessage.error('网络错误，请稍后重试')
+    }
+  } finally {
+    revoking.value = false
+  }
+}
+
+function handleBack() {
+  router.back()
 }
 </script>
 
