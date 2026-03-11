@@ -150,7 +150,16 @@
 
             <el-table-column prop="status" label="状态">
                 <template #default="{ row }">
-                    <el-tag :type="getStatusColor(row.parse_status || row.status)">
+                    <el-tooltip
+                        v-if="row.node_type === 'file' && (row.parse_status === 'failed' || row.parse_status === 'needs_password') && (row.error_message || row.parse_status === 'needs_password')"
+                        :content="row.error_message || (row.parse_status === 'needs_password' ? '该文件已加密，请点击解析后输入密码重试' : '')"
+                        placement="top"
+                    >
+                        <el-tag :type="getStatusColor(row.parse_status || row.status)">
+                            {{ translateStatus(row.parse_status || row.status) }}
+                        </el-tag>
+                    </el-tooltip>
+                    <el-tag v-else :type="getStatusColor(row.parse_status || row.status)">
                         {{ translateStatus(row.parse_status || row.status) }}
                     </el-tag>
                 </template>
@@ -251,6 +260,7 @@ interface FileItem {
     name: string
     node_type: 'file' | 'directory'
     parse_status?: string
+    error_message?: string
     size_display?: string
     uploaded_at?: string
     updated_at?: string
@@ -672,6 +682,7 @@ async function loadDirectoryContent() {
                 node_type: 'file',
                 size: file.size,
                 parse_status: file.parse_status,
+                error_message: file.error_message,
                 size_display: formatFileSize(file.size),
                 uploaded_at: file.uploaded_at,
                 content_type: file.content_type
@@ -913,8 +924,9 @@ async function performGlobalSearch(query: string) {
                 size_display: formatFileSize(file.size),
                 uploaded_at: file.uploaded_at,
                 content_type: file.content_type,
-                parse_status: file.parse_status, // 添加解析状态
-                path: file.directory_name // 添加路径信息
+                parse_status: file.parse_status,
+                error_message: file.error_message,
+                path: file.directory_name
             }))
         ];
     } catch (error) {
