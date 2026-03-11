@@ -80,17 +80,30 @@
                 <el-table-column prop="file_name" label="文件名" />
                 <el-table-column prop="status" label="状态" width="100">
                     <template #default="{ row }">
-                        <el-tag :type="statusTagType(row.status)">
+                        <el-tooltip v-if="row.status === 'failed' && row.error" :content="row.error" placement="top">
+                            <el-tag :type="statusTagType(row.status)">
+                                {{ translateStatus(row.status) }}
+                            </el-tag>
+                        </el-tooltip>
+                        <el-tag v-else :type="statusTagType(row.status)">
                             {{ translateStatus(row.status) }}
                         </el-tag>
                     </template>
                 </el-table-column>
-                <el-table-column label="操作" width="100">
+                <el-table-column label="操作" width="120">
                     <template #default="{ row }">
+                        <el-tooltip v-if="row.status === 'failed' && row.error" :content="row.error" placement="top">
+                            <span class="parse-failed-hint">解析失败</span>
+                        </el-tooltip>
                         <el-button
-                            v-if="row.status === 'pending' || row.status === 'processing' || row.status === 'parsed'"
+                            v-else-if="row.status === 'pending' || row.status === 'processing' || row.status === 'parsed'"
                             size="small" type="warning" @click="cancelParse([row.file_id])">
                             取消
+                        </el-button>
+                        <el-button
+                            v-else-if="row.status === 'needs_password'"
+                            size="small" type="primary" @click="handleNeedsPassword(row)">
+                            输入密码
                         </el-button>
                     </template>
                 </el-table-column>
@@ -196,11 +209,32 @@
                 </div>
             </el-form>
         </el-dialog>
+
+        <!-- 密码输入对话框 -->
+        <el-dialog v-model="passwordDialogVisible" title="输入解密密码" width="450px" :close-on-click-modal="false">
+            <div class="password-dialog-content">
+                <p class="password-dialog-tip" v-if="passwordForm.length > 1">您选择了多个文件，请为加密文件提供密码（未加密的文件留空即可）。</p>
+                <p class="password-dialog-tip" v-else>如果文件被加密（如PDF或ZIP），请提供密码，否则留空。</p>
+                <el-form label-position="top">
+                    <el-form-item v-for="(file, index) in passwordForm" :key="file.id" :label="file.name">
+                        <el-input v-model="file.password" type="password" placeholder="密码（选填）" show-password>
+                            <template #prefix>
+                                <el-icon><Lock /></el-icon>
+                            </template>
+                        </el-input>
+                    </el-form-item>
+                </el-form>
+            </div>
+            <template #footer>
+                <el-button @click="passwordDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="confirmParseWithPassword">确认解析</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
 <script setup lang="ts">
-import { Folder, Document, Plus } from '@element-plus/icons-vue'
+import { Folder, Document, Plus, Lock } from '@element-plus/icons-vue'
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import axios from '../../utils/request'
 import { ElMessage } from 'element-plus'
@@ -248,6 +282,10 @@ const globalSearchResults = ref<FileItem[]>([]);
 const uploadTrigger = ref<HTMLButtonElement | null>(null)
 const selectedStatusFilter = ref<string | null>(null)
 
+// 密码弹窗相关状态
+const passwordDialogVisible = ref(false)
+const passwordForm = ref<{ id: string; name: string; password: string }[]>([])
+
 // 状态筛选选项配置
 const statusFilterOptions = [
     { value: null, label: '全部状态' },
@@ -256,6 +294,7 @@ const statusFilterOptions = [
     { value: 'processing', label: '解析中' },
     { value: 'parsed', label: '已解析' },
     { value: 'failed', label: '解析失败' },
+    { value: 'needs_password', label: '需要密码' },
     { value: 'cancelled', label: '取消解析' }
 ]
 
@@ -938,12 +977,57 @@ async function parseSingleFile(fileItem: FileItem) {
         return;
     }
 
-    // 检查是否在导览步骤三
+    // 调用解析方法，传入单个文件ID，直接解析（不弹窗）
+    await submitParseTask([fileItem.id]);
+
+    // 如果在导览步骤三，解析开始后销毁导览并保存进度
     const progress = getTourProgress();
     const isStep3 = progress?.currentStep === 2; // 步骤三对应索引2
+    if (isStep3) {
+        const { destroyUserTour } = await import('../../utils/userTour');
+        // 保存进度到步骤3（索引2），表示用户已点击解析，等待解析完成
+        // 解析完成后，TaskBanner 会检测到新任务并触发步骤4
+        saveTourProgress(2);
+        sessionStorage.setItem('tour_in_progress', 'true');
+        destroyUserTour();
+    }
+}
 
-    // 调用解析方法，传入单个文件ID
-    await submitParseTask([fileItem.id]);
+// 批量解析方法
+async function batchParse() {
+    // 只筛选文件类型
+    const selectedFiles = selectedItems.value.filter(item => item.node_type === 'file');
+
+    if (selectedFiles.length === 0) {
+        ElMessage.warning('请选择至少一个文件进行解析');
+        return;
+    }
+
+    // 直接调用共用的解析方法（不弹窗）
+    await submitParseTask(selectedFiles.map(file => file.id));
+}
+
+// 处理单个文件的密码补填（由任务详情表单中的“输入密码”按钮触发）
+function handleNeedsPassword(row: any) {
+    passwordForm.value = [{ id: row.file_id, name: row.file_name, password: '' }];
+    passwordDialogVisible.value = true;
+}
+
+// 确认解析（带密码）
+async function confirmParseWithPassword() {
+    passwordDialogVisible.value = false;
+    
+    const fileIds = passwordForm.value.map(item => item.id);
+    const passwords: Record<string, string> = {};
+    passwordForm.value.forEach(item => {
+        if (item.password) {
+            passwords[item.id] = item.password;
+        }
+    });
+
+    const isStep3 = getTourProgress()?.currentStep === 2;
+
+    await submitParseTask(fileIds, passwords);
 
     // 如果在导览步骤三，解析开始后销毁导览并保存进度
     if (isStep3) {
@@ -956,11 +1040,14 @@ async function parseSingleFile(fileItem: FileItem) {
     }
 }
 
-async function submitParseTask(fileIds: string[]) {
+async function submitParseTask(fileIds: string[], passwords?: Record<string, string>) {
     try {
-        const response = await axios.post('/translate/multi', {
-            file_ids: fileIds
-        }, { headers: headers.value });
+        const payload: any = { file_ids: fileIds };
+        if (passwords && Object.keys(passwords).length > 0) {
+            payload.passwords = passwords;
+        }
+
+        const response = await axios.post('/translate/multi', payload, { headers: headers.value });
 
         // 处理任务状态（保持原有逻辑）
         if (response.status === 202) {
@@ -998,20 +1085,6 @@ async function submitParseTask(fileIds: string[]) {
         }
         console.error(error);
     }
-}
-
-// 批量解析方法
-async function batchParse() {
-    // 只筛选文件类型
-    const selectedFiles = selectedItems.value.filter(item => item.node_type === 'file');
-
-    if (selectedFiles.length === 0) {
-        ElMessage.warning('请选择至少一个文件进行解析');
-        return;
-    }
-
-    // 调用共用的解析方法
-    await submitParseTask(selectedFiles.map(file => file.id));
 }
 
 // 批量取消解析
@@ -1113,7 +1186,7 @@ function startPollingTaskStatus() {
                     if (newStatus === 'parsed' || newStatus === 'failed' || newStatus === 'cancelled' || newStatus === 'pending_review') {
                         completedTasks.value++;
                     }
-                    return { ...task, status: newStatus };
+                    return { ...task, status: newStatus, error: taskStatus.error ?? task.error };
                 }
                 return task;
             });
@@ -1170,6 +1243,8 @@ function statusTagType(status: string): TagProps['type'] {
             return 'warning'
         case 'cancelled':
             return 'info'
+        case 'needs_password':
+            return 'warning'
         default:
             return 'info' // 其他状态
     }
@@ -1186,7 +1261,8 @@ function translateStatus(status: string | undefined): string {
         'parsed': '已解析',
         'failed': '解析失败',
         'cancelled': '取消解析',
-        'pending_review': '待审核'
+        'pending_review': '待审核',
+        'needs_password': '需要密码'
     };
     return statusMap[status] || status;
 }
@@ -1200,7 +1276,8 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
         processing: 'warning',
         parsed: 'success',
         failed: 'danger',
-        cancelled: 'info'
+        cancelled: 'info',
+        needs_password: 'warning'
     }
 
     return statusMap[status] || 'info'
@@ -1300,5 +1377,11 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
 .task-info {
     margin: 15px 0;
     line-height: 1.8;
+}
+
+.parse-failed-hint {
+    font-size: 12px;
+    color: var(--ep-text-color-secondary);
+    cursor: default;
 }
 </style>

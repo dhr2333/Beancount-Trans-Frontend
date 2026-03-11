@@ -1,6 +1,6 @@
 <template>
   <el-upload class="upload-demo" :drag="true" :action=action method="POST" :data="getUploadData" :multiple="false"
-    :headers=headers accept=".csv,.pdf,.xls,.xlsx" show-file-list name="trans" @success="handleUploadSuccess"
+    :headers=headers accept=".csv,.pdf,.xls,.xlsx,.zip" show-file-list name="trans" @success="handleUploadSuccess"
     @error="handleUploadError" @change="handleChange">
     <div class="el-upload__text">
       <el-icon class="el-icon--upload"><upload-filled /></el-icon>
@@ -29,7 +29,7 @@
           <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
         <el-input v-model="input" style="width: 250px" type="password" v-if="showPassword"
-          placeholder="输入PDF文件解密密码后再上传文件" show-password>
+          placeholder="PDF/ZIP 文件解密密码" show-password>
           <template #prefix>
             <el-icon>
               <Lock />
@@ -260,20 +260,28 @@ const handleChange = (uploadFile: UploadFile, _uploadFiles: UploadFiles) => {
 };
 
 const handleUploadError = (err: any, file: any) => {
-  if (JSON.parse(err.message).error === "PDF解密失败") {
-    ElMessage.error("PDF解密失败");
+  let errMsg = '';
+  try {
+    const parsed = JSON.parse(err.message);
+    errMsg = parsed?.error || parsed?.message || '';
+  } catch {
+    errMsg = err?.message || '';
   }
-  else if (JSON.parse(err.message).error === "当前账单不支持") {
-    ElMessage.error("当前账单不支持");
+  
+  if (errMsg.includes("PDF解密失败") || errMsg.includes("ZIP 解密失败") || errMsg.includes("解密失败")) {
+    ElMessage.error(errMsg || "解密失败，请检查口令");
   }
-  else if (JSON.parse(err.message).error === "使用DeepSeek模型需要API密钥") {
+  else if (errMsg === "当前账单不支持" || errMsg.includes("Unsupported")) {
+    ElMessage.error("当前账单不支持或文件损坏");
+  }
+  else if (errMsg === "使用DeepSeek模型需要API密钥") {
     ElMessage.error("使用DeepSeek模型需要API密钥");
   }
-  else if (JSON.parse(err.message).error === "DeepSeek调用失败，请检查API密钥是否正确") {
+  else if (errMsg === "DeepSeek调用失败，请检查API密钥是否正确") {
     ElMessage.error("DeepSeek调用失败，请检查API密钥是否正确");
   }
   else {
-    ElMessage.error("未知错误：" + err.message);
+    ElMessage.error(errMsg || "未知错误");
   }
 };
 
