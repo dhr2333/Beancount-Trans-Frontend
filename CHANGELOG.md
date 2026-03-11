@@ -1,3 +1,9 @@
+## [5.9.5](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.4...5.9.5) (2026-03-11)
+
+### Bug Fixes
+
+* Enhance ReconciliationForm with first reconciliation tag and improved timing selection ([29f1aea](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/29f1aea33213a9ed9e6dc13f392cc80d72442b91))
+
 ## [5.9.4](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.3...5.9.4) (2026-03-11)
 
 ### Bug Fixes
