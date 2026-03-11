@@ -4,7 +4,12 @@
       <template #header>
         <div class="card-header">
           <div class="header-content">
-            <span class="header-title">对账</span>
+            <div class="header-title-wrapper">
+              <span class="header-title">对账</span>
+              <el-tag v-if="isFirstReconciliation" type="success" size="small" effect="light">
+                首次对账
+              </el-tag>
+            </div>
             <span class="header-account">{{ accountName }}</span>
           </div>
         </div>
@@ -21,10 +26,28 @@
           </el-form-item>
 
           <el-form-item label="对账时间点">
-            <el-radio-group v-model="formData.reconciliationTiming">
-              <el-radio label="end_of_day">当天最后一笔交易后</el-radio>
-              <el-radio label="start_of_next_day">第二天第一笔交易前</el-radio>
-            </el-radio-group>
+            <div class="timing-selector">
+              <el-radio-group v-model="formData.reconciliationTiming">
+                <el-radio label="end_of_day">当天最后一笔交易后</el-radio>
+                <el-radio label="start_of_next_day">第二天第一笔交易前</el-radio>
+              </el-radio-group>
+              <!-- <el-alert
+                v-if="formData.reconciliationTiming === 'end_of_day'"
+                type="info"
+                :closable="false"
+                class="timing-alert"
+              >
+                <strong>输入的余额包含今天发生的所有交易</strong>
+              </el-alert> -->
+              <!-- <el-alert
+                v-if="formData.reconciliationTiming === 'start_of_next_day'"
+                type="info"
+                :closable="false"
+                class="timing-alert"
+              >
+                <strong>输入的余额仅截止到昨天，不包含今天的任何交易</strong>
+              </el-alert> -->
+            </div>
           </el-form-item>
 
           <!-- 余额对比区（核心） -->
@@ -67,71 +90,89 @@
           <el-divider content-position="left">
             <span class="section-title">差额分配</span>
           </el-divider>
-          <el-table :data="formData.transactionItems" border class="allocation-table">
-            <el-table-column label="账户" min-width="300">
-              <template #default="{ row }">
-                <AccountSelector v-model="row.accountId" placeholder="选择账户" :show-details="false"
-                  @change="(account) => handleAccountChange(row, account)" />
-              </template>
-            </el-table-column>
-            <el-table-column label="金额" min-width="200">
-              <template #default="{ row }">
-                <el-input-number v-model="row.amount" :controls="false" :precision="2" placeholder="留空自动分配剩余金额"
-                  style="width: 100%" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="180" align="center">
-              <template #default="{ row, $index }">
-                <div class="action-cell">
-                  <!-- 日期选择器（仅当金额有值时显示） -->
-                  <div v-if="row.amount !== undefined && row.amount !== null" class="date-picker-wrapper">
-                    <el-date-picker v-model="row.date" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD"
-                      :clearable="true" placeholder="默认为对账日期" :max-date="asOfDate ? new Date(asOfDate) : undefined"
-                      :min-date="getMinDate()" class="no-border-date-picker" placement="bottom-start" :teleported="true"
-                      :popper-options="{
-                        modifiers: [
-                          {
-                            name: 'offset',
-                            options: {
-                              offset: [0, 4]
-                            }
-                          },
-                          {
-                            name: 'preventOverflow',
-                            options: {
-                              boundary: 'viewport',
-                              padding: 8
-                            }
-                          },
-                          {
-                            name: 'computeStyles',
-                            options: {
-                              adaptive: true,
-                              roundOffsets: true
-                            }
-                          }
-                        ]
-                      }" />
+          <template v-if="!showAdvancedAllocation">
+            <el-alert type="success" :closable="false" :show-icon="false" class="first-reconciliation-alert">
+              <template #title>
+                <div class="alert-title-flex">
+                  <div class="alert-text-lines">
+                    <p>💡 系统检测到这是该账户的首次对账。</p>
+                    <p>您只需根据实际「对账时间点」输入上方的「实际余额」即可，</p>
+                    <p>系统会自动将差额记录为期初余额 (<code>Equity:Opening-Balances</code>)。</p>
                   </div>
-                  <!-- 删除按钮 -->
-                  <el-button type="danger" size="small" text :disabled="formData.transactionItems.length === 1"
-                    @click="removeItem($index)">
-                    删除
+                  <el-button type="primary" link @click="showAdvancedAllocation = true">
+                    自定义分配 (高级)
                   </el-button>
                 </div>
               </template>
-            </el-table-column>
-          </el-table>
-          <div class="allocation-actions">
-            <el-button type="primary" plain @click="addItem">
-              + 添加账户
-            </el-button>
-          </div>
-          <div v-if="validationErrors.length > 0" class="validation-errors">
-            <p v-for="(error, i) in validationErrors" :key="i" class="error">
-              {{ error }}
-            </p>
-          </div>
+            </el-alert>
+          </template>
+          <template v-else>
+            <el-table :data="formData.transactionItems" border class="allocation-table">
+              <el-table-column label="账户" min-width="300">
+                <template #default="{ row }">
+                  <AccountSelector v-model="row.accountId" placeholder="选择账户" :show-details="false"
+                    @change="(account) => handleAccountChange(row, account)" />
+                </template>
+              </el-table-column>
+              <el-table-column label="金额" min-width="200">
+                <template #default="{ row }">
+                  <el-input-number v-model="row.amount" :controls="false" :precision="2" placeholder="留空自动分配剩余金额"
+                    style="width: 100%" />
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="180" align="center">
+                <template #default="{ row, $index }">
+                  <div class="action-cell">
+                    <!-- 日期选择器（仅当金额有值时显示） -->
+                    <div v-if="row.amount !== undefined && row.amount !== null" class="date-picker-wrapper">
+                      <el-date-picker v-model="row.date" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD"
+                        :clearable="true" placeholder="默认为对账日期" :max-date="asOfDate ? new Date(asOfDate) : undefined"
+                        :min-date="getMinDate()" class="no-border-date-picker" placement="bottom-start"
+                        :teleported="true" :popper-options="{
+                          modifiers: [
+                            {
+                              name: 'offset',
+                              options: {
+                                offset: [0, 4]
+                              }
+                            },
+                            {
+                              name: 'preventOverflow',
+                              options: {
+                                boundary: 'viewport',
+                                padding: 8
+                              }
+                            },
+                            {
+                              name: 'computeStyles',
+                              options: {
+                                adaptive: true,
+                                roundOffsets: true
+                              }
+                            }
+                          ]
+                        }" />
+                    </div>
+                    <!-- 删除按钮 -->
+                    <el-button type="danger" size="small" text :disabled="formData.transactionItems.length === 1"
+                      @click="removeItem($index)">
+                      删除
+                    </el-button>
+                  </div>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="allocation-actions">
+              <el-button type="primary" plain @click="addItem">
+                + 添加账户
+              </el-button>
+            </div>
+            <div v-if="validationErrors.length > 0" class="validation-errors">
+              <p v-for="(error, i) in validationErrors" :key="i" class="error">
+                {{ error }}
+              </p>
+            </div>
+          </template>
         </div>
 
         <!-- 操作按钮区 -->
@@ -139,12 +180,7 @@
           <el-button type="primary" @click="handleSubmit" :loading="submitting">
             提交
           </el-button>
-          <el-button
-            v-if="showRevokeButton"
-            type="warning"
-            @click="handleRevokeReconciliation"
-            :loading="revoking"
-          >
+          <el-button v-if="showRevokeButton" type="warning" @click="handleRevokeReconciliation" :loading="revoking">
             撤销上次对账
           </el-button>
           <el-button @click="handleBack">返回</el-button>
@@ -203,6 +239,9 @@ const lastReconciliationDate = ref<string | null>(null)  // 上一次对账日�
 const lastCompletedTaskId = ref<number | null>(null)  // 最近一次已完成对账任务 id，用于撤销
 const revoking = ref(false)  // 撤销请求中
 
+const isFirstReconciliation = ref(false) // 是否为该账户首次对账
+const showAdvancedAllocation = ref(true) // 是否展开高级分配表单
+
 const formData = ref<ReconciliationFormData>({
   expectedBalance: 0,
   actualBalance: undefined,
@@ -258,6 +297,14 @@ async function loadReconciliationData() {
     formData.value.expectedBalance = balanceInfo?.expected_balance || 0
 
     accountName.value = response.data.account_name
+
+    isFirstReconciliation.value = response.data.is_first_reconciliation
+    // 首次对账默认折叠高级分配表单
+    if (isFirstReconciliation.value) {
+      showAdvancedAllocation.value = false
+    } else {
+      showAdvancedAllocation.value = true
+    }
 
     // 存储 as_of_date（用于限制日期选择器的最大日期）
     asOfDate.value = response.data.as_of_date
@@ -792,6 +839,12 @@ function handleBack() {
       flex-direction: column;
       gap: 8px;
 
+      .header-title-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
       .header-title {
         font-size: 16px;
         font-weight: 600;
@@ -818,6 +871,24 @@ function handleBack() {
   .desktop-form {
     :deep(.el-form-item) {
       margin-bottom: 22px;
+    }
+
+    .timing-selector {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      width: 100%;
+
+      .timing-alert {
+        padding: 6px 12px;
+        margin-top: 4px;
+        max-width: 400px;
+
+        :deep(.el-alert__content) {
+          padding: 0;
+        }
+      }
     }
   }
 
@@ -908,6 +979,53 @@ function handleBack() {
       font-size: 15px;
       font-weight: 600;
       color: var(--ep-text-color-primary);
+    }
+
+    .first-reconciliation-alert {
+      margin-bottom: 16px;
+      width: 100%;
+      box-sizing: border-box;
+
+      :deep(.el-alert__content) {
+        padding-left: 0;
+        padding-right: 0;
+        width: 100%;
+        text-align: left;
+      }
+
+      :deep(.el-alert__title) {
+        width: 100%;
+      }
+
+      .alert-title-flex {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        font-size: 14px;
+        line-height: 1.5;
+        text-align: left;
+
+        .alert-text-lines {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          text-align: left;
+          min-width: 0;
+
+          p {
+            margin: 0;
+          }
+        }
+
+        code {
+          background-color: var(--ep-fill-color);
+          padding: 2px 4px;
+          border-radius: 4px;
+          font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+        }
+      }
     }
 
     .allocation-table {
