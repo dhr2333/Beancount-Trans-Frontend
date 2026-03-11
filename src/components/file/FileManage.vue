@@ -80,15 +80,23 @@
                 <el-table-column prop="file_name" label="文件名" />
                 <el-table-column prop="status" label="状态" width="100">
                     <template #default="{ row }">
-                        <el-tag :type="statusTagType(row.status)">
+                        <el-tooltip v-if="row.status === 'failed' && row.error" :content="row.error" placement="top">
+                            <el-tag :type="statusTagType(row.status)">
+                                {{ translateStatus(row.status) }}
+                            </el-tag>
+                        </el-tooltip>
+                        <el-tag v-else :type="statusTagType(row.status)">
                             {{ translateStatus(row.status) }}
                         </el-tag>
                     </template>
                 </el-table-column>
-                <el-table-column label="操作" width="100">
+                <el-table-column label="操作" width="120">
                     <template #default="{ row }">
+                        <el-tooltip v-if="row.status === 'failed' && row.error" :content="row.error" placement="top">
+                            <span class="parse-failed-hint">解析失败</span>
+                        </el-tooltip>
                         <el-button
-                            v-if="row.status === 'pending' || row.status === 'processing' || row.status === 'parsed'"
+                            v-else-if="row.status === 'pending' || row.status === 'processing' || row.status === 'parsed'"
                             size="small" type="warning" @click="cancelParse([row.file_id])">
                             取消
                         </el-button>
@@ -1178,7 +1186,7 @@ function startPollingTaskStatus() {
                     if (newStatus === 'parsed' || newStatus === 'failed' || newStatus === 'cancelled' || newStatus === 'pending_review') {
                         completedTasks.value++;
                     }
-                    return { ...task, status: newStatus };
+                    return { ...task, status: newStatus, error: taskStatus.error ?? task.error };
                 }
                 return task;
             });
@@ -1369,5 +1377,11 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
 .task-info {
     margin: 15px 0;
     line-height: 1.8;
+}
+
+.parse-failed-hint {
+    font-size: 12px;
+    color: var(--ep-text-color-secondary);
+    cursor: default;
 }
 </style>
