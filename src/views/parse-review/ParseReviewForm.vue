@@ -58,10 +58,16 @@
                       ({{ candidate.score }})
                     </span>
                   </el-tag>
+                  <el-button size="small" plain @click="handleOpenMappingDialog(scope.row)" class="add-mapping-btn">
+                    <el-icon><Plus /></el-icon> 新增映射
+                  </el-button>
                 </div>
               </div>
               <div v-else class="candidates">
                 <span class="label muted">无候选分类</span>
+                <el-button size="small" plain @click="handleOpenMappingDialog(scope.row)" class="add-mapping-btn">
+                  <el-icon><Plus /></el-icon> 新增映射
+                </el-button>
               </div>
             </div>
           </template>
@@ -94,13 +100,38 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 内联新增映射对话框 -->
+    <el-dialog v-model="mappingDialog.visible" title="新增映射" width="500px">
+      <el-form :model="mappingForm" :rules="mappingRules" ref="mappingFormRef" label-width="100px">
+        <el-form-item label="关键字" prop="key">
+          <el-input v-model="mappingForm.key" placeholder="请输入关键字" />
+        </el-form-item>
+        <el-form-item label="映射账户" prop="accountId">
+          <AccountSelector v-model="mappingForm.accountId" 
+            placeholder="请选择映射账户" />
+        </el-form-item>
+        <el-form-item :label="mappingForm.type === 'expense' ? '收款方' : '付款方'" prop="party">
+          <el-input v-model="mappingForm.party" :placeholder="mappingForm.type === 'expense' ? '选填：收款方信息' : '选填：付款方信息'" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="mappingDialog.visible = false">取消</el-button>
+        <el-button type="primary" @click="handleMappingSubmit" :loading="mappingDialog.loading">
+          保存并重解析
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
+import AccountSelector from '../../components/common/AccountSelector.vue'
+import axios from '../../utils/request'
 import {
   getParseResults,
   reparseEntry,
@@ -135,6 +166,121 @@ const parseResult = ref<ParseResult | null>(null)
 
 const errorEntries = ref<Record<string, string>>({})
 const validationWarnings = ref<Record<string, string>>({})
+
+// 内联新增映射相关
+const mappingDialog = ref({
+  visible: false,
+  loading: false,
+  targetEntryUuid: ''
+})
+
+const mappingFormRef = ref<FormInstance>()
+const mappingForm = ref({
+  type: 'expense',
+  key: '',
+  accountId: null as number | null,
+  party: ''
+})
+
+const mappingRules: FormRules = {
+  key: [{ required: true, message: '请输入关键字', trigger: 'blur' }],
+  accountId: [{ required: true, message: '请选择映射账户', trigger: 'change' }]
+}
+
+// 处理打开新增映射对话框
+const handleOpenMappingDialog = (row: FormattedEntry) => {
+  mappingDialog.value.targetEntryUuid = row.uuid
+  
+  // 预填数据
+  let defaultType = 'expense'
+  let defaultKey = ''
+  const defaultParty = ''
+  
+  if (row.original_row) {
+    if (row.original_row.transaction_type && row.original_row.transaction_type.includes('收入')) {
+      defaultType = 'income'
+    }
+    
+    if (row.original_row.counterparty) {
+      defaultKey = row.original_row.counterparty
+      
+    } else if (row.original_row.commodity) {
+      defaultKey = row.original_row.commodity.substring(0, 10) // 截取一部分作为关键字
+    }
+  }
+  
+  mappingForm.value = {
+    type: defaultType,
+    key: defaultKey,
+    accountId: null,
+    party: defaultParty
+  }
+  
+  mappingDialog.value.visible = true
+}
+
+// 处理映射提交
+const handleMappingSubmit = async () => {
+  if (!mappingFormRef.value) return
+  
+  await mappingFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    
+    mappingDialog.value.loading = true
+    try {
+      // 1. 创建映射
+      if (mappingForm.value.type === 'expense') {
+        await axios.post('/expense/', {
+          key: mappingForm.value.key,
+          expend_id: mappingForm.value.accountId,
+          payee: mappingForm.value.party,
+          currency: 'CNY' // 默认CNY
+        })
+      } else {
+        await axios.post('/income/', {
+          key: mappingForm.value.key,
+          income_id: mappingForm.value.accountId,
+          payer: mappingForm.value.party
+        })
+      }
+      
+      ElMessage.success('映射创建成功')
+      
+      // 2. 自动重解析当前条目
+      try {
+        const response = await reparseEntry(taskId.value, {
+          entry_uuid: mappingDialog.value.targetEntryUuid,
+          selected_key: mappingForm.value.key
+        })
+
+        const updated = response.data
+        const index = formattedEntries.value.findIndex(e => e.uuid === mappingDialog.value.targetEntryUuid)
+        if (index !== -1) {
+          formattedEntries.value[index] = {
+            ...formattedEntries.value[index],
+            formatted: updated.formatted,
+            edited_formatted: (updated.edited_formatted || '').replace(/\n+$/, ''),
+            selected_expense_key: updated.selected_expense_key,
+            expense_candidates_with_score: updated.expense_candidates_with_score
+          }
+        }
+        
+        ElMessage.success('重解析完成')
+        mappingDialog.value.visible = false
+      } catch (reparseError: any) {
+        ElMessage.error(reparseError.response?.data?.error || '重新解析失败，请手动点击重试')
+      }
+    } catch (error: any) {
+      if (error.response?.status === 400 && error.response.data?.non_field_errors) {
+        ElMessage.error(error.response.data.non_field_errors[0])
+      } else {
+        ElMessage.error('创建映射失败')
+      }
+    } finally {
+      mappingDialog.value.loading = false
+    }
+  })
+}
 
 // 计算剩余时间（基于 expires_at 或 created）
 const remainingTime = computed(() => {
@@ -570,6 +716,10 @@ onMounted(() => {
   border-radius: 4px;
   background: var(--el-fill-color-light);
   vertical-align: middle;
+}
+
+.add-mapping-btn {
+  margin-left: 8px;
 }
 
 .action-bar {

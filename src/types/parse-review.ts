@@ -2,6 +2,19 @@
  * 解析待办审核相关类型定义
  */
 
+export interface OriginalRow {
+  transaction_time: string
+  transaction_category: string
+  counterparty: string
+  commodity: string
+  transaction_type: string
+  amount: string | number
+  payment_method?: string
+  transaction_status?: string
+  bill_identifier?: string
+  [key: string]: any
+}
+
 /**
  * 格式化条目
  */
@@ -14,7 +27,7 @@ export interface FormattedEntry {
     key: string
     score: number
   }>
-  original_row?: any
+  original_row?: OriginalRow
 }
 
 /**
