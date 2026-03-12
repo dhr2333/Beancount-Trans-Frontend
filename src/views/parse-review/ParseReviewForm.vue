@@ -23,7 +23,7 @@
         highlight-current-row>
         <el-table-column label="Beancount 条目预览" min-width="400">
           <template #default="scope">
-            <div :class="['entry-preview-wrapper', { 'has-error': !!errorEntries[scope.row.uuid], 'has-warning': !!validationWarnings[scope.row.uuid] && !errorEntries[scope.row.uuid] }]">
+            <div :class="getEntryClasses(scope.row.uuid, scope.row.edited_formatted)">
               <el-input v-model="scope.row.edited_formatted" type="textarea" :rows="7" class="entry-preview"
                 placeholder="单击进入编辑模式" @blur="handleEntryEdit(scope.row.uuid, scope.row.edited_formatted)" />
               <div v-if="errorEntries[scope.row.uuid]" class="validation-message error-message">
@@ -126,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
@@ -423,6 +423,24 @@ const handleEntryEdit = async (uuid: string, editedFormatted: string) => {
   }
 }
 
+// 获取条目预览的类名
+const getEntryClasses = (uuid: string, editedFormatted: string) => {
+  const isError = !!errorEntries.value[uuid]
+  const isWarning = !!validationWarnings.value[uuid] && !isError
+  
+  // 检查是否包含 Other 分类
+  const isOther = /(?:Assets|Expenses|Income):Other/.test(editedFormatted || '')
+
+  return [
+    'entry-preview-wrapper',
+    {
+      'has-error': isError,
+      'has-warning': isWarning,
+      'has-other': isOther && !isError && !isWarning // 错误和警告优先级更高
+    }
+  ]
+}
+
 // 预览所有条目
 const handlePreview = () => {
   previewContent.value = formattedEntries.value
@@ -618,17 +636,42 @@ onMounted(() => {
   position: relative;
   
   &.has-error {
-    :deep(.el-textarea__inner) {
+    :deep(.el-textarea__inner),
+    :deep(.ep-textarea__inner) {
       border-color: var(--el-color-danger);
       box-shadow: 0 0 0 1px var(--el-color-danger) inset;
     }
   }
   
   &.has-warning {
-    :deep(.el-textarea__inner) {
+    :deep(.el-textarea__inner),
+    :deep(.ep-textarea__inner) {
       border-color: var(--el-color-warning);
       box-shadow: 0 0 0 1px var(--el-color-warning) inset;
     }
+  }
+  
+  &.has-other {
+    :deep(.el-textarea__inner),
+    :deep(.ep-textarea__inner) {
+      border-color: var(--ep-color-primary, var(--el-color-primary));
+      box-shadow: 0 0 0 1px var(--ep-color-primary, var(--el-color-primary)) inset;
+      background-color: var(--ep-color-primary-light-9, var(--el-color-primary-light-9));
+    }
+  }
+}
+
+// 暗黑模式下：避免 primary-light-* 过亮导致文本对比度差
+:deep(html.dark) .entry-preview-wrapper.has-other {
+  :deep(.el-textarea__inner),
+  :deep(.ep-textarea__inner) {
+    color: var(--el-text-color-primary, var(--ep-text-color-primary));
+    background-color: var(--ep-color-primary-dark-2, var(--el-color-primary-dark-2));
+    background-color: color-mix(
+      in srgb,
+      var(--ep-color-primary, var(--el-color-primary)) 18%,
+      var(--ep-bg-color, var(--el-bg-color))
+    );
   }
 }
 
@@ -651,7 +694,8 @@ onMounted(() => {
 }
 
 .entry-preview {
-  :deep(.el-textarea__inner) {
+  :deep(.el-textarea__inner),
+  :deep(.ep-textarea__inner) {
     font-family: Monaco, Consolas, 'Courier New', monospace;
     font-size: 12px;
     line-height: 1.6;
@@ -716,6 +760,12 @@ onMounted(() => {
   border-radius: 4px;
   background: var(--el-fill-color-light);
   vertical-align: middle;
+}
+
+// 暗黑模式下：无分类建议提示更柔和、对比度更稳定
+:deep(html.dark) .no-category-tip {
+  background: var(--ep-fill-color-darker, var(--el-fill-color-darker));
+  color: var(--ep-text-color-placeholder, var(--el-text-color-placeholder));
 }
 
 .add-mapping-btn {
