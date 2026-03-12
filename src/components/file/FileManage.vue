@@ -42,7 +42,7 @@
                         <el-dropdown-item command="file">
                             <el-icon>
                                 <Document />
-                            </el-icon>选择文件上传
+                            </el-icon>文件上传（选择/拖拽）
                         </el-dropdown-item>
                     </el-dropdown-menu>
                 </template>
@@ -130,7 +130,7 @@
                 </div>
             </div>
 
-            <el-table :data="filteredItems" style="width: 100%" @selection-change="handleSelectionChange"
+            <el-table ref="fileTableRef" :data="filteredItems" style="width: 100%" @selection-change="handleSelectionChange"
                 highlight-current-row class="file-table" id="tour-file-table">
             <el-table-column type="selection" width="55" />
 
@@ -152,7 +152,7 @@
                 </template>
             </el-table-column>
 
-            <el-table-column prop="date" label="上传时间">
+            <el-table-column prop="date" label="创建时间">
                 <template #default="{ row }">
                     {{ formatDateTime(row.node_type === 'directory' ? row.created_at : row.uploaded_at) }}
                 </template>
@@ -325,6 +325,7 @@ const newFolderName = ref('')
 const targetDirectoryId = ref<string | null>(null)
 const moveTreeData = ref<Array<{ id: number; name: string; children?: unknown[] }>>([])
 const moveTreeRef = ref<InstanceType<typeof import('element-plus').ElTree> | null>(null)
+const fileTableRef = ref<InstanceType<typeof import('element-plus').ElTable> | null>(null)
 const moveSingleItem = ref<FileItem | null>(null)
 const currentPage = ref(1)
 const pageSize = ref(20)
@@ -349,11 +350,11 @@ let progressTimeoutId: ReturnType<typeof setTimeout> | null = null
 const statusFilterOptions = [
     { value: null, label: '全部状态' },
     { value: 'unprocessed', label: '未解析' },
-    { value: 'pending', label: '待解析' },
-    { value: 'processing', label: '解析中' },
+    // { value: 'pending', label: '待解析' },
+    // { value: 'processing', label: '解析中' },
     { value: 'parsed', label: '已解析' },
     { value: 'failed', label: '解析失败' },
-    { value: 'needs_password', label: '需要密码' },
+    // { value: 'needs_password', label: '需要密码' },
     { value: 'cancelled', label: '取消解析' }
 ]
 
@@ -880,6 +881,9 @@ function navigateTo(dirId: string | null) {
 
 // 节点点击处理
 function handleNodeClick(node: FileItem) {
+    // 点击文件名即切换该行选中状态
+    const isSelected = selectedItems.value.some((item) => item.id === node.id)
+    fileTableRef.value?.toggleRowSelection(node, !isSelected)
     if (node.node_type === 'directory') {
         // 重置全局搜索状态
         isGlobalSearch.value = false;
