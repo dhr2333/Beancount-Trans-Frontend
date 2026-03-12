@@ -59,6 +59,7 @@
                 <el-option label="取消解析" value="cancel"></el-option>
                 <el-option label="下载" value="download"></el-option>
                 <el-option label="删除" value="delete"></el-option>
+                <el-option label="移动" value="move"></el-option>
             </el-select>
         </div>
 
@@ -199,6 +200,11 @@
                     <el-button v-if="row.node_type === 'file'" icon="Download" circle size="small"
                         :disabled="shouldDisableDownloadAndDelete" @click="downloadFile(row.id)" />
 
+                    <!-- <el-tooltip content="移动" placement="top">
+                        <el-button icon="FolderOpened" circle size="small"
+                            :disabled="shouldDisableDownloadAndDelete" @click="openMoveDialog(row)" />
+                    </el-tooltip> -->
+
                     <el-tooltip content="删除" placement="top">
                         <el-popconfirm title="将同时清除此文件的解析结果，是否继续？" @confirm="deleteItem(row)">
                             <template #reference>
@@ -235,6 +241,25 @@
             </el-form>
         </el-dialog>
 
+        <!-- 移动到指定目录对话框 -->
+        <el-dialog v-model="moveDialog" title="移动到..." width="400px" @open="onMoveDialogOpen" @close="onMoveDialogClose">
+            <el-tree
+                ref="moveTreeRef"
+                :data="moveTreeData"
+                :props="{ label: 'name' }"
+                node-key="id"
+                highlight-current
+                default-expand-all
+                @node-click="onMoveTreeSelect"
+            />
+            <template #footer>
+                <el-button @click="moveDialog = false">取消</el-button>
+                <el-button type="primary" :disabled="targetDirectoryId === null" @click="executeMoveAction">
+                    确定
+                </el-button>
+            </template>
+        </el-dialog>
+
         <!-- 密码输入对话框 -->
         <el-dialog v-model="passwordDialogVisible" title="输入解密密码" width="450px" :close-on-click-modal="false">
             <div class="password-dialog-content">
@@ -259,7 +284,7 @@
 </template>
 
 <script setup lang="ts">
-import { Folder, Document, Plus, Lock, UploadFilled } from '@element-plus/icons-vue'
+import { Folder, Document, Plus, Lock, UploadFilled, FolderOpened } from '@element-plus/icons-vue'
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import axios from '../../utils/request'
 import { ElMessage } from 'element-plus'
@@ -298,6 +323,9 @@ const createFolderDialog = ref(false)
 const moveDialog = ref(false)
 const newFolderName = ref('')
 const targetDirectoryId = ref<string | null>(null)
+const moveTreeData = ref<Array<{ id: number; name: string; children?: unknown[] }>>([])
+const moveTreeRef = ref<InstanceType<typeof import('element-plus').ElTree> | null>(null)
+const moveSingleItem = ref<FileItem | null>(null)
 const currentPage = ref(1)
 const pageSize = ref(20)
 const uploadProgress = ref(0)
@@ -903,6 +931,91 @@ async function createFolder() {
     }
 }
 
+// 移动：加载目录树（供对话框使用）
+async function loadDirectoryTree() {
+    try {
+        const res = await axios.get('/directories/tree/', { headers: headers.value })
+        const tree = res.data
+        moveTreeData.value = tree && tree.id != null ? [tree] : []
+    } catch (error) {
+        ElMessage.error('加载目录树失败')
+        console.error(error)
+        moveTreeData.value = []
+    }
+}
+
+function openMoveDialog(item?: FileItem) {
+    moveSingleItem.value = item ?? null
+    moveDialog.value = true
+    targetDirectoryId.value = null
+}
+
+function onMoveDialogOpen() {
+    targetDirectoryId.value = null
+    moveTreeData.value = []
+    loadDirectoryTree()
+    nextTick(() => {
+        moveTreeRef.value?.setCurrentKey(undefined)
+    })
+}
+
+function onMoveDialogClose() {
+    targetDirectoryId.value = null
+    moveTreeData.value = []
+}
+
+function onMoveTreeSelect(data: { id?: number }, _node: unknown) {
+    if (data?.id != null) targetDirectoryId.value = String(data.id)
+}
+
+async function executeMoveAction() {
+    const targetId = targetDirectoryId.value
+    if (targetId == null) return
+    const items = selectedItems.value.length ? selectedItems.value : moveSingleItem.value ? [moveSingleItem.value] : []
+    if (!items.length) {
+        moveDialog.value = false
+        return
+    }
+    const fileIds = items.filter((i) => i.node_type === 'file').map((i) => Number(i.id))
+    const directoryIds = items.filter((i) => i.node_type === 'directory').map((i) => Number(i.id))
+    const rootId = rootDirectoryId.value != null ? Number(rootDirectoryId.value) : null
+    const targetDirIdForApi = rootId !== null && targetId === String(rootId) ? null : Number(targetId)
+
+    try {
+        const promises: Promise<unknown>[] = []
+        if (fileIds.length) {
+            promises.push(
+                axios.post('/files/batch_move/', {
+                    file_ids: fileIds,
+                    target_directory_id: Number(targetId),
+                }, { headers: headers.value })
+            )
+        }
+        if (directoryIds.length) {
+            promises.push(
+                axios.post('/directories/batch_move/', {
+                    directory_ids: directoryIds,
+                    target_directory_id: targetDirIdForApi,
+                }, { headers: headers.value })
+            )
+        }
+        if (promises.length) {
+            await Promise.all(promises)
+            ElMessage.success('移动成功')
+            moveDialog.value = false
+            moveSingleItem.value = null
+            selectedItems.value = []
+            await loadDirectoryContent()
+        }
+    } catch (error: unknown) {
+        const msg = error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+            : '移动失败'
+        ElMessage.error(msg || '移动失败')
+        console.error(error)
+    }
+}
+
 // 文件下载
 async function downloadFile(fileId: string) {
     // 检查是否在导览步骤2或步骤3，如果是则阻止下载
@@ -987,6 +1100,7 @@ function executeBatchAction(action: string) {
     } else if (action === 'delete') {
         batchDelete()
     } else if (action === 'move') {
+        moveSingleItem.value = null
         moveDialog.value = true
         targetDirectoryId.value = null
     }

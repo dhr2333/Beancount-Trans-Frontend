@@ -75,4 +75,22 @@ export interface UpdateEditRequest {
 export interface UpdateEditResponse {
   uuid: string
   edited_formatted: string
+  validation_warning?: string
+}
+
+/**
+ * 确认写入错误条目
+ */
+export interface ErrorEntry {
+  uuid: string
+  index: number
+  error_message: string
+}
+
+/**
+ * 确认写入错误响应
+ */
+export interface ConfirmWriteErrorResponse {
+  error: string
+  error_entries?: ErrorEntry[]
 }
