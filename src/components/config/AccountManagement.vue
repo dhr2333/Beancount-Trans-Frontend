@@ -404,6 +404,7 @@ import type {
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
 import { hasAuthTokens } from '../../utils/auth'
 import { getAccountTypeColor } from '~/utils/accountTypeColor'
+import { extractApiErrorMessage } from '../../utils/errorHelper'
 import { shouldShowAnonymousPrompt } from '~/composables/useAnonymousPrompt'
 
 // 接口定义
@@ -709,7 +710,7 @@ const updateAccountStatus = async (account: AccountOption) => {
         if (error.response?.status === 401) {
             ElMessage.info('未认证，请登录后重试')
         } else {
-            ElMessage.error('更新账户状态失败')
+            ElMessage.error(extractApiErrorMessage(error.response?.data, '更新账户状态失败'))
         }
     }
 }
@@ -746,9 +747,9 @@ const createAccount = async () => {
         if (error.response?.status === 401) {
             ElMessage.info('未认证，请登录后重试')
         } else if (error.response?.status === 400) {
-            ElMessage.error('创建失败，请检查账户路径格式')
+            ElMessage.error(extractApiErrorMessage(error.response?.data, '创建失败，请检查账户路径格式'))
         } else {
-            ElMessage.error('创建账户失败')
+            ElMessage.error(extractApiErrorMessage(error.response?.data, '创建账户失败'))
         }
     }
 }
@@ -817,9 +818,9 @@ const updateAccount = async () => {
         if (error.response?.status === 401) {
             ElMessage.info('未认证，请登录后重试')
         } else if (error.response?.status === 400) {
-            ElMessage.error('更新失败，请检查账户路径格式')
+            ElMessage.error(extractApiErrorMessage(error.response?.data, '更新失败，请检查账户路径格式'))
         } else {
-            ElMessage.error('更新账户失败')
+            ElMessage.error(extractApiErrorMessage(error.response?.data, '更新账户失败'))
         }
     }
 }

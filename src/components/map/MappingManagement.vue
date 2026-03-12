@@ -180,6 +180,7 @@ import IncomeMapping from './Income.vue'
 import AssetsMapping from './Assets.vue'
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
 import { hasAuthTokens } from '../../utils/auth'
+import { extractApiErrorMessage } from '../../utils/errorHelper'
 import { shouldShowAnonymousPrompt } from '~/composables/useAnonymousPrompt'
 import type { FormInstance, FormRules, TabPaneName } from 'element-plus'
 
@@ -294,9 +295,9 @@ const handleQuickCreate = async () => {
         if (error.response?.status === 401) {
             ElMessage.info('未认证，请登录后重试')
         } else if (error.response?.status === 400) {
-            ElMessage.error('创建失败，请检查数据格式')
+            ElMessage.error(extractApiErrorMessage(error.response?.data, '创建失败，请检查数据格式'))
         } else {
-            ElMessage.error('创建映射失败')
+            ElMessage.error(extractApiErrorMessage(error.response?.data, '创建映射失败'))
         }
     }
 }
