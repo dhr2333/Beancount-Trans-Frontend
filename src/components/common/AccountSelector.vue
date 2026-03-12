@@ -7,10 +7,16 @@
             <template #default="{ node, data }">
                 <div class="cascader-node">
                     <span class="node-label">{{ data.account }}</span>
-                    <el-tag v-if="showDetails && data.account_type" :type="getAccountTypeColor(data.account_type)" size="small"
-                        class="node-tag">
-                        {{ data.account_type }}
-                    </el-tag>
+                    <template v-if="showDetails">
+                        <el-tag v-if="node.level === 1 && data.account_type" :type="getAccountTypeColor(data.account_type)" size="small"
+                            class="node-tag">
+                            {{ data.account_type }}
+                        </el-tag>
+                        <el-tag v-else-if="node.level > 1 && data.description" type="info" size="small"
+                            class="node-tag">
+                            {{ data.description }}
+                        </el-tag>
+                    </template>
                     <el-tag v-if="showDetails && data.mapping_count && data.mapping_count.total > 0" type="info" size="small"
                         class="mapping-tag">
                         {{ data.mapping_count.total }}映射
@@ -27,6 +33,9 @@
                         <h4>{{ selectedAccount.account }}</h4>
                         <el-tag :type="getAccountTypeColor(selectedAccount.account_type)">
                             {{ selectedAccount.account_type }}
+                        </el-tag>
+                        <el-tag v-if="selectedAccount.description" type="info">
+                            {{ selectedAccount.description }}
                         </el-tag>
                     </div>
                     <div v-if="selectedAccount.mapping_count" class="mapping-stats">
@@ -56,6 +65,7 @@ interface AccountBase {
     parent?: number
     parent_account?: string
     account_type: string
+    description?: string
     enable: boolean
     mapping_count?: {
         expense: number
@@ -217,8 +227,12 @@ const customFilterMethod = (node: any, keyword: string) => {
     const accountType = node.data.account_type || ''
     const lowerAccountType = accountType.toLowerCase()
 
+    // 检查账户描述是否包含关键词（不区分大小写）
+    const description = node.data.description || ''
+    const lowerDescription = description.toLowerCase()
+
     // 返回匹配结果
-    return lowerAccountName.includes(lowerKeyword) || lowerAccountType.includes(lowerKeyword)
+    return lowerAccountName.includes(lowerKeyword) || lowerAccountType.includes(lowerKeyword) || lowerDescription.includes(lowerKeyword)
 }
 
 // 处理选择变化
