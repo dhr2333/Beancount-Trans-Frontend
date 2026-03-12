@@ -42,7 +42,7 @@
                         <el-dropdown-item command="file">
                             <el-icon>
                                 <Document />
-                            </el-icon>上传文件
+                            </el-icon>选择文件上传
                         </el-dropdown-item>
                     </el-dropdown-menu>
                 </template>
@@ -113,9 +113,24 @@
             </template>
         </el-dialog>
 
-        <!-- 文件列表 -->
-        <el-table :data="filteredItems" style="width: 100%" @selection-change="handleSelectionChange"
-            highlight-current-row class="file-table" id="tour-file-table">
+        <!-- 文件列表 (带拖拽区域) -->
+        <div 
+            class="file-table-dropzone"
+            @dragenter="onDragEnter"
+            @dragleave="onDragLeave"
+            @dragover="onDragOver"
+            @drop="onDrop"
+        >
+            <div v-show="isDragActive" class="drop-overlay">
+                <div class="drop-overlay-content">
+                    <el-icon class="drop-icon" :size="48"><UploadFilled /></el-icon>
+                    <p class="drop-text">拖拽文件到此处上传</p>
+                    <p class="drop-sub-text">支持多文件，最大 20MB/个</p>
+                </div>
+            </div>
+
+            <el-table :data="filteredItems" style="width: 100%" @selection-change="handleSelectionChange"
+                highlight-current-row class="file-table" id="tour-file-table">
             <el-table-column type="selection" width="55" />
 
             <el-table-column v-if="isGlobalSearch" prop="path" label="路径">
@@ -136,7 +151,7 @@
                 </template>
             </el-table-column>
 
-            <el-table-column prop="date" label="修改日期">
+            <el-table-column prop="date" label="上传时间">
                 <template #default="{ row }">
                     {{ formatDateTime(row.node_type === 'directory' ? row.created_at : row.uploaded_at) }}
                 </template>
@@ -195,7 +210,8 @@
 
                 </template>
             </el-table-column>
-        </el-table>
+            </el-table>
+        </div>
 
         <!-- 分页 -->
         <!-- <div class="pagination">
@@ -243,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import { Folder, Document, Plus, Lock } from '@element-plus/icons-vue'
+import { Folder, Document, Plus, Lock, UploadFilled } from '@element-plus/icons-vue'
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import axios from '../../utils/request'
 import { ElMessage } from 'element-plus'
@@ -296,6 +312,11 @@ const selectedStatusFilter = ref<string | null>(null)
 const passwordDialogVisible = ref(false)
 const passwordForm = ref<{ id: string; name: string; password: string }[]>([])
 
+// 拖拽上传相关状态
+const isDragActive = ref(false)
+const dragCounter = ref(0)
+let progressTimeoutId: ReturnType<typeof setTimeout> | null = null
+
 // 状态筛选选项配置
 const statusFilterOptions = [
     { value: null, label: '全部状态' },
@@ -320,7 +341,7 @@ function handleNewCommand(command: string) {
 }
 
 async function customUpload(options: any) {
-    const { file, onProgress, onSuccess, onError } = options;
+    const { file, onProgress, onSuccess, onError, skipRefresh } = options;
     const uploadedFileName = file.name;
 
     try {
@@ -353,8 +374,10 @@ async function customUpload(options: any) {
         });
 
         onSuccess(response);
-        ElMessage.success('文件上传成功');
-        await loadDirectoryContent();
+        ElMessage.success(`文件 "${uploadedFileName}" 上传成功`);
+        if (!skipRefresh) {
+            await loadDirectoryContent();
+        }
     } catch (error: unknown) {
         console.error('文件上传失败:', error);
         let errorMsg = '文件上传失败';
@@ -398,18 +421,117 @@ async function customUpload(options: any) {
         onError(error);
     } finally {
         isUploading.value = false;
-        setTimeout(() => {
-            uploadProgress.value = 0;
+        if (progressTimeoutId) clearTimeout(progressTimeoutId);
+        progressTimeoutId = setTimeout(() => {
+            if (!isUploading.value) {
+                uploadProgress.value = 0;
+            }
         }, 2000);
+    }
+}
+
+// 拖拽上传相关函数
+function onDragEnter(e: DragEvent) {
+    e.preventDefault();
+    if (isTourStep2.value) return;
+    dragCounter.value++;
+    if (dragCounter.value === 1) {
+        isDragActive.value = true;
+    }
+}
+
+function onDragLeave(e: DragEvent) {
+    e.preventDefault();
+    if (isTourStep2.value) return;
+    dragCounter.value--;
+    if (dragCounter.value === 0) {
+        isDragActive.value = false;
+    }
+}
+
+function onDragOver(e: DragEvent) {
+    e.preventDefault(); // 必须调用以允许 drop
+}
+
+async function onDrop(e: DragEvent) {
+    e.preventDefault();
+    dragCounter.value = 0;
+    isDragActive.value = false;
+
+    if (isTourStep2.value) {
+        ElMessage.warning('导览进行中，请先完成当前步骤');
+        return;
+    }
+
+    if (!currentDirectoryId.value && !rootDirectoryId.value) {
+        ElMessage.error('请先等待目录加载完成');
+        return;
+    }
+
+    if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+
+    // 检查是否包含文件夹
+    let hasFolder = false;
+    if (e.dataTransfer.items) {
+        for (let i = 0; i < e.dataTransfer.items.length; i++) {
+            const item = e.dataTransfer.items[i];
+            if (item.kind === 'file') {
+                const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : (item as any).getAsEntry ? (item as any).getAsEntry() : null;
+                if (entry && entry.isDirectory) {
+                    hasFolder = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (hasFolder) {
+        ElMessage.warning('仅支持文件拖拽上传，不支持文件夹');
+        return;
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    await processUploadQueue(files);
+}
+
+async function processUploadQueue(files: File[]) {
+    // 过滤不符合要求的文件
+    const validFiles = files.filter(f => validateUpload(f));
+    if (validFiles.length === 0) return;
+
+    let hasUploaded = false;
+
+    // 串行上传
+    for (const file of validFiles) {
+        await new Promise<void>((resolve) => {
+            customUpload({
+                file,
+                onProgress: () => {},
+                onSuccess: () => {
+                    hasUploaded = true;
+                    resolve();
+                },
+                onError: () => {
+                    // 发生错误也继续下一个
+                    resolve();
+                },
+                skipRefresh: true
+            });
+        });
+    }
+
+    // 队列全部结束后刷新一次目录
+    if (hasUploaded) {
+        await loadDirectoryContent();
     }
 }
 
 // 上传前验证
 function validateUpload(file: File) {
-    // 验证文件大小 (限制为100MB)
-    const maxSize = 100 * 1024 * 1024
+    // 验证文件大小 (限制为20MB)
+    const maxSize = 20 * 1024 * 1024
     if (file.size > maxSize) {
-        ElMessage.error('文件大小不能超过100MB')
+        ElMessage.error('文件大小不能超过20MB')
         return false
     }
 
@@ -1395,5 +1517,44 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
     font-size: 12px;
     color: var(--ep-text-color-secondary);
     cursor: default;
+}
+
+.file-table-dropzone {
+    position: relative;
+    min-height: 200px;
+}
+
+.drop-overlay {
+    position: absolute;
+    inset: 0;
+    background-color: var(--ep-fill-color-extra-light);
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--ep-color-primary);
+    border-radius: 8px;
+}
+
+.drop-overlay-content {
+    text-align: center;
+    color: var(--ep-color-primary);
+}
+
+.drop-icon {
+    margin-bottom: 10px;
+}
+
+.drop-text {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 0 0 5px 0;
+}
+
+.drop-sub-text {
+    font-size: 14px;
+    color: var(--ep-text-color-secondary);
+    margin: 0;
 }
 </style>
