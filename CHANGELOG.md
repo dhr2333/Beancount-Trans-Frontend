@@ -1,3 +1,9 @@
+## [5.9.6](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.5...5.9.6) (2026-03-12)
+
+### Bug Fixes
+
+* Add inline mapping dialog and original row type definition ([fc6afdc](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/fc6afdcad8cee8b49c8da143467dbbc8e1c54207))
+
 ## [5.9.5](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.4...5.9.5) (2026-03-11)
 
 ### Bug Fixes
