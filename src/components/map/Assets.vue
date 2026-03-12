@@ -286,6 +286,7 @@ import { Search, Plus, Upload, Download, Edit, Delete } from '@element-plus/icon
 import axios from '../../utils/request'
 import handleRefresh from '../../utils/commonFunctions'
 import { hasAuthTokens } from '../../utils/auth'
+import { extractApiErrorMessage } from '../../utils/errorHelper'
 import * as XLSX from 'xlsx'
 import { pinyin } from 'pinyin-pro';
 import AccountSelector from '../common/AccountSelector.vue'
@@ -501,7 +502,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                             ElMessage.info('权限不足，请登录后重试');
                         }
                         else if (error.response && error.response.status == 400) {
-                            ElMessage.error('新增失败，请检查关键字是否冲突');
+                            ElMessage.error(extractApiErrorMessage(error.response?.data, '新增失败，请检查关键字是否冲突'));
                         }
                         else {
                             dialogError.value = true
@@ -591,7 +592,7 @@ const handleImport = () => {
                                 ElMessage.info('权限不足，请登录后重试');
                             }
                             else if (error.response && error.response.status == 400) {
-                                ElMessage.error('导入失败，请按"导出"提供的格式重新导入');
+                                ElMessage.error(extractApiErrorMessage(error.response?.data, '导入失败，请按"导出"提供的格式重新导入'));
                             }
                             // dialogError.value = true
                             console.error(error);
@@ -677,7 +678,7 @@ const editForm = async (formEl: FormInstance | undefined) => {
                             ElMessage.info('权限不足，请登录后重试');
                         }
                         else if (error.response && error.response.status == 400) {
-                            ElMessage.error('修改失败，请检查关键字是否冲突');
+                            ElMessage.error(extractApiErrorMessage(error.response?.data, '修改失败，请检查关键字是否冲突'));
                         }
                         else {
                             dialogError.value = true

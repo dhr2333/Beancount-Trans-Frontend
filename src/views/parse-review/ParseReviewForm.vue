@@ -23,8 +23,16 @@
         highlight-current-row>
         <el-table-column label="Beancount 条目预览" min-width="400">
           <template #default="scope">
-            <el-input v-model="scope.row.edited_formatted" type="textarea" :rows="7" class="entry-preview"
-              placeholder="单击进入编辑模式" @blur="handleEntryEdit(scope.row.uuid, scope.row.edited_formatted)" />
+            <div :class="['entry-preview-wrapper', { 'has-error': !!errorEntries[scope.row.uuid], 'has-warning': !!validationWarnings[scope.row.uuid] && !errorEntries[scope.row.uuid] }]">
+              <el-input v-model="scope.row.edited_formatted" type="textarea" :rows="7" class="entry-preview"
+                placeholder="单击进入编辑模式" @blur="handleEntryEdit(scope.row.uuid, scope.row.edited_formatted)" />
+              <div v-if="errorEntries[scope.row.uuid]" class="validation-message error-message">
+                {{ errorEntries[scope.row.uuid] }}
+              </div>
+              <div v-else-if="validationWarnings[scope.row.uuid]" class="validation-message warning-message">
+                {{ validationWarnings[scope.row.uuid] }}
+              </div>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="AI分类反馈" min-width="400">
@@ -101,7 +109,7 @@ import {
   reparseAll
 } from '../../api/parse-review'
 import { getTask } from '../../api/reconciliation'
-import type { FormattedEntry, ParseResult } from '../../types/parse-review'
+import type { FormattedEntry, ParseResult, ErrorEntry } from '../../types/parse-review'
 import type { ScheduledTask } from '../../types/reconciliation'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 
@@ -124,6 +132,9 @@ const previewContent = ref('')
 
 const taskInfo = ref<ScheduledTask | null>(null)
 const parseResult = ref<ParseResult | null>(null)
+
+const errorEntries = ref<Record<string, string>>({})
+const validationWarnings = ref<Record<string, string>>({})
 
 // 计算剩余时间（基于 expires_at 或 created）
 const remainingTime = computed(() => {
@@ -245,9 +256,21 @@ const handleKeywordSelect = async (uuid: string, selectedKey: string) => {
 // 处理条目编辑
 const handleEntryEdit = async (uuid: string, editedFormatted: string) => {
   try {
-    await updateEntryEdit(taskId.value, uuid, {
+    // 每次编辑后清除错误状态
+    if (errorEntries.value[uuid]) {
+      delete errorEntries.value[uuid]
+    }
+
+    const response = await updateEntryEdit(taskId.value, uuid, {
       edited_formatted: editedFormatted
     })
+    
+    if (response.data.validation_warning) {
+      validationWarnings.value[uuid] = response.data.validation_warning
+    } else {
+      delete validationWarnings.value[uuid]
+    }
+
     ElMessage.success('编辑内容已保存')
   } catch (error: any) {
     ElMessage.error(error.response?.data?.error || '更新编辑内容失败')
@@ -306,12 +329,23 @@ const handleSavePreview = async () => {
 
       // 如果内容有变化，才更新
       if (entry.edited_formatted.replace(/\n+$/, '') !== editedContent) {
+        // 清除错误状态
+        if (errorEntries.value[entry.uuid]) {
+          delete errorEntries.value[entry.uuid]
+        }
+
         updatePromises.push(
           updateEntryEdit(taskId.value, entry.uuid, {
             edited_formatted: editedContent
-          }).then(() => {
+          }).then((response) => {
             // 更新本地数据
             entry.edited_formatted = editedContent
+            
+            if (response.data.validation_warning) {
+              validationWarnings.value[entry.uuid] = response.data.validation_warning
+            } else {
+              delete validationWarnings.value[entry.uuid]
+            }
           })
         )
       }
@@ -337,6 +371,7 @@ const handleSavePreview = async () => {
 // 确认写入
 const handleConfirmWrite = async () => {
   loading.value.confirm = true
+  errorEntries.value = {}
   try {
     await confirmWrite(taskId.value)
     ElMessage.success('确认写入成功')
@@ -350,7 +385,23 @@ const handleConfirmWrite = async () => {
       emitTaskBannerRefresh()
     }, 500)
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.error || '确认写入失败')
+    if (error.response?.data?.error_entries) {
+      const entries = error.response.data.error_entries as ErrorEntry[]
+      entries.forEach(entry => {
+        errorEntries.value[entry.uuid] = entry.error_message
+      })
+      ElMessage.error(error.response?.data?.error || '确认写入失败，请修正错误')
+      
+      // 自动滚动到第一个错误
+      setTimeout(() => {
+        const firstErrorEl = document.querySelector('.has-error')
+        if (firstErrorEl) {
+          firstErrorEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 100)
+    } else {
+      ElMessage.error(error.response?.data?.error || '确认写入失败')
+    }
   } finally {
     loading.value.confirm = false
   }
@@ -415,6 +466,42 @@ onMounted(() => {
 .content-container {
   min-height: 400px;
   margin-bottom: 24px;
+}
+
+.entry-preview-wrapper {
+  position: relative;
+  
+  &.has-error {
+    :deep(.el-textarea__inner) {
+      border-color: var(--el-color-danger);
+      box-shadow: 0 0 0 1px var(--el-color-danger) inset;
+    }
+  }
+  
+  &.has-warning {
+    :deep(.el-textarea__inner) {
+      border-color: var(--el-color-warning);
+      box-shadow: 0 0 0 1px var(--el-color-warning) inset;
+    }
+  }
+}
+
+.validation-message {
+  font-size: 12px;
+  margin-top: 4px;
+  line-height: 1.4;
+  padding: 4px 8px;
+  border-radius: 4px;
+  
+  &.error-message {
+    color: var(--el-color-danger);
+    background-color: var(--el-color-danger-light-9);
+  }
+  
+  &.warning-message {
+    color: var(--el-color-warning);
+    background-color: var(--el-color-warning-light-9);
+  }
 }
 
 .entry-preview {

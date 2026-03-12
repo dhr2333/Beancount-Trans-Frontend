@@ -42,7 +42,7 @@
                         <el-dropdown-item command="file">
                             <el-icon>
                                 <Document />
-                            </el-icon>上传文件
+                            </el-icon>选择文件上传
                         </el-dropdown-item>
                     </el-dropdown-menu>
                 </template>
@@ -59,6 +59,7 @@
                 <el-option label="取消解析" value="cancel"></el-option>
                 <el-option label="下载" value="download"></el-option>
                 <el-option label="删除" value="delete"></el-option>
+                <el-option label="移动" value="move"></el-option>
             </el-select>
         </div>
 
@@ -113,9 +114,24 @@
             </template>
         </el-dialog>
 
-        <!-- 文件列表 -->
-        <el-table :data="filteredItems" style="width: 100%" @selection-change="handleSelectionChange"
-            highlight-current-row class="file-table" id="tour-file-table">
+        <!-- 文件列表 (带拖拽区域) -->
+        <div 
+            class="file-table-dropzone"
+            @dragenter="onDragEnter"
+            @dragleave="onDragLeave"
+            @dragover="onDragOver"
+            @drop="onDrop"
+        >
+            <div v-show="isDragActive" class="drop-overlay">
+                <div class="drop-overlay-content">
+                    <el-icon class="drop-icon" :size="48"><UploadFilled /></el-icon>
+                    <p class="drop-text">拖拽文件到此处上传</p>
+                    <p class="drop-sub-text">支持多文件，最大 20MB/个</p>
+                </div>
+            </div>
+
+            <el-table :data="filteredItems" style="width: 100%" @selection-change="handleSelectionChange"
+                highlight-current-row class="file-table" id="tour-file-table">
             <el-table-column type="selection" width="55" />
 
             <el-table-column v-if="isGlobalSearch" prop="path" label="路径">
@@ -136,7 +152,7 @@
                 </template>
             </el-table-column>
 
-            <el-table-column prop="date" label="修改日期">
+            <el-table-column prop="date" label="上传时间">
                 <template #default="{ row }">
                     {{ formatDateTime(row.node_type === 'directory' ? row.created_at : row.uploaded_at) }}
                 </template>
@@ -184,6 +200,11 @@
                     <el-button v-if="row.node_type === 'file'" icon="Download" circle size="small"
                         :disabled="shouldDisableDownloadAndDelete" @click="downloadFile(row.id)" />
 
+                    <!-- <el-tooltip content="移动" placement="top">
+                        <el-button icon="FolderOpened" circle size="small"
+                            :disabled="shouldDisableDownloadAndDelete" @click="openMoveDialog(row)" />
+                    </el-tooltip> -->
+
                     <el-tooltip content="删除" placement="top">
                         <el-popconfirm title="将同时清除此文件的解析结果，是否继续？" @confirm="deleteItem(row)">
                             <template #reference>
@@ -195,7 +216,8 @@
 
                 </template>
             </el-table-column>
-        </el-table>
+            </el-table>
+        </div>
 
         <!-- 分页 -->
         <!-- <div class="pagination">
@@ -217,6 +239,25 @@
                     <el-button type="primary" native-type="submit">创建</el-button>
                 </div>
             </el-form>
+        </el-dialog>
+
+        <!-- 移动到指定目录对话框 -->
+        <el-dialog v-model="moveDialog" title="移动到..." width="400px" @open="onMoveDialogOpen" @close="onMoveDialogClose">
+            <el-tree
+                ref="moveTreeRef"
+                :data="moveTreeData"
+                :props="{ label: 'name' }"
+                node-key="id"
+                highlight-current
+                default-expand-all
+                @node-click="onMoveTreeSelect"
+            />
+            <template #footer>
+                <el-button @click="moveDialog = false">取消</el-button>
+                <el-button type="primary" :disabled="targetDirectoryId === null" @click="executeMoveAction">
+                    确定
+                </el-button>
+            </template>
         </el-dialog>
 
         <!-- 密码输入对话框 -->
@@ -243,7 +284,7 @@
 </template>
 
 <script setup lang="ts">
-import { Folder, Document, Plus, Lock } from '@element-plus/icons-vue'
+import { Folder, Document, Plus, Lock, UploadFilled, FolderOpened } from '@element-plus/icons-vue'
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import axios from '../../utils/request'
 import { ElMessage } from 'element-plus'
@@ -282,6 +323,9 @@ const createFolderDialog = ref(false)
 const moveDialog = ref(false)
 const newFolderName = ref('')
 const targetDirectoryId = ref<string | null>(null)
+const moveTreeData = ref<Array<{ id: number; name: string; children?: unknown[] }>>([])
+const moveTreeRef = ref<InstanceType<typeof import('element-plus').ElTree> | null>(null)
+const moveSingleItem = ref<FileItem | null>(null)
 const currentPage = ref(1)
 const pageSize = ref(20)
 const uploadProgress = ref(0)
@@ -295,6 +339,11 @@ const selectedStatusFilter = ref<string | null>(null)
 // 密码弹窗相关状态
 const passwordDialogVisible = ref(false)
 const passwordForm = ref<{ id: string; name: string; password: string }[]>([])
+
+// 拖拽上传相关状态
+const isDragActive = ref(false)
+const dragCounter = ref(0)
+let progressTimeoutId: ReturnType<typeof setTimeout> | null = null
 
 // 状态筛选选项配置
 const statusFilterOptions = [
@@ -320,7 +369,7 @@ function handleNewCommand(command: string) {
 }
 
 async function customUpload(options: any) {
-    const { file, onProgress, onSuccess, onError } = options;
+    const { file, onProgress, onSuccess, onError, skipRefresh } = options;
     const uploadedFileName = file.name;
 
     try {
@@ -353,8 +402,10 @@ async function customUpload(options: any) {
         });
 
         onSuccess(response);
-        ElMessage.success('文件上传成功');
-        await loadDirectoryContent();
+        ElMessage.success(`文件 "${uploadedFileName}" 上传成功`);
+        if (!skipRefresh) {
+            await loadDirectoryContent();
+        }
     } catch (error: unknown) {
         console.error('文件上传失败:', error);
         let errorMsg = '文件上传失败';
@@ -398,18 +449,117 @@ async function customUpload(options: any) {
         onError(error);
     } finally {
         isUploading.value = false;
-        setTimeout(() => {
-            uploadProgress.value = 0;
+        if (progressTimeoutId) clearTimeout(progressTimeoutId);
+        progressTimeoutId = setTimeout(() => {
+            if (!isUploading.value) {
+                uploadProgress.value = 0;
+            }
         }, 2000);
+    }
+}
+
+// 拖拽上传相关函数
+function onDragEnter(e: DragEvent) {
+    e.preventDefault();
+    if (isTourStep2.value) return;
+    dragCounter.value++;
+    if (dragCounter.value === 1) {
+        isDragActive.value = true;
+    }
+}
+
+function onDragLeave(e: DragEvent) {
+    e.preventDefault();
+    if (isTourStep2.value) return;
+    dragCounter.value--;
+    if (dragCounter.value === 0) {
+        isDragActive.value = false;
+    }
+}
+
+function onDragOver(e: DragEvent) {
+    e.preventDefault(); // 必须调用以允许 drop
+}
+
+async function onDrop(e: DragEvent) {
+    e.preventDefault();
+    dragCounter.value = 0;
+    isDragActive.value = false;
+
+    if (isTourStep2.value) {
+        ElMessage.warning('导览进行中，请先完成当前步骤');
+        return;
+    }
+
+    if (!currentDirectoryId.value && !rootDirectoryId.value) {
+        ElMessage.error('请先等待目录加载完成');
+        return;
+    }
+
+    if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+
+    // 检查是否包含文件夹
+    let hasFolder = false;
+    if (e.dataTransfer.items) {
+        for (let i = 0; i < e.dataTransfer.items.length; i++) {
+            const item = e.dataTransfer.items[i];
+            if (item.kind === 'file') {
+                const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : (item as any).getAsEntry ? (item as any).getAsEntry() : null;
+                if (entry && entry.isDirectory) {
+                    hasFolder = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (hasFolder) {
+        ElMessage.warning('仅支持文件拖拽上传，不支持文件夹');
+        return;
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    await processUploadQueue(files);
+}
+
+async function processUploadQueue(files: File[]) {
+    // 过滤不符合要求的文件
+    const validFiles = files.filter(f => validateUpload(f));
+    if (validFiles.length === 0) return;
+
+    let hasUploaded = false;
+
+    // 串行上传
+    for (const file of validFiles) {
+        await new Promise<void>((resolve) => {
+            customUpload({
+                file,
+                onProgress: () => {},
+                onSuccess: () => {
+                    hasUploaded = true;
+                    resolve();
+                },
+                onError: () => {
+                    // 发生错误也继续下一个
+                    resolve();
+                },
+                skipRefresh: true
+            });
+        });
+    }
+
+    // 队列全部结束后刷新一次目录
+    if (hasUploaded) {
+        await loadDirectoryContent();
     }
 }
 
 // 上传前验证
 function validateUpload(file: File) {
-    // 验证文件大小 (限制为100MB)
-    const maxSize = 100 * 1024 * 1024
+    // 验证文件大小 (限制为20MB)
+    const maxSize = 20 * 1024 * 1024
     if (file.size > maxSize) {
-        ElMessage.error('文件大小不能超过100MB')
+        ElMessage.error('文件大小不能超过20MB')
         return false
     }
 
@@ -781,6 +931,91 @@ async function createFolder() {
     }
 }
 
+// 移动：加载目录树（供对话框使用）
+async function loadDirectoryTree() {
+    try {
+        const res = await axios.get('/directories/tree/', { headers: headers.value })
+        const tree = res.data
+        moveTreeData.value = tree && tree.id != null ? [tree] : []
+    } catch (error) {
+        ElMessage.error('加载目录树失败')
+        console.error(error)
+        moveTreeData.value = []
+    }
+}
+
+function openMoveDialog(item?: FileItem) {
+    moveSingleItem.value = item ?? null
+    moveDialog.value = true
+    targetDirectoryId.value = null
+}
+
+function onMoveDialogOpen() {
+    targetDirectoryId.value = null
+    moveTreeData.value = []
+    loadDirectoryTree()
+    nextTick(() => {
+        moveTreeRef.value?.setCurrentKey(undefined)
+    })
+}
+
+function onMoveDialogClose() {
+    targetDirectoryId.value = null
+    moveTreeData.value = []
+}
+
+function onMoveTreeSelect(data: { id?: number }, _node: unknown) {
+    if (data?.id != null) targetDirectoryId.value = String(data.id)
+}
+
+async function executeMoveAction() {
+    const targetId = targetDirectoryId.value
+    if (targetId == null) return
+    const items = selectedItems.value.length ? selectedItems.value : moveSingleItem.value ? [moveSingleItem.value] : []
+    if (!items.length) {
+        moveDialog.value = false
+        return
+    }
+    const fileIds = items.filter((i) => i.node_type === 'file').map((i) => Number(i.id))
+    const directoryIds = items.filter((i) => i.node_type === 'directory').map((i) => Number(i.id))
+    const rootId = rootDirectoryId.value != null ? Number(rootDirectoryId.value) : null
+    const targetDirIdForApi = rootId !== null && targetId === String(rootId) ? null : Number(targetId)
+
+    try {
+        const promises: Promise<unknown>[] = []
+        if (fileIds.length) {
+            promises.push(
+                axios.post('/files/batch_move/', {
+                    file_ids: fileIds,
+                    target_directory_id: Number(targetId),
+                }, { headers: headers.value })
+            )
+        }
+        if (directoryIds.length) {
+            promises.push(
+                axios.post('/directories/batch_move/', {
+                    directory_ids: directoryIds,
+                    target_directory_id: targetDirIdForApi,
+                }, { headers: headers.value })
+            )
+        }
+        if (promises.length) {
+            await Promise.all(promises)
+            ElMessage.success('移动成功')
+            moveDialog.value = false
+            moveSingleItem.value = null
+            selectedItems.value = []
+            await loadDirectoryContent()
+        }
+    } catch (error: unknown) {
+        const msg = error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+            : '移动失败'
+        ElMessage.error(msg || '移动失败')
+        console.error(error)
+    }
+}
+
 // 文件下载
 async function downloadFile(fileId: string) {
     // 检查是否在导览步骤2或步骤3，如果是则阻止下载
@@ -865,6 +1100,7 @@ function executeBatchAction(action: string) {
     } else if (action === 'delete') {
         batchDelete()
     } else if (action === 'move') {
+        moveSingleItem.value = null
         moveDialog.value = true
         targetDirectoryId.value = null
     }
@@ -1395,5 +1631,44 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
     font-size: 12px;
     color: var(--ep-text-color-secondary);
     cursor: default;
+}
+
+.file-table-dropzone {
+    position: relative;
+    min-height: 200px;
+}
+
+.drop-overlay {
+    position: absolute;
+    inset: 0;
+    background-color: var(--ep-fill-color-extra-light);
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--ep-color-primary);
+    border-radius: 8px;
+}
+
+.drop-overlay-content {
+    text-align: center;
+    color: var(--ep-color-primary);
+}
+
+.drop-icon {
+    margin-bottom: 10px;
+}
+
+.drop-text {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 0 0 5px 0;
+}
+
+.drop-sub-text {
+    font-size: 14px;
+    color: var(--ep-text-color-secondary);
+    margin: 0;
 }
 </style>
