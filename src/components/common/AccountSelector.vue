@@ -85,6 +85,8 @@ interface Props {
     placeholder?: string
     disabled?: boolean
     showDetails?: boolean // 是否显示账户类型、映射统计等详细信息
+    /** 外部注入的账户树；传入且非空时使用该数据，不再请求 tree/ */
+    accountTree?: AccountOption[] | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -92,7 +94,8 @@ const props = withDefaults(defineProps<Props>(), {
     accountType: '',
     placeholder: '请选择账户',
     disabled: false,
-    showDetails: true
+    showDetails: true,
+    accountTree: undefined
 })
 
 // Emits
@@ -102,8 +105,15 @@ const emit = defineEmits<{
 }>()
 
 // 响应式数据
-const accountTree = ref<AccountOption[]>([])
+const internalAccountTree = ref<AccountOption[]>([])
 type InternalCascaderValue = CascaderValue | CascaderValue[] | null
+
+// 是否由父组件注入账户树（传入即视为注入，即使为空也不自行请求）
+const hasInjectedTree = computed(() => props.accountTree != null)
+// 实际用于选项的树：优先使用注入的树
+const effectiveAccountTree = computed<AccountOption[]>(() =>
+    hasInjectedTree.value ? (props.accountTree ?? []) : internalAccountTree.value
+)
 const selectedValue = ref<InternalCascaderValue>(props.modelValue ?? null)
 
 const cascaderValue = computed<CascaderValue | undefined>({
@@ -128,17 +138,10 @@ const cascaderProps: CascaderProps = {
 
 // 计算属性：过滤后的账户选项
 const accountOptions = computed<AccountOption[]>(() => {
-    console.log('AccountSelector - 原始账户树:', accountTree.value)
-    console.log('AccountSelector - 账户类型过滤:', props.accountType)
-
     if (!props.accountType) {
-        console.log('AccountSelector - 无类型过滤，返回所有账户')
-        return accountTree.value
+        return effectiveAccountTree.value
     }
-
-    const filtered = filterAccountsByType(accountTree.value, props.accountType)
-    console.log('AccountSelector - 过滤后的账户:', filtered)
-    return filtered
+    return filterAccountsByType(effectiveAccountTree.value, props.accountType)
 })
 
 // 获取账户树形数据
@@ -150,17 +153,17 @@ const fetchAccountTree = async () => {
 
         // 确保数据是数组格式
         if (Array.isArray(response.data)) {
-            accountTree.value = response.data as AccountOption[]
+            internalAccountTree.value = response.data as AccountOption[]
         } else if (response.data && Array.isArray(response.data.results)) {
-            accountTree.value = response.data.results as AccountOption[]
+            internalAccountTree.value = response.data.results as AccountOption[]
         } else {
             console.warn('账户树数据格式异常:', response.data)
-            accountTree.value = []
+            internalAccountTree.value = []
         }
 
         const normalized = normalizeCascaderValue(selectedValue.value)
         if (normalized !== null) {
-            const account = findAccountById(accountTree.value, normalized)
+            const account = findAccountById(internalAccountTree.value, normalized)
             selectedAccount.value = account
         }
     } catch (error: any) {
@@ -170,7 +173,7 @@ const fetchAccountTree = async () => {
         } else {
             ElMessage.error('获取账户数据失败')
         }
-        accountTree.value = []
+        internalAccountTree.value = []
     } finally {
         loading.value = false
     }
@@ -257,17 +260,16 @@ const handleChange = async (value: CascaderValue | CascaderValue[] | null) => {
     emit('update:modelValue', normalizedValue)
 
     if (normalizedValue !== null) {
-        // 如果账户树为空且不在加载中，先加载账户树
-        if (accountTree.value.length === 0 && !loading.value) {
+        // 未注入账户树且本地树为空、不在加载中时，先加载
+        if (!hasInjectedTree.value && internalAccountTree.value.length === 0 && !loading.value) {
             await fetchAccountTree()
         }
 
-        // 尝试查找账户对象
-        let account = findAccountById(accountTree.value, normalizedValue)
+        // 尝试查找账户对象（优先用当前有效树）
+        let account = findAccountById(effectiveAccountTree.value, normalizedValue)
 
-        // 如果找不到且正在加载中，等待加载完成后再查找
-        if (!account && loading.value) {
-            // 等待加载完成（最多等待2秒）
+        // 如果找不到且正在加载中且未使用注入树，等待加载完成后再查找
+        if (!account && !hasInjectedTree.value && loading.value) {
             await new Promise<void>((resolve) => {
                 const unwatch = watch(loading, (isLoading) => {
                     if (!isLoading) {
@@ -275,14 +277,12 @@ const handleChange = async (value: CascaderValue | CascaderValue[] | null) => {
                         resolve()
                     }
                 })
-                // 设置超时，避免无限等待
                 setTimeout(() => {
                     unwatch()
                     resolve()
                 }, 2000)
             })
-            // 加载完成后再次查找
-            account = findAccountById(accountTree.value, normalizedValue)
+            account = findAccountById(internalAccountTree.value, normalizedValue)
         }
 
         selectedAccount.value = account
@@ -295,9 +295,8 @@ const handleChange = async (value: CascaderValue | CascaderValue[] | null) => {
 
 // 处理下拉框显示状态
 const handleVisibleChange = (visible: boolean) => {
-    // 如果下拉框打开且账户树为空且不在加载中，才加载账户树
-    // 这样可以避免重复加载，同时确保数据可用
-    if (visible && accountTree.value.length === 0 && !loading.value) {
+    // 未注入树时：下拉打开且本地树为空且不在加载中，才请求
+    if (visible && !hasInjectedTree.value && internalAccountTree.value.length === 0 && !loading.value) {
         fetchAccountTree()
     }
 }
@@ -309,7 +308,7 @@ watch(() => props.modelValue, (newValue) => {
     }
 
     if (newValue) {
-        const account = findAccountById(accountTree.value, newValue)
+        const account = findAccountById(effectiveAccountTree.value, newValue)
         selectedAccount.value = account
     } else {
         selectedAccount.value = null
@@ -319,38 +318,44 @@ watch(() => props.modelValue, (newValue) => {
 // 组件挂载时初始化
 onMounted(() => {
     unsubscribeAccountTreeUpdated = subscribeAccountTreeUpdated(() => {
-        fetchAccountTree()
+        if (!hasInjectedTree.value) {
+            fetchAccountTree()
+        }
     })
 
-    // 异步预加载账户树，不阻塞页面渲染
-    // 优先使用 requestIdleCallback，在浏览器空闲时加载
-    // 如果不支持，则使用 setTimeout 作为降级方案
+    // 已注入账户树时直接根据当前值解析 selectedAccount，不请求
+    if (hasInjectedTree.value) {
+        if (props.modelValue) {
+            const account = findAccountById(effectiveAccountTree.value, props.modelValue)
+            if (account) selectedAccount.value = account
+        }
+        const normalized = normalizeCascaderValue(selectedValue.value)
+        if (normalized !== null) {
+            const account = findAccountById(effectiveAccountTree.value, normalized)
+            if (account) selectedAccount.value = account
+        }
+        return
+    }
+
+    // 未注入时：异步预加载账户树
     const loadAccountTreeAsync = () => {
         fetchAccountTree().then(() => {
-            // 如果组件有初始值，设置对应的账户对象
             if (props.modelValue) {
-                const account = findAccountById(accountTree.value, props.modelValue!)
-                if (account) {
-                    selectedAccount.value = account
-                }
+                const account = findAccountById(internalAccountTree.value, props.modelValue!)
+                if (account) selectedAccount.value = account
             }
-
-            // 处理 selectedValue 中的值
             const normalized = normalizeCascaderValue(selectedValue.value)
             if (normalized !== null) {
-                const account = findAccountById(accountTree.value, normalized)
-                selectedAccount.value = account
+                const account = findAccountById(internalAccountTree.value, normalized)
+                if (account) selectedAccount.value = account
             }
         })
     }
 
-    // 使用 nextTick 确保 DOM 更新完成
     nextTick(() => {
         if (typeof requestIdleCallback !== 'undefined') {
-            // 浏览器空闲时加载（推荐）
             requestIdleCallback(loadAccountTreeAsync, { timeout: 2000 })
         } else {
-            // 降级方案：延迟 100ms 加载
             setTimeout(loadAccountTreeAsync, 100)
         }
     })

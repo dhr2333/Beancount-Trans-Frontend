@@ -111,7 +111,7 @@
               <el-table-column label="账户" min-width="300">
                 <template #default="{ row }">
                   <AccountSelector v-model="row.accountId" placeholder="选择账户" :show-details="false"
-                    @change="(account) => handleAccountChange(row, account)" />
+                    :account-tree="accountTree" @change="(account) => handleAccountChange(row, account)" />
                 </template>
               </el-table-column>
               <el-table-column label="金额" min-width="200">
@@ -260,7 +260,6 @@ onBeforeRouteLeave(async (to, from, next) => {
 
 onMounted(async () => {
   await loadReconciliationData()
-  await loadAccounts()
 })
 
 // 路由 taskId 变化时（如撤销后跳转到新任务）重新加载数据，使「上次对账」与撤销按钮状态与后端一致
@@ -269,7 +268,6 @@ watch(
   (newId, oldId) => {
     if (newId != null && newId !== '' && String(newId) !== String(oldId)) {
       loadReconciliationData()
-      loadAccounts()
     }
   }
 )
