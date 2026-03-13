@@ -5,25 +5,35 @@
     <!-- 格式配置面板，只在非匿名用户或已跳过提示时显示 -->
     <el-form v-if="!showAnonymousPrompt" :model="formModel" :rules="formRules" ref="configForm">
         <el-collapse v-model="activePanels" class="config-panel">
-            <!-- 基础字段显示 -->
-            <el-collapse-item title="基础字段显示" name="basic" class="config-item">
-                <div class="config-group">
-                    <el-checkbox-group v-model="formatSettings">
-                        <el-checkbox label="showNote">显示备注内容</el-checkbox>
-                        <el-checkbox label="showTag">显示交易标签</el-checkbox>
-                        <el-checkbox label="showTime">显示交易时间</el-checkbox>
-                        <el-checkbox label="showUUID">显示交易流水号</el-checkbox>
-                        <el-checkbox label="showStatus">显示交易状态</el-checkbox>
-                        <el-checkbox label="showDiscount">显示折扣信息</el-checkbox>
-                    </el-checkbox-group>
+            <!-- 基础设置 -->
+            <el-collapse-item title="基础设置" name="basic" class="config-item">
+                <div class="config-group" style="padding-top: 10px;">
+                    <el-form-item label="标记符号">
+                        <el-select v-model="flagSymbol" placeholder="选择日期标记符号" class="symbol-selector">
+                            <el-option label="星号 *" value="*" />
+                            <el-option label="叹号 !" value="!" />
+                            <el-option label="井号 #" value="#" />
+                        </el-select>
+                    </el-form-item>
+                    
+                    <el-form-item label="显示字段">
+                        <el-checkbox-group v-model="formatSettings" class="checkbox-grid" style="width: 100%;">
+                            <el-checkbox label="showNote">显示备注内容</el-checkbox>
+                            <el-checkbox label="showTag">显示交易标签</el-checkbox>
+                            <el-checkbox label="showTime">显示交易时间</el-checkbox>
+                            <el-checkbox label="showUUID">显示交易流水号</el-checkbox>
+                            <el-checkbox label="showStatus">显示交易状态</el-checkbox>
+                            <el-checkbox label="showDiscount">显示折扣信息</el-checkbox>
+                        </el-checkbox-group>
+                    </el-form-item>
                 </div>
             </el-collapse-item>
 
-            <!-- 高级格式设置 -->
-            <el-collapse-item title="高级格式设置" name="advanced" class="config-item">
+            <!-- 模板配置 -->
+            <el-collapse-item title="高级配置" name="template" class="config-item">
                 <div class="config-group">
                     <el-divider>账户模板配置</el-divider>
-
+                    
                     <!-- 收入模板组 -->
                     <div class="template-group">
                         <el-input v-model="incomeTemplate" placeholder="输入自定义收入账户（如：Income:Discount）" clearable
@@ -58,29 +68,54 @@
                             </el-input>
                         </el-form-item>
                     </div>
-                    <el-divider>标记符号设置</el-divider>
-                    <el-select v-model="flagSymbol" placeholder="选择日期标记符号" class="symbol-selector">
-                        <el-option label="星号 *" value="*" />
-                        <el-option label="叹号 !" value="!" />
-                        <el-option label="井号 #" value="#" />
-                    </el-select>
                 </div>
             </el-collapse-item>
-            <el-collapse-item title="AI模型配置" name="ai" class="config-item">
-                <div class="config-group">
-                    <el-divider>模型选择</el-divider>
 
-                    <!-- 精简后的AI模型选择 -->
+            <!-- 解析设置 -->
+            <el-collapse-item title="解析设置" name="parsing" class="config-item">
+                <div class="config-group">
+                    <el-divider>多文件解析模式</el-divider>
+                    <el-form-item>
+                        <div class="parsing-mode-container">
+                            <el-radio-group v-model="parsingModePreference">
+                                <el-radio label="review">审核模式</el-radio>
+                                <el-radio label="direct_write">直接写入模式</el-radio>
+                            </el-radio-group>
+                            <el-alert 
+                                type="info" 
+                                show-icon 
+                                :closable="false"
+                                class="mode-alert"
+                            >
+                                <template v-if="parsingModePreference === 'review'">
+                                    <strong>审核模式：</strong>解析完成后需要用户审核，可以选择关键字或直接编辑条目，确认后再写入账本
+                                </template>
+                                <template v-else>
+                                    <strong>直接写入模式：</strong>解析完成后立即写入账本，适合对AI分类有较高信任度的用户
+                                </template>
+                            </el-alert>
+                        </div>
+                    </el-form-item>
+
+                    <el-divider>AI模型选择</el-divider>
                     <el-form-item label="AI引擎" prop="aiModel">
-                        <el-select v-model="aiModel" placeholder="选择AI处理引擎" class="model-selector">
-                            <el-option label="单规则匹配" value="None" description="选择第一个" />
-                            <el-option label="BERT - 本地模型 (平衡模式)" value="BERT"
-                                description="基于Transformer架构，适合复杂语义理解，准确度较高（F1 0.87），推理速度 32ms/token" />
-                            <el-option label="spaCy - 本地模型 (极速模式)" value="spaCy"
-                                description="工业级NLP库，优化词向量匹配，推理速度 <5ms/token，适合实时处理" />
-                            <el-option label="DeepSeek - 云端大模型 (高精度模式)" value="DeepSeek"
-                                description="千亿参数LLM（需API密钥），复杂场景准确度提升35%，延迟 800-1200ms/请求" />
-                        </el-select>
+                        <div class="ai-engine-container">
+                            <el-select v-model="aiModel" placeholder="选择AI处理引擎" class="model-selector">
+                                <el-option label="单规则匹配" value="None" />
+                                <el-option label="BERT - 本地模型 (平衡模式)" value="BERT" />
+                                <el-option label="spaCy - 本地模型 (极速模式)" value="spaCy" />
+                                <el-option label="DeepSeek - 云端大模型 (高精度模式)" value="DeepSeek" />
+                            </el-select>
+
+                            <el-alert
+                                v-if="engineDescription"
+                                type="info"
+                                :closable="false"
+                                class="engine-description-alert"
+                            >
+                                {{ engineDescription }}
+                            </el-alert>
+                        </div>
                     </el-form-item>
 
                     <!-- DeepSeek专属配置 -->
@@ -90,27 +125,6 @@
                                 show-password clearable />
                         </el-form-item>
                     </template>
-                </div>
-            </el-collapse-item>
-            <el-collapse-item title="解析模式设置" name="parsing" class="config-item">
-                <div class="config-group">
-                    <el-divider>解析模式偏好</el-divider>
-                    <el-form-item label="多文件解析模式">
-                        <el-radio-group v-model="parsingModePreference">
-                            <el-radio label="review">审核模式</el-radio>
-                            <el-radio label="direct_write">直接写入模式</el-radio>
-                        </el-radio-group>
-                        <div class="mode-description">
-                            <el-text type="info" size="small">
-                                <template v-if="parsingModePreference === 'review'">
-                                    审核模式：解析完成后需要用户审核，可以选择关键字或直接编辑条目，确认后再写入账本
-                                </template>
-                                <template v-else>
-                                    直接写入模式：解析完成后立即写入账本，适合对AI分类有较高信任度的用户
-                                </template>
-                            </el-text>
-                        </div>
-                    </el-form-item>
                 </div>
             </el-collapse-item>
         </el-collapse>
@@ -126,9 +140,11 @@
         </el-button>
     </div>
 </template>
+
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Warning } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
 import { hasAuthTokens } from '../../utils/auth'
@@ -177,7 +193,7 @@ interface Config {
 }
 
 // 响应式配置状态
-const activePanels = ref(['basic', 'advanced', 'ai', 'parsing'])
+const activePanels = ref(['basic', 'template', 'parsing'])
 const formatSettings = ref<string[]>([])
 const incomeTemplate = ref('')
 const commissionTemplate = ref('')
@@ -194,6 +210,21 @@ const loading = ref({
 
 // 匿名用户提示
 const showAnonymousPrompt = ref(false)
+
+const engineDescription = computed(() => {
+    switch (aiModel.value) {
+        case 'None':
+            return '选择第一个'
+        case 'BERT':
+            return '基于Transformer架构，适合复杂语义理解，准确度较高（F1 0.87），推理速度 32ms/token'
+        case 'spaCy':
+            return '工业级NLP库，优化词向量匹配，推理速度 <5ms/token，适合实时处理'
+        case 'DeepSeek':
+            return '千亿参数LLM（需API密钥），复杂场景准确度提升35%，延迟 800-1200ms/请求'
+        default:
+            return ''
+    }
+})
 
 // 转换配置格式：前端 camelCase <-> 后端 snake_case
 const convertToFrontend = (config: Config) => {
@@ -346,7 +377,6 @@ const resetToDefault = async () => {
 }
 </script>
 
-
 <style scoped>
 .template-group {
     display: flex;
@@ -368,7 +398,6 @@ const resetToDefault = async () => {
 
 .config-group {
     padding: 0 16px;
-
 }
 
 .label-with-tip {
@@ -379,17 +408,42 @@ const resetToDefault = async () => {
 
 .model-selector {
     width: 100%;
-    margin-bottom: 15px;
 }
 
 .el-form-item {
     margin-bottom: 18px;
 }
 
-.mode-description {
-    margin-top: 8px;
-    padding: 8px 12px;
-    background-color: var(--el-fill-color-light);
-    border-radius: 4px;
+.checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.ai-engine-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.parsing-mode-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mode-alert,
+.engine-description-alert {
+    margin-top: 5px;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 30px;
+    margin-bottom: 20px;
 }
 </style>
