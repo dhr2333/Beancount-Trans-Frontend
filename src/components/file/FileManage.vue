@@ -72,7 +72,7 @@
         <el-dialog v-model="parseDialogVisible" title="解析任务进度" width="600px">
             <el-progress :percentage="parseProgressPercentage" :status="parseStatus" />
             <div class="task-info">
-                <p>任务组ID: {{ currentTaskGroupId }}</p>
+                <p>任务组ID: {{ activeTaskGroupIds.length > 0 ? activeTaskGroupIds[activeTaskGroupIds.length - 1] : '' }}</p>
                 <p>状态: {{ parseStatusText }}</p>
                 <p>进度: {{ completedTasks }}/{{ totalTasks }}</p>
             </div>
@@ -428,7 +428,7 @@ async function customUpload(options: any) {
             // 检测同名文件冲突错误
             if (errorData?.existing_files && errorData.existing_files.length > 0) {
                 const directoryPaths = errorData.existing_files.map(f => f.directory_path).join('、');
-                errorMsg = `文件名 "${uploadedFileName}" 在以下目录已存在：${directoryPaths}。为避免解析结果冲突，请重命名文件后上传。`;
+                errorMsg = `文件名 "${uploadedFileName}" 在以下目录已存在：${directoryPaths}，请勿重复上传。`;
             }
             // 检测同一目录重复文件错误（数据库唯一约束）
             else if (errorText.includes('duplicate key') || errorText.includes('already exists')) {
@@ -1193,7 +1193,7 @@ function formatDateTime(dateString: string): string {
 
 
 const parseDialogVisible = ref(false);
-const currentTaskGroupId = ref('');
+const activeTaskGroupIds = ref<string[]>([]);
 const completedTasks = ref(0);
 const totalTasks = ref(0);
 const taskDetails = ref<any[]>([]);
@@ -1279,7 +1279,7 @@ async function confirmParseWithPassword() {
 
     const isStep3 = getTourProgress()?.currentStep === 2;
 
-    await submitParseTask(fileIds, passwords);
+    await submitParseTask(fileIds, passwords, true);
 
     // 如果在导览步骤三，解析开始后销毁导览并保存进度
     if (isStep3) {
@@ -1292,7 +1292,7 @@ async function confirmParseWithPassword() {
     }
 }
 
-async function submitParseTask(fileIds: string[], passwords?: Record<string, string>) {
+async function submitParseTask(fileIds: string[], passwords?: Record<string, string>, isPasswordRetry: boolean = false) {
     try {
         const payload: any = { file_ids: fileIds };
         if (passwords && Object.keys(passwords).length > 0) {
@@ -1303,21 +1303,32 @@ async function submitParseTask(fileIds: string[], passwords?: Record<string, str
 
         // 处理任务状态（保持原有逻辑）
         if (response.status === 202) {
-            currentTaskGroupId.value = response.data.task_group_id;
-            totalTasks.value = fileIds.length;
-            completedTasks.value = 0;
+            if (isPasswordRetry) {
+                activeTaskGroupIds.value.push(response.data.task_group_id);
+                fileIds.forEach(id => {
+                    const task = taskDetails.value.find(t => t.file_id === id);
+                    if (task) {
+                        task.status = 'pending';
+                        task.error = undefined;
+                    }
+                });
+            } else {
+                activeTaskGroupIds.value = [response.data.task_group_id];
+                totalTasks.value = fileIds.length;
+                completedTasks.value = 0;
 
-            // 构建任务详情（兼容全局搜索模式）
-            taskDetails.value = fileIds.map(id => {
-                // 在文件列表中查找对应文件
-                const file = items.value.find(item => item.id === id) ||
-                    globalSearchResults.value.find(item => item.id === id);
-                return {
-                    file_id: id,
-                    file_name: file ? file.name : id,
-                    status: 'pending'
-                };
-            });
+                // 构建任务详情（兼容全局搜索模式）
+                taskDetails.value = fileIds.map(id => {
+                    // 在文件列表中查找对应文件
+                    const file = items.value.find(item => item.id === id) ||
+                        globalSearchResults.value.find(item => item.id === id);
+                    return {
+                        file_id: id,
+                        file_name: file ? file.name : id,
+                        status: 'pending'
+                    };
+                });
+            }
 
             parseDialogVisible.value = true;
             startPollingTaskStatus();
@@ -1413,19 +1424,32 @@ function startPollingTaskStatus() {
 
     pollingInterval.value = setInterval(async () => {
         try {
-            const response = await axios.get('/translate/task_group_status', {
-                params: { task_group_id: currentTaskGroupId.value },
-                headers: headers.value
+            if (activeTaskGroupIds.value.length === 0) return;
+
+            // 并发请求所有 active 组的状态
+            const promises = activeTaskGroupIds.value.map(groupId => 
+                axios.get('/translate/task_group_status', {
+                    params: { task_group_id: groupId },
+                    headers: headers.value
+                }).catch(e => null)
+            );
+            const responses = await Promise.all(promises);
+
+            const allTasks: any[] = [];
+            responses.forEach(res => {
+                if (res && res.data && res.data.tasks) {
+                    allTasks.push(...res.data.tasks);
+                }
             });
 
-            const statusData = response.data;
             completedTasks.value = 0;
+            let hasNewPendingReview = false;
 
             // 更新任务状态
-            let hasNewPendingReview = false;
             taskDetails.value = taskDetails.value.map(task => {
-                const taskStatus = statusData.tasks.find((t: any) => t.file_id === task.file_id);
-                if (taskStatus) {
+                const taskStatuses = allTasks.filter(t => t.file_id === task.file_id);
+                if (taskStatuses.length > 0) {
+                    const taskStatus = taskStatuses[taskStatuses.length - 1]; // 取最后也就是最新的
                     const oldStatus = task.status;
                     const newStatus = taskStatus.status;
 
@@ -1435,10 +1459,14 @@ function startPollingTaskStatus() {
                     }
 
                     // pending_review 表示解析已完成，只是需要审核，应该计入已完成
-                    if (newStatus === 'parsed' || newStatus === 'failed' || newStatus === 'cancelled' || newStatus === 'pending_review') {
+                    if (['parsed', 'failed', 'cancelled', 'pending_review'].includes(newStatus)) {
                         completedTasks.value++;
                     }
                     return { ...task, status: newStatus, error: taskStatus.error ?? task.error };
+                }
+                
+                if (['parsed', 'failed', 'cancelled', 'pending_review'].includes(task.status)) {
+                    completedTasks.value++;
                 }
                 return task;
             });
@@ -1449,12 +1477,12 @@ function startPollingTaskStatus() {
             }
 
             // 检查任务组是否完成
-            // 如果任务组状态为 completed，或者所有任务都是已完成状态（包括 pending_review），则关闭弹窗
-            const allTasksCompleted = statusData.tasks.every((task: any) =>
+            // 如果所有任务都是已完成状态（包括 pending_review），则关闭弹窗
+            const allTasksCompleted = taskDetails.value.every((task: any) =>
                 ['parsed', 'failed', 'cancelled', 'pending_review'].includes(task.status)
             );
 
-            if (statusData.status === 'completed' || allTasksCompleted) {
+            if (allTasksCompleted) {
                 stopPolling();
                 ElMessage.success('所有文件解析完成');
 
