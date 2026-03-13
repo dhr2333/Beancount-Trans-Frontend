@@ -1,3 +1,9 @@
+## [5.9.7](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.6...5.9.7) (2026-03-13)
+
+### Performance Improvements
+
+* Enhance AccountSelector to support external account tree injection and improve account selection logic ([ef9780c](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/ef9780c507853971038f370875fd10487ad578ba))
+
 ## [5.9.6](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.5...5.9.6) (2026-03-12)
 
 ### Bug Fixes
