@@ -122,7 +122,7 @@
           <el-icon class="el-icon--left"><i-ep-download /></el-icon>
           下载解析结果
         </el-button>
-        <el-button 1 的平台拉取公钥不是同一用途。 v-if="!isLinkedRemote" plain :loading="downloadingKey" @click="downloadDeployKey"
+        <el-button v-if="!isLinkedRemote" type="primary" plain :loading="downloadingKey" @click="downloadDeployKey"
           class="action-btn-main">
           <el-icon class="el-icon--left"><i-ep-key /></el-icon>
           下载 Deploy Key
