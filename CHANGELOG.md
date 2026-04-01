@@ -1,3 +1,9 @@
+## [5.9.8](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.7...5.9.8) (2026-04-01)
+
+### Bug Fixes
+
+* self-hosting ([#60](https://github.com/dhr2333/Beancount-Trans-Frontend/issues/60)) ([3560b5d](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/3560b5d3e0b2ee51af14a429c4060ef8bd633947))
+
 ## [5.9.7](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.6...5.9.7) (2026-03-13)
 
 ### Performance Improvements
