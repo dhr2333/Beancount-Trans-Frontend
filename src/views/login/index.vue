@@ -13,7 +13,7 @@
       <!-- 登录表单 -->
       <div class="login-form">
         <el-tabs v-model="loginMethod" class="login-tabs">
-          <el-tab-pane label="手机号登录" name="phone">
+          <el-tab-pane v-if="smsEnabled" label="手机号登录" name="phone">
             <el-form ref="phoneLoginFormRef" :model="phoneLoginForm" :rules="phoneLoginRules" label-width="0">
               <el-form-item prop="phone_number">
                 <el-input v-model="phoneLoginForm.phone_number" placeholder="手机号" size="large" clearable>
@@ -148,7 +148,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { User, Lock, Phone, Message } from '@element-plus/icons-vue'
@@ -159,9 +159,29 @@ import { initTourState } from '../../utils/userTour'
 
 const apiUrl = import.meta.env.VITE_API_URL
 
-// 登录相关
+// 登录相关（默认手机号页；无短信时由 public-config 切到账密）
+const smsEnabled = ref(true)
+/** 与后端 PHONE_BINDING_REQUIRED 对齐；未拉到 public-config 前默认为 true */
+const phoneBindingRequired = ref(true)
 const loginMethod = ref('phone')
 const loginLoading = ref(false)
+
+onMounted(async () => {
+  try {
+    const { data } = await axios.get(`${apiUrl.replace(/\/$/, '')}/auth/public-config/`)
+    if (data && typeof data.sms_enabled === 'boolean') {
+      smsEnabled.value = data.sms_enabled
+    }
+    if (data && typeof data.phone_binding_required === 'boolean') {
+      phoneBindingRequired.value = data.phone_binding_required
+    }
+    if (!smsEnabled.value && loginMethod.value === 'phone') {
+      loginMethod.value = 'username'
+    }
+  } catch {
+    // 保持默认，兼容旧后端
+  }
+})
 
 // 验证码相关
 const codeSending = ref(false)
@@ -389,9 +409,10 @@ const handleUsernameLogin = async () => {
         }, 2000) // 延迟2秒，确保后端完成账户和待办的创建
       }
 
-      // 检查手机号绑定状态
-      if (!res.data.user.phone_number) {
-        // 未绑定手机号，跳转到手机号绑定页面
+      // 检查手机号绑定状态（须与后端 PHONE_BINDING_REQUIRED / public-config 一致）
+      const mustBindPhone =
+        phoneBindingRequired.value && !res.data.user.phone_number
+      if (mustBindPhone) {
         ElMessage.warning('请先绑定手机号')
         router.push('/phone-binding')
       } else {

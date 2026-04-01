@@ -980,10 +980,28 @@ const handleConfirmDisableTOTP = async () => {
     }
 }
 
-// Git 仓库相关
+// Git 仓库相关（webhook_secret 仅关联/创建接口首次返回，GET 通常不含；同一会话内合并保留便于展示）
+const mergeGitRepositoryPreservingSecret = (
+    next: GitRepository,
+    prev: GitRepository | null
+): GitRepository => {
+    if (
+        prev &&
+        prev.id === next.id &&
+        next.webhook_secret == null &&
+        prev.webhook_secret != null &&
+        prev.webhook_secret !== ''
+    ) {
+        return { ...next, webhook_secret: prev.webhook_secret }
+    }
+    return next
+}
+
 const fetchGitRepository = async () => {
     try {
-        gitRepository.value = await getGitRepository()
+        const prev = gitRepository.value
+        const data = await getGitRepository()
+        gitRepository.value = mergeGitRepositoryPreservingSecret(data, prev)
     } catch (error: any) {
         // 404 表示未启用 Git，这是正常的
         if (error.response?.status !== 404) {
@@ -1000,7 +1018,10 @@ const onGitRepositoryCreated = (repository: GitRepository) => {
 }
 
 const onGitRepositoryUpdated = (repository: GitRepository) => {
-    gitRepository.value = repository
+    gitRepository.value = mergeGitRepositoryPreservingSecret(
+        repository,
+        gitRepository.value
+    )
 }
 
 const onGitRepositoryDeleted = () => {

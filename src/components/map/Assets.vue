@@ -532,14 +532,30 @@ const submitForm = async (formEl: FormInstance | undefined) => {
 //     XLSX.utils.book_append_sheet(wb, ws, "Sheet1")
 //     XLSX.writeFile(wb, fileName)
 // }
+function parseCsvEnable(v: unknown): boolean {
+    if (v === false || v === true) return v
+    const s = String(v ?? '').trim().toLowerCase()
+    if (s === 'false' || s === '0' || s === '否') return false
+    if (s === 'true' || s === '1' || s === '是') return true
+    return true
+}
+
+function normalizeCsvRowKeys(item: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = {}
+    for (const k of Object.keys(item)) {
+        out[k.replace(/^\ufeff/, '').trim()] = item[k]
+    }
+    return out
+}
+
 const handleExport = () => {
-    const data = AssetsData.value
-    data.forEach((item: any) => {
-        delete item.id
-        delete item.url
-        delete item.owner
-    })
-    const ws = XLSX.utils.json_to_sheet(data)
+    const rows = AssetsData.value.map((row: any) => ({
+        key: row.key ?? '',
+        full: row.full ?? '',
+        映射账户: row.assets?.account ?? '',
+        enable: row.enable !== false,
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
     const csv = XLSX.utils.sheet_to_csv(ws)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
@@ -571,7 +587,18 @@ const handleImport = () => {
                     const worksheet = workbook.Sheets[firstSheetName];
                     let json = XLSX.utils.sheet_to_json(worksheet, { raw: false });
 
-                    console.log(JSON.stringify(json));
+                    json = json.map((item: any) => {
+                        const row = normalizeCsvRowKeys(item) as Record<string, unknown>
+                        const assetsAccount = String(
+                            row['映射账户'] ?? row.assets_account ?? ''
+                        ).trim()
+                        return {
+                            key: row.key ?? '',
+                            full: row.full ?? '',
+                            assets_account: assetsAccount,
+                            enable: parseCsvEnable(row.enable),
+                        }
+                    })
 
                     axios({
                         url: 'assets/',

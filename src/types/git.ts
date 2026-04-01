@@ -2,16 +2,32 @@
  * Git 仓库相关的 TypeScript 类型定义
  */
 
+export type GitProvider =
+  | 'gitea_hosted'
+  | 'github'
+  | 'gitlab'
+  | 'gitea'
+  | 'other'
+
 // Git 仓库信息
 export interface GitRepository {
   id: number
   ssh_clone_url: string
-  https_clone_url: string
   repo_name: string
+  setup_mode?: 'create' | 'link'
+  provider: GitProvider
+  remote_ssh_url?: string
+  external_full_name?: string
+  default_branch?: string
+  deploy_key_public?: string
+  webhook_callback_url?: string
+  setup_instructions?: string[]
+  /** 仅创建/关联接口首次返回；列表 GET 通常不含此字段 */
+  webhook_secret?: string
   created_with_template: boolean
   last_sync_at: string | null
   sync_status: SyncStatus
-  sync_error: string
+  sync_error: string | null
   deploy_key_download_url: string
   created: string
   modified: string
@@ -44,9 +60,16 @@ export const SyncStatusType: Record<SyncStatus, 'info' | 'warning' | 'success' |
   failed: 'danger'
 }
 
-// 创建仓库请求
+// 创建仓库请求（仅平台托管 Gitea）
 export interface CreateRepositoryRequest {
   template: boolean
+}
+
+export interface LinkRepositoryRequest {
+  remote_ssh_url: string
+  provider?: 'github' | 'gitlab' | 'gitea' | 'other'
+  default_branch?: string
+  external_full_name?: string
 }
 
 // 创建仓库选项
