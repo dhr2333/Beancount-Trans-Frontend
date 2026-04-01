@@ -28,14 +28,25 @@
 
       <!-- 仓库信息 -->
       <div class="repo-info-section">
+        <el-alert v-if="isLinkedRemote && showLinkedRemoteIntro" type="info" show-icon :closable="false"
+          class="linked-remote-intro">
+          <template #title>关联远程：完成平台侧对接</template>
+          <p class="linked-intro-text">
+            请按顺序展开下方<strong>步骤 1、步骤 2</strong>，在托管平台配置公钥与 Webhook。本地 Git 的克隆与推送由您自行完成，此处仅说明如何让平台从您的远程仓库拉取。
+          </p>
+          <el-text type="warning" size="small" class="mt-2">
+            Webhook Secret 仅首次展示，请务必及时复制保存。刷新或重新进入页面后通常不再显示。如丢失请删除仓库后重新关联。
+          </el-text>
+        </el-alert>
+
         <el-descriptions border :column="3" class="repo-descriptions">
           <el-descriptions-item label="仓库名称">
             <span class="repo-name">{{ repository.repo_name }}</span>
           </el-descriptions-item>
 
           <el-descriptions-item label="创建方式">
-            <el-tag :type="repository.created_with_template ? 'success' : 'info'" size="small" effect="light">
-              {{ repository.created_with_template ? '基于模板' : '空仓库' }}
+            <el-tag :type="creationMethodTagType" size="small" effect="light">
+              {{ creationMethodLabel }}
             </el-tag>
           </el-descriptions-item>
 
@@ -46,7 +57,7 @@
             <el-text v-else type="info" size="small">尚未同步</el-text>
           </el-descriptions-item>
 
-          <el-descriptions-item label="SSH 地址" :span="3">
+          <el-descriptions-item label="SSH 克隆地址" :span="3">
             <el-input :model-value="repository.ssh_clone_url" readonly class="ssh-url-input">
               <template #append>
                 <el-button @click="copyToClipboard(repository.ssh_clone_url)">
@@ -56,7 +67,49 @@
               </template>
             </el-input>
           </el-descriptions-item>
+
+          <el-descriptions-item v-if="!isLinkedRemote && repository.webhook_callback_url" label="Webhook URL" :span="3">
+            <el-input :model-value="repository.webhook_callback_url" readonly class="ssh-url-input">
+              <template #append>
+                <el-button @click="copyToClipboard(repository.webhook_callback_url!)">
+                  <el-icon><i-ep-copy-document /></el-icon>
+                  复制
+                </el-button>
+              </template>
+            </el-input>
+          </el-descriptions-item>
+
+          <el-descriptions-item v-if="!isLinkedRemote && repository.webhook_secret" label="Webhook Secret" :span="3">
+            <el-alert type="warning" :closable="false" show-icon class="webhook-secret-alert" title="仅首次展示，请立即复制保存"
+              description="填入远程 Webhook 的 Secret / Token / 密钥字段。刷新或重新进入页面后通常不再显示；若未保存，可删除本 Git 仓库重新关联。" />
+            <el-input :model-value="repository.webhook_secret" readonly class="ssh-url-input mt-2" />
+            <el-button class="mt-2" size="small" type="primary" plain
+              @click="copyToClipboard(repository.webhook_secret!)">
+              <el-icon><i-ep-copy-document /></el-icon>
+              复制 Secret
+            </el-button>
+          </el-descriptions-item>
+
+          <el-descriptions-item v-if="!isLinkedRemote && repository.deploy_key_public && !isPlatformHosted"
+            label="Deploy Key 公钥" :span="3">
+            <el-input type="textarea" :rows="3" :model-value="repository.deploy_key_public" readonly
+              class="ssh-url-input" />
+            <el-button class="mt-2" size="small" @click="copyToClipboard(repository.deploy_key_public!)">
+              <el-icon><i-ep-copy-document /></el-icon>
+              复制公钥
+            </el-button>
+          </el-descriptions-item>
         </el-descriptions>
+
+        <div v-if="repository.setup_instructions?.length && !isLinkedRemote" class="setup-hints">
+          <h4 class="section-title small-title">
+            <el-icon><i-ep-info-filled /></el-icon>
+            Webhook 与远程配置提示
+          </h4>
+          <ul class="hint-list">
+            <li v-for="(line, idx) in repository.setup_instructions" :key="idx">{{ line }}</li>
+          </ul>
+        </div>
 
         <!-- 同步错误信息 -->
         <el-alert v-if="repository.sync_status === 'failed' && repository.sync_error" title="同步失败" type="error"
@@ -69,7 +122,8 @@
           <el-icon class="el-icon--left"><i-ep-download /></el-icon>
           下载解析结果
         </el-button>
-        <el-button plain :loading="downloadingKey" @click="downloadDeployKey" class="action-btn-main">
+        <el-button v-if="!isLinkedRemote" type="primary" plain :loading="downloadingKey" @click="downloadDeployKey"
+          class="action-btn-main">
           <el-icon class="el-icon--left"><i-ep-key /></el-icon>
           下载 Deploy Key
         </el-button>
@@ -82,15 +136,75 @@
           使用说明
         </h4>
 
-        <el-collapse>
-          <el-collapse-item title="配置 SSH 密钥" name="ssh">
+        <el-collapse v-model="instructionActivePanels">
+          <!-- 关联远程：仅平台对接（与「平台创建仓库」的克隆/推送说明区分） -->
+          <el-collapse-item v-if="isLinkedRemote" title="步骤 1：添加 Deploy Key 公钥（平台拉取）" name="link-deploy-key">
+            <div class="instruction-content link-step-panel">
+              <p>平台通过 Deploy Key 公钥从您的远程仓库拉取账本，与您在本地执行 <code>git push</code> 时使用的账户或 SSH
+                密钥<strong>无关</strong>。</p>
+              <p>在 <strong>GitHub / GitLab / Gitea</strong> 打开该仓库 → <strong>Settings</strong> → <strong>Deploy
+                  keys</strong>（或同类入口）→
+                粘贴下方公钥，并勾选<strong>只读</strong>。</p>
+              <template v-if="repository.deploy_key_public">
+                <el-input type="textarea" :rows="4" :model-value="repository.deploy_key_public" readonly
+                  class="ssh-url-input" />
+                <el-button class="mt-2" size="small" type="primary" plain
+                  @click="copyToClipboard(repository.deploy_key_public!)">
+                  <el-icon><i-ep-copy-document /></el-icon>
+                  复制公钥
+                </el-button>
+              </template>
+              <el-text v-else type="warning" size="small">未返回公钥时请联系管理员或刷新页面后重试。</el-text>
+            </div>
+          </el-collapse-item>
+
+          <el-collapse-item v-if="isLinkedRemote" title="步骤 2：配置 Webhook（推送后自动拉取）" name="link-webhook">
+            <div class="instruction-content link-step-panel">
+              <p>
+                在仓库的 <strong>Webhooks</strong> 中新增一条：<strong>Payload URL</strong> 使用下方地址；<strong>Content type</strong>
+                选择
+                <code>application/json</code>；事件勾选 <strong>push</strong>。将平台提供的 Secret 填入托管方要求的字段。
+              </p>
+              <p>
+                仅当推送分支为默认分支 <code>{{ defaultBranch }}</code> 时，平台才会执行拉取；也可随时使用页头的 <strong>立即同步</strong> 手动拉取。
+              </p>
+              <template v-if="repository.webhook_callback_url">
+                <p class="mono-label">Webhook URL</p>
+                <el-input :model-value="repository.webhook_callback_url" readonly class="ssh-url-input">
+                  <template #append>
+                    <el-button @click="copyToClipboard(repository.webhook_callback_url!)">
+                      <el-icon><i-ep-copy-document /></el-icon>
+                      复制
+                    </el-button>
+                  </template>
+                </el-input>
+              </template>
+              <template v-if="repository.webhook_secret">
+                <el-alert type="warning" :closable="false" show-icon class="webhook-secret-alert mt-2"
+                  title="Webhook Secret 仅首次展示，请立即复制保存"
+                  description="刷新或重新进入页面后通常不再显示。若未保存，需删除本 Git 配置后重新关联，并在远程更新 Webhook。" />
+                <el-input :model-value="repository.webhook_secret" readonly class="ssh-url-input mt-2" />
+                <el-button class="mt-2" size="small" type="primary" plain
+                  @click="copyToClipboard(repository.webhook_secret!)">
+                  <el-icon><i-ep-copy-document /></el-icon>
+                  复制 Secret
+                </el-button>
+              </template>
+              <p v-else-if="repository.webhook_callback_url" class="secret-missing-hint">
+                若此处未显示 Secret，可能已刷新过页面；请在各托管平台按文档更新密钥，或删除仓库后重新关联以获取新 Secret。
+              </p>
+            </div>
+          </el-collapse-item>
+
+          <el-collapse-item v-if="!isLinkedRemote" title="配置 SSH 密钥" name="ssh">
             <div class="instruction-content">
-              <p>下载 Deploy Key 后，需要配置 SSH 以使用该密钥：</p>
-              <div class="code-block">
-                <pre><code># 设置 SSH 密钥权限
+              <template v-if="isPlatformHosted">
+                <p>下载 Deploy Key 后，需要配置 SSH 以访问平台 Gitea：</p>
+                <div class="code-block">
+                  <pre><code># 设置 SSH 密钥权限
 chmod 600 ~/Downloads/{{ username }}_deploy_key.pem
 
-# 添加 SSH 配置
+# 添加 SSH 配置（示例，HostName/Port 以实际部署为准）
 cat >> ~/.ssh/config &lt;&lt; 'EOF'
 Host gitea-beancount
         HostName gitea.dhr2333.cn
@@ -98,37 +212,37 @@ Host gitea-beancount
         User git
         IdentityFile ~/Downloads/{{ username }}_deploy_key.pem
 EOF</code></pre>
-              </div>
+                </div>
+              </template>
+              <template v-else>
+                <p>下载 Deploy Key 私钥后，在本地配置 <code>IdentityFile</code> 指向该文件，或使用 <code>ssh-agent</code> 加载密钥，确保能访问上方「SSH
+                  克隆地址」。</p>
+                <p>在 GitHub / GitLab / Gitea 仓库设置中添加 Deploy Key，并粘贴「Deploy Key 公钥」。</p>
+              </template>
             </div>
           </el-collapse-item>
 
-          <el-collapse-item title="克隆仓库到本地" name="clone">
+          <el-collapse-item v-if="!isLinkedRemote" title="克隆仓库到本地" name="clone">
             <div class="instruction-content">
-              <p>使用以下命令克隆仓库到本地：</p>
+              <p>使用 SSH 克隆地址：</p>
               <div class="code-block">
-                <pre><code># 使用 SSH 并配置仓库别名
-git clone gitea-beancount:beancount-trans/{{ repository.repo_name }}.git Assets
-</code></pre>
+                <pre><code>git clone {{ repository.ssh_clone_url }} Assets</code></pre>
               </div>
+              <p v-if="isPlatformHosted">若已按上文配置 <code>Host gitea-beancount</code>，也可使用别名形式克隆。</p>
             </div>
           </el-collapse-item>
 
-          <el-collapse-item title="推送修改到平台" name="push">
+          <el-collapse-item v-if="!isLinkedRemote" title="推送与同步" name="push">
             <div class="instruction-content">
-              <p>编辑账本后，推送修改到平台：</p>
+              <p>编辑账本后推送到默认分支 <code>{{ defaultBranch }}</code>：</p>
               <div class="code-block">
-                <pre><code># 添加修改
-git add .
-
-# 提交修改
+                <pre><code>git add .
 git commit -m "更新账本"
-
-# 推送到平台（二选一）
-git push origin main
-
-git push gitea-beancount:beancount-trans/c3965d-assets.git main</code></pre>
+git push origin {{ defaultBranch }}</code></pre>
               </div>
-              <p><strong>注意：</strong>推送后平台会自动同步，您也可以手动点击"立即同步"按钮。</p>
+              <p v-if="repository.webhook_callback_url"><strong>Webhook：</strong>推送至上述分支且远程已配置 Webhook
+                后，平台会尝试自动拉取；也可手动点击「立即同步」。</p>
+              <p v-else><strong>注意：</strong>平台托管仓库由 Gitea 触发同步；您也可随时使用「立即同步」。</p>
             </div>
           </el-collapse-item>
 
@@ -137,32 +251,36 @@ git push gitea-beancount:beancount-trans/c3965d-assets.git main</code></pre>
             <template #title>
               <div class="advanced-title">
                 高级设置
-                <el-text type="info" size="small" class="ml-2">（Deploy Key 重置、删除仓库）</el-text>
+                <el-text type="info" size="small" class="ml-2">
+                  （{{ isLinkedRemote ? '删除仓库' : 'Deploy Key 重置、删除仓库' }}）
+                </el-text>
               </div>
             </template>
             <div class="advanced-settings">
-              <!-- Deploy Key 重置 -->
-              <div class="setting-item first-item">
-                <div class="setting-info">
-                  <span class="setting-label">重置 Deploy Key</span>
-                  <span class="setting-desc">重置后旧密钥将失效，需要重新配置 SSH 访问</span>
+              <!-- Deploy Key 重置（平台托管 / 其他非关联远程场景） -->
+              <template v-if="!isLinkedRemote">
+                <div class="setting-item first-item">
+                  <div class="setting-info">
+                    <span class="setting-label">重置 Deploy Key</span>
+                    <span class="setting-desc">重置后旧密钥将失效，需要重新配置 SSH 访问</span>
+                  </div>
+                  <div class="setting-actions">
+                    <el-popconfirm title="确定重置密钥吗？旧密钥将立即失效。" @confirm="confirmRegenerateKey" width="260">
+                      <template #reference>
+                        <el-button type="warning" plain size="small" :loading="regeneratingKey">
+                          <el-icon class="el-icon--left"><i-ep-refresh /></el-icon>
+                          重置 Key
+                        </el-button>
+                      </template>
+                    </el-popconfirm>
+                  </div>
                 </div>
-                <div class="setting-actions">
-                  <el-popconfirm title="确定重置密钥吗？旧密钥将立即失效。" @confirm="confirmRegenerateKey" width="260">
-                    <template #reference>
-                      <el-button type="warning" plain size="small" :loading="regeneratingKey">
-                        <el-icon class="el-icon--left"><i-ep-refresh /></el-icon>
-                        重置 Key
-                      </el-button>
-                    </template>
-                  </el-popconfirm>
-                </div>
-              </div>
 
-              <div class="setting-divider"></div>
+                <div class="setting-divider"></div>
+              </template>
 
               <!-- 删除仓库 -->
-              <div class="setting-item">
+              <div class="setting-item" :class="{ 'first-item': isLinkedRemote }">
                 <div class="setting-info">
                   <span class="setting-label text-danger">删除仓库</span>
                   <span class="setting-desc">永久删除 Git 仓库配置，此操作不可恢复</span>
@@ -187,8 +305,8 @@ git push gitea-beancount:beancount-trans/c3965d-assets.git main</code></pre>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
   triggerSync as apiTriggerSync,
   handleDeployKeyDownload,
@@ -222,6 +340,82 @@ const deletingRepository = ref(false)
 
 // 计算属性
 const username = computed(() => localStorage.getItem('username') || 'user')
+
+const defaultBranch = computed(() => (props.repository.default_branch || 'main').trim() || 'main')
+
+const isPlatformHosted = computed(
+  () =>
+    props.repository.provider === 'gitea_hosted' &&
+    !(props.repository.remote_ssh_url || '').trim()
+)
+
+/** 关联已有远程：显式 link，或未返回 setup_mode 时由非平台托管 + SSH 地址推断 */
+const isLinkedRemote = computed(() => {
+  const mode = props.repository.setup_mode
+  if (mode === 'link') return true
+  if (mode === 'create') return false
+  const url = (props.repository.remote_ssh_url || '').trim()
+  return url.length > 0 && props.repository.provider !== 'gitea_hosted'
+})
+
+const creationMethodLabel = computed(() => {
+  if (isLinkedRemote.value) return '关联'
+  if (props.repository.created_with_template) return '模板创建'
+  return '空仓库'
+})
+
+const creationMethodTagType = computed<'success' | 'warning' | 'info'>(() => {
+  if (isLinkedRemote.value) return 'warning'
+  if (props.repository.created_with_template) return 'success'
+  return 'info'
+})
+
+const instructionActivePanels = ref<string[]>([])
+
+/** 关联远程顶部引导：每个仓库 id 仅首次进入时展示，之后写入 localStorage 不再出现 */
+const showLinkedRemoteIntro = ref(false)
+
+function linkedRemoteIntroStorageKey(repoId: number): string {
+  const u = localStorage.getItem('username') || 'anon'
+  return `git_linked_remote_intro_seen_${u}_${repoId}`
+}
+
+watch(
+  () => [isLinkedRemote.value, props.repository.id] as const,
+  ([linked, repoId]) => {
+    if (!linked || !repoId) {
+      showLinkedRemoteIntro.value = false
+      return
+    }
+    const key = linkedRemoteIntroStorageKey(repoId)
+    showLinkedRemoteIntro.value = !localStorage.getItem(key)
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  if (
+    showLinkedRemoteIntro.value &&
+    isLinkedRemote.value &&
+    props.repository.id
+  ) {
+    localStorage.setItem(
+      linkedRemoteIntroStorageKey(props.repository.id),
+      '1'
+    )
+  }
+})
+
+/** 关联远程：使用说明默认全部折叠 */
+watch(
+  isLinkedRemote,
+  (linked) => {
+    if (linked) {
+      instructionActivePanels.value = []
+    }
+  },
+  { immediate: true }
+)
 
 // 工具方法
 const getSyncIcon = (status: string) => {
@@ -323,18 +517,6 @@ const downloadDeployKey = async () => {
 }
 
 const confirmRegenerateKey = async () => {
-  // 兼容 popconfirm 调用或直接调用，这里主要用于 logic 复用
-  // 注意：template 中使用了 popconfirm，所以这里不需要 ElMessageBox 二次确认，
-  // 除非逻辑需要保留双重确认。
-  // Popconfirm 是 template 层的确认，触发 confirm 事件后会调用这个方法。
-  // 因此这里直接执行业务逻辑。
-
-  // 但是，如果直接移除 ElMessageBox，原来的 logic 就变了。
-  // 让我检查 template。
-  // <el-popconfirm @confirm="confirmRegenerateKey">
-  // 那么 confirmRegenerateKey 里面就不应该再有 ElMessageBox 了，否则会弹两次。
-  // 我将移除 confirmRegenerateKey 中的 ElMessageBox。
-
   regeneratingKey.value = true
 
   try {
@@ -354,7 +536,6 @@ const confirmRegenerateKey = async () => {
 
 // 删除仓库相关方法
 const confirmDeleteRepository = async () => {
-  // 同理，template 使用了 popconfirm
   await deleteRepository()
 }
 
@@ -432,6 +613,23 @@ const deleteRepository = async () => {
   margin-bottom: 24px;
 }
 
+.linked-remote-intro {
+  margin-bottom: 16px;
+
+  .linked-intro-text {
+    margin: 0;
+    line-height: 1.6;
+    font-size: 13px;
+    color: var(--ep-text-color-regular);
+  }
+}
+
+.field-hint-below {
+  display: block;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
 .repo-descriptions {
   :deep(.el-descriptions__label) {
     width: 120px;
@@ -459,6 +657,10 @@ const deleteRepository = async () => {
 
 .sync-error-alert {
   margin-top: 16px;
+}
+
+.webhook-secret-alert {
+  margin-bottom: 8px;
 }
 
 // Actions Section Styles
@@ -554,6 +756,36 @@ const deleteRepository = async () => {
 }
 
 // Instructions Styles
+.setup-hints {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--ep-fill-color-lighter);
+  border: 1px solid var(--ep-border-color-lighter);
+}
+
+.hint-list {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ep-text-color-regular);
+}
+
+.mono-text {
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 13px;
+}
+
+.small-title {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+}
+
+.mt-2 {
+  margin-top: 8px;
+}
+
 .instructions-section {
   .section-title {
     display: flex;
@@ -574,6 +806,29 @@ const deleteRepository = async () => {
     line-height: 1.6;
     color: var(--ep-text-color-regular);
   }
+}
+
+.link-step-panel {
+  .mono-label {
+    margin: 12px 0 6px 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ep-text-color-secondary);
+  }
+
+  .secret-missing-hint {
+    margin: 8px 0 0 0;
+    font-size: 13px;
+    color: var(--ep-text-color-secondary);
+  }
+}
+
+.link-platform-list {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.55;
+  font-size: 13px;
+  color: var(--ep-text-color-regular);
 }
 
 .code-block {

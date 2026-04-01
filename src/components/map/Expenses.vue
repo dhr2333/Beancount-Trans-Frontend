@@ -579,15 +579,33 @@ const submitForm = async (formEl: FormInstance | undefined) => {
   })
 }
 
-// 导出
+function parseCsvEnable(v: unknown): boolean {
+  if (v === false || v === true) return v
+  const s = String(v ?? '').trim().toLowerCase()
+  if (s === 'false' || s === '0' || s === '否') return false
+  if (s === 'true' || s === '1' || s === '是') return true
+  return true
+}
+
+/** Excel 等工具导出的 UTF-8 CSV 常在首列表头带 BOM，会导致 key 读成 "\\ufeffkey" */
+function normalizeCsvRowKeys(item: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const k of Object.keys(item)) {
+    out[k.replace(/^\ufeff/, '').trim()] = item[k]
+  }
+  return out
+}
+
+// 导出（扁平列含映射账户路径，不修改表格数据源）
 const handleExport = () => {
-  const data = ExpenseData.value
-  data.forEach((item: any) => {
-    delete item.id
-    delete item.url
-    delete item.owner
-  })
-  const ws = XLSX.utils.json_to_sheet(data)
+  const rows = ExpenseData.value.map((row: any) => ({
+    key: row.key ?? '',
+    payee: row.payee ?? '',
+    映射账户: row.expend?.account ?? '',
+    currency: row.currency ?? '',
+    enable: row.enable !== false,
+  }))
+  const ws = XLSX.utils.json_to_sheet(rows)
   const csv = XLSX.utils.sheet_to_csv(ws)
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement('a')
@@ -620,17 +638,19 @@ const handleImport = () => {
           const worksheet = workbook.Sheets[firstSheetName];
           let json = XLSX.utils.sheet_to_json(worksheet, { raw: false });
 
-          // 遍历JSON数据，确保所有字段存在
           json = json.map((item: any) => {
+            const row = normalizeCsvRowKeys(item) as Record<string, unknown>
+            const expendAccount = String(
+              row['映射账户'] ?? row.expend_account ?? ''
+            ).trim()
             return {
-              key: item.key || "",
-              payee: item.payee || "",
-              expend: item.expend || "",
-              currency: item.currency || "",
-              enable: item.enable || "",
-            };
-          });
-
+              key: row.key ?? '',
+              payee: row.payee ?? '',
+              expend_account: expendAccount,
+              currency: row.currency ?? '',
+              enable: parseCsvEnable(row.enable),
+            }
+          })
 
           axios({
             url: 'expense/',
@@ -638,8 +658,9 @@ const handleImport = () => {
             method: "POST",
             headers: { 'Content-Type': 'application/json' }
           })
-            .then(response => {
-              // console.log(response.data);
+            .then(() => {
+              ElMessage.success('导入成功')
+              fetchData()
             })
             .catch(error => {
               if (error.response && error.response.status == 401) {

@@ -88,6 +88,8 @@ import { isDark } from "~/composables";
 
 // 4. 常量
 const apiUrl = import.meta.env.VITE_API_URL;
+/** 与登录页、request 拦截器一致，避免双斜杠或缺 /api */
+const apiBase = String(apiUrl || '').replace(/\/$/, '');
 const USERNAME_CHECK_INTERVAL = 1000; // 1秒
 
 // 5. 响应式数据
@@ -107,11 +109,8 @@ const cleanToken = async () => {
     const accessToken = localStorage.getItem("access");
     if (accessToken) {
       try {
-        await axios.post(`${apiUrl}/fava/stop/`, {}, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          }
-        });
+        // 由 request 拦截器附加 JWT，勿手写 Authorization（null 会变成字符串 "Bearer null" 导致 401）
+        await axios.post(`${apiBase}/fava/stop/`, {});
         console.log('Fava实例已停止');
       } catch (error: unknown) {
         console.warn('停止Fava实例时出错:', error);
@@ -151,19 +150,35 @@ const handleSelect = (_key: string, _keyPath: string[]) => {
  * 打开 Fava 实例
  */
 const openFavaInstance = async () => {
+  if (!localStorage.getItem('access')) {
+    ElMessage.info('请先登录');
+    return;
+  }
+  if (!apiBase) {
+    ElMessage.error('未配置 VITE_API_URL，无法请求 Fava 入口');
+    return;
+  }
+
   const loading = ElLoading.service({
     lock: true,
     text: '正在为您生成专属加密空间，请稍候',
   });
 
   try {
-    const response = await axios.get('fava/', {
-      headers: { Authorization: `Bearer ${localStorage.getItem('access')}` },
+    // 使用绝对路径，避免 baseURL 组合异常；JWT 仅由 request 拦截器注入
+    const response = await axios.get(`${apiBase}/fava/`, {
       withCredentials: true,
     });
 
+    // 静态多实例（FAVA_DEPLOY_MODE=static）：后端返回 JSON { url, deploy_mode }
+    const data = response.data as { url?: string; deploy_mode?: string } | undefined
+    if (response.status === 200 && data?.url && data.deploy_mode === 'static') {
+      window.location.href = data.url
+      return
+    }
+
     if (response.status === 200 && response.request.responseURL) {
-      // 确保使用完整的重定向URL
+      // 动态容器：302 跟随后的最终 URL
       const redirectPath = response.request.responseURL;
       const newUrl = new URL(redirectPath, window.location.origin);
       window.location.href = newUrl.toString();
@@ -173,9 +188,13 @@ const openFavaInstance = async () => {
   } catch (error: unknown) {
     // 类型安全的错误处理
     if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as { response?: { status?: number } };
+      const axiosError = error as {
+        response?: { status?: number; data?: { error?: string; code?: string } }
+      };
       if (axiosError.response?.status === 401) {
         ElMessage.info('未认证，请登录后重试');
+      } else if (axiosError.response?.status === 404 && axiosError.response.data?.code === 'FAVA_STATIC_NOT_CONFIGURED') {
+        ElMessage.error(axiosError.response.data?.error || '未配置静态 Fava 入口');
       } else {
         ElMessage.error('加载账本失败');
       }

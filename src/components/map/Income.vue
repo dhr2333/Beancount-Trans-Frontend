@@ -522,16 +522,31 @@ const submitForm = async (formEl: FormInstance | undefined) => {
     })
 }
 
+function parseCsvEnable(v: unknown): boolean {
+    if (v === false || v === true) return v
+    const s = String(v ?? '').trim().toLowerCase()
+    if (s === 'false' || s === '0' || s === '否') return false
+    if (s === 'true' || s === '1' || s === '是') return true
+    return true
+}
 
-// 导出
+function normalizeCsvRowKeys(item: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = {}
+    for (const k of Object.keys(item)) {
+        out[k.replace(/^\ufeff/, '').trim()] = item[k]
+    }
+    return out
+}
+
+// 导出（扁平列含映射账户路径，不修改表格数据源）
 const handleExport = () => {
-    const data = IncomeData.value
-    data.forEach((item: any) => {
-        delete item.id
-        delete item.url
-        delete item.owner
-    })
-    const ws = XLSX.utils.json_to_sheet(data)
+    const rows = IncomeData.value.map((row: any) => ({
+        key: row.key ?? '',
+        payer: row.payer ?? '',
+        映射账户: row.income?.account ?? '',
+        enable: row.enable !== false,
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
     const csv = XLSX.utils.sheet_to_csv(ws)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
@@ -557,11 +572,23 @@ const handleImport = () => {
             reader.onload = (e) => {
                 const data = e.target?.result;
                 if (data) {
-                    // 使用XLSX.read来解析CSV数据
                     const workbook = XLSX.read(data, { type: 'string' });
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
                     let json = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+
+                    json = json.map((item: any) => {
+                        const row = normalizeCsvRowKeys(item) as Record<string, unknown>
+                        const incomeAccount = String(
+                            row['映射账户'] ?? row.income_account ?? ''
+                        ).trim()
+                        return {
+                            key: row.key ?? '',
+                            payer: row.payer ?? '',
+                            income_account: incomeAccount,
+                            enable: parseCsvEnable(row.enable),
+                        }
+                    })
 
                     axios({
                         url: 'income/',
@@ -569,7 +596,7 @@ const handleImport = () => {
                         method: "POST",
                         headers: { 'Content-Type': 'application/json' }
                     })
-                        .then(response => {
+                        .then(() => {
                             ElMessage.success('导入成功')
                             fetchData()
                         })
@@ -588,7 +615,7 @@ const handleImport = () => {
                 }
             };
             if (file !== null) {
-                reader.readAsText(file);  // 读取文件为文本
+                reader.readAsText(file);
             }
         }
     };

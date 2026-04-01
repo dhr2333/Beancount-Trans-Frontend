@@ -2,6 +2,7 @@ import axios from '../utils/request'
 import type {
   GitRepository,
   CreateRepositoryRequest,
+  LinkRepositoryRequest,
   SyncStatusInfo,
   SyncResponse,
   DeployKeyResponse,
@@ -29,6 +30,15 @@ export const getGitRepository = async (): Promise<GitRepository> => {
  */
 export const createGitRepository = async (data: CreateRepositoryRequest): Promise<GitRepository> => {
   const response = await axios.post(`${API_BASE}/git/repository/`, data)
+  return response.data
+}
+
+/**
+ * 关联已有外部 Git 远程（SSH）
+ * POST /api/git/repository/link/
+ */
+export const linkGitRepository = async (data: LinkRepositoryRequest): Promise<GitRepository> => {
+  const response = await axios.post(`${API_BASE}/git/repository/link/`, data)
   return response.data
 }
 
