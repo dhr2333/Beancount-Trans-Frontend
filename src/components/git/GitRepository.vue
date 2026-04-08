@@ -380,6 +380,21 @@ function linkedRemoteIntroStorageKey(repoId: number): string {
   return `git_linked_remote_intro_seen_${u}_${repoId}`
 }
 
+/**
+ * 必须在「根据 storage 设置 showLinkedRemoteIntro」的 watch 之前注册。
+ * 否则后者 immediate 会把 ref 直接设为 true，本 watch 看不到 false→true，永远不会写入 localStorage。
+ */
+watch(
+  showLinkedRemoteIntro,
+  (show) => {
+    if (!show || !isLinkedRemote.value || !props.repository.id) return
+    const key = linkedRemoteIntroStorageKey(props.repository.id)
+    if (localStorage.getItem(key)) return
+    localStorage.setItem(key, '1')
+  },
+  { immediate: true }
+)
+
 watch(
   () => [isLinkedRemote.value, props.repository.id] as const,
   ([linked, repoId]) => {
