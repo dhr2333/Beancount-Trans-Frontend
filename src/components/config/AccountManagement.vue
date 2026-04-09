@@ -204,7 +204,7 @@
 
         <!-- 新增账户对话框 -->
         <el-dialog v-model="addAccountDialog" title="新增账户" width="500px">
-            <el-form :model="newAccount" :rules="accountRules" ref="accountForm" label-width="120px">
+            <el-form :model="newAccount" :rules="addAccountRules" ref="accountForm" label-width="120px">
                 <el-form-item label="账户路径" prop="account">
                     <el-input v-model="newAccount.account" placeholder="Assets:Savings:Bank" />
                 </el-form-item>
@@ -245,7 +245,7 @@
 
         <!-- 编辑账户对话框 -->
         <el-dialog v-model="editAccountDialog" title="编辑账户" width="500px">
-            <el-form :model="editAccountForm" :rules="accountRules" ref="editAccountFormRef" label-width="120px">
+            <el-form :model="editAccountForm" :rules="editAccountRules" ref="editAccountFormRef" label-width="120px">
                 <el-form-item label="账户路径" prop="account">
                     <el-input v-model="editAccountForm.account" />
                 </el-form-item>
@@ -573,32 +573,34 @@ const normalizeCascaderValue = (value: MigrationModelValue): number | null => {
 
 const selectedMigrationAccountId = computed(() => normalizeCascaderValue(selectedMigrationAccount.value))
 
-// 表单验证规则
-const accountRules: FormRules = {
-    account: [
-        { required: true, message: '请输入账户路径', trigger: 'blur' },
-        { pattern: /^[A-Z][A-Za-z0-9:-]*$/, message: '账户路径必须以大写字母开头，只能包含字母、数字、冒号和连字符', trigger: 'blur' }
-    ],
-    reconciliation_cycle_interval: [
-        {
-            validator: (rule, value, callback) => {
-                // 检查新增表单或编辑表单中的周期单位
-                const newCycleUnit = newAccount.value.reconciliation_cycle_unit
-                const editCycleUnit = editAccountForm.value.reconciliation_cycle_unit
-                const cycleUnit = newCycleUnit || editCycleUnit
+// 表单验证规则（新增 / 编辑分开：对账周期间隔只读当前表单，避免两套 model 共用规则时互相污染）
+const accountPathRules = [
+    { required: true, message: '请输入账户路径', trigger: 'blur' },
+    { pattern: /^[A-Z][A-Za-z0-9:-]*$/, message: '账户路径必须以大写字母开头，只能包含字母、数字、冒号和连字符', trigger: 'blur' }
+]
 
-                // 如果设置了对账周期单位，周期间隔必须填写
-                if (cycleUnit && (value === null || value === undefined || value === '')) {
-                    callback(new Error('如果设置了对账周期单位，周期间隔必须填写'))
-                } else if (cycleUnit && value !== null && value !== undefined && value <= 0) {
-                    callback(new Error('对账周期间隔必须大于 0'))
-                } else {
-                    callback()
-                }
-            },
-            trigger: 'blur'
+const reconciliationIntervalRule = (getCycleUnit: () => string | null | undefined) => ({
+    validator: (_rule: unknown, value: unknown, callback: (e?: Error) => void) => {
+        const cycleUnit = getCycleUnit()
+        if (cycleUnit && (value === null || value === undefined || value === '')) {
+            callback(new Error('如果设置了对账周期单位，周期间隔必须填写'))
+        } else if (cycleUnit && value !== null && value !== undefined && typeof value === 'number' && value <= 0) {
+            callback(new Error('对账周期间隔必须大于 0'))
+        } else {
+            callback()
         }
-    ]
+    },
+    trigger: 'blur' as const
+})
+
+const addAccountRules: FormRules = {
+    account: accountPathRules,
+    reconciliation_cycle_interval: [reconciliationIntervalRule(() => newAccount.value.reconciliation_cycle_unit)]
+}
+
+const editAccountRules: FormRules = {
+    account: accountPathRules,
+    reconciliation_cycle_interval: [reconciliationIntervalRule(() => editAccountForm.value.reconciliation_cycle_unit)]
 }
 
 
