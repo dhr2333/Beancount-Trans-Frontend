@@ -63,7 +63,7 @@
         <el-menu-item index="/reconciliation">待办列表</el-menu-item>
       </router-link>
       <el-menu-item>
-        <a href="https://trans.dhr2333.cn/docs/quick-start" class="help-link" target="_blank">用户手册</a>
+        <a href="https://trans.dhr2333.cn/docs/quick-start" class="help-link" target="_blank">教程</a>
       </el-menu-item>
       <router-link to="/settings" class="no-underline">
         <el-menu-item index="/settings">个人设置</el-menu-item>
