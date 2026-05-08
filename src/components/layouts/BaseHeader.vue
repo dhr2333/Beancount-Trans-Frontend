@@ -87,9 +87,7 @@ import router from "~/routers";
 import { isDark } from "~/composables";
 
 // 4. 常量
-const apiUrl = import.meta.env.VITE_API_URL;
-/** 与登录页、request 拦截器一致，避免双斜杠或缺 /api */
-const apiBase = String(apiUrl || '').replace(/\/$/, '');
+const FAVA_STOP_PATH = '/fava/stop/'
 const USERNAME_CHECK_INTERVAL = 1000; // 1秒
 
 // 5. 响应式数据
@@ -110,7 +108,7 @@ const cleanToken = async () => {
     if (accessToken) {
       try {
         // 由 request 拦截器附加 JWT，勿手写 Authorization（null 会变成字符串 "Bearer null" 导致 401）
-        await axios.post(`${apiBase}/fava/stop/`, {});
+        await axios.post(FAVA_STOP_PATH, {});
         console.log('Fava实例已停止');
       } catch (error: unknown) {
         console.warn('停止Fava实例时出错:', error);
@@ -154,10 +152,6 @@ const openFavaInstance = async () => {
     ElMessage.info('请先登录');
     return;
   }
-  if (!apiBase) {
-    ElMessage.error('未配置 VITE_API_URL，无法请求 Fava 入口');
-    return;
-  }
 
   const loading = ElLoading.service({
     lock: true,
@@ -165,8 +159,7 @@ const openFavaInstance = async () => {
   });
 
   try {
-    // 使用绝对路径，避免 baseURL 组合异常；JWT 仅由 request 拦截器注入
-    const response = await axios.get(`${apiBase}/fava/`, {
+    const response = await axios.get(`/fava/`, {
       withCredentials: true,
     });
 

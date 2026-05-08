@@ -3,7 +3,13 @@ import { ref } from 'vue';
 import { ElMessage } from 'element-plus';
 
 export const responseData = ref('');
-const apiUrl = import.meta.env.VITE_API_URL;
+/**
+ * 自托管 / 生产构建：永远走同域 /api，由前端 Nginx 反代到后端容器
+ * 本地开发：允许用 VITE_API_URL 直连后端，避免必须配置 Vite proxy
+ */
+const apiUrl = import.meta.env.DEV
+    ? (import.meta.env.VITE_API_URL || '/api')
+    : '/api';
 
 // 刷新令牌的函数
 const refreshToken = async () => {
@@ -13,7 +19,7 @@ const refreshToken = async () => {
     }
 
     try {
-        const refreshRes = await axios.post(apiUrl + '/auth/token/refresh/', { 
+        const refreshRes = await axios.post(apiUrl + '/auth/token/refresh/', {
             "refresh": refresh 
         });
 

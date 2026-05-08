@@ -9,8 +9,6 @@ import type {
   DeleteRepositoryResponse
 } from '../types/git'
 
-const API_BASE = import.meta.env.VITE_API_URL
-
 /**
  * Git 仓库相关 API 调用
  */
@@ -20,7 +18,7 @@ const API_BASE = import.meta.env.VITE_API_URL
  * GET /api/git/repository/
  */
 export const getGitRepository = async (): Promise<GitRepository> => {
-  const response = await axios.get(`${API_BASE}/git/repository/`)
+  const response = await axios.get(`/git/repository/`)
   return response.data
 }
 
@@ -29,7 +27,7 @@ export const getGitRepository = async (): Promise<GitRepository> => {
  * POST /api/git/repository/
  */
 export const createGitRepository = async (data: CreateRepositoryRequest): Promise<GitRepository> => {
-  const response = await axios.post(`${API_BASE}/git/repository/`, data)
+  const response = await axios.post(`/git/repository/`, data)
   return response.data
 }
 
@@ -38,7 +36,7 @@ export const createGitRepository = async (data: CreateRepositoryRequest): Promis
  * POST /api/git/repository/link/
  */
 export const linkGitRepository = async (data: LinkRepositoryRequest): Promise<GitRepository> => {
-  const response = await axios.post(`${API_BASE}/git/repository/link/`, data)
+  const response = await axios.post(`/git/repository/link/`, data)
   return response.data
 }
 
@@ -47,7 +45,7 @@ export const linkGitRepository = async (data: LinkRepositoryRequest): Promise<Gi
  * DELETE /api/git/repository/delete/
  */
 export const deleteGitRepository = async (): Promise<DeleteRepositoryResponse> => {
-  const response = await axios.delete(`${API_BASE}/git/repository/delete/`)
+  const response = await axios.delete(`/git/repository/delete/`)
   return response.data
 }
 
@@ -56,7 +54,7 @@ export const deleteGitRepository = async (): Promise<DeleteRepositoryResponse> =
  * GET /api/git/repository/deploy-key/
  */
 export const downloadDeployKey = async (): Promise<Blob> => {
-  const response = await axios.get(`${API_BASE}/git/repository/deploy-key/`, {
+  const response = await axios.get(`/git/repository/deploy-key/`, {
     responseType: 'blob'
   })
   return response.data
@@ -67,7 +65,7 @@ export const downloadDeployKey = async (): Promise<Blob> => {
  * POST /api/git/repository/deploy-key/regenerate/
  */
 export const regenerateDeployKey = async (): Promise<Blob> => {
-  const response = await axios.post(`${API_BASE}/git/repository/deploy-key/regenerate/`, {}, {
+  const response = await axios.post(`/git/repository/deploy-key/regenerate/`, {}, {
     responseType: 'blob'
   })
   return response.data
@@ -78,7 +76,7 @@ export const regenerateDeployKey = async (): Promise<Blob> => {
  * POST /api/git/sync/
  */
 export const triggerSync = async (): Promise<SyncResponse> => {
-  const response = await axios.post(`${API_BASE}/git/sync/`)
+  const response = await axios.post(`/git/sync/`)
   return response.data
 }
 
@@ -87,7 +85,7 @@ export const triggerSync = async (): Promise<SyncResponse> => {
  * GET /api/git/sync/status/
  */
 export const getSyncStatus = async (): Promise<SyncStatusInfo> => {
-  const response = await axios.get(`${API_BASE}/git/sync/status/`)
+  const response = await axios.get(`/git/sync/status/`)
   return response.data
 }
 
@@ -96,7 +94,7 @@ export const getSyncStatus = async (): Promise<SyncStatusInfo> => {
  * GET /api/git/trans/download/
  */
 export const downloadTransArchive = async (): Promise<Blob> => {
-  const response = await axios.get(`${API_BASE}/git/trans/download/`, {
+  const response = await axios.get(`/git/trans/download/`, {
     responseType: 'blob'
   })
   return response.data

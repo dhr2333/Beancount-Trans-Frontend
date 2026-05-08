@@ -12,8 +12,9 @@
                 <el-tabs v-model="activeTab" class="settings-tabs">
                     <!-- Git 同步 -->
                     <el-tab-pane label="Git 同步" name="git">
-                        <GitSetup v-if="!gitRepository" @created="onGitRepositoryCreated" />
-                        <GitRepositoryComponent v-else :repository="gitRepository" @updated="onGitRepositoryUpdated"
+                        <!-- @vue-ignore -->
+                        <git-setup v-if="!gitRepository" @created="onGitRepositoryCreated as any" />
+                        <git-repository-component v-else :repository="gitRepository" @updated="onGitRepositoryUpdated"
                             @deleted="onGitRepositoryDeleted" />
                     </el-tab-pane>
 
@@ -396,8 +397,6 @@ import type { GitRepository } from '../../types/git'
 import GitSetup from '../../components/git/GitSetup.vue'
 import GitRepositoryComponent from '../../components/git/GitRepository.vue'
 
-const apiUrl = import.meta.env.VITE_API_URL
-
 const isAuthenticated = ref(hasAuthTokens())
 const unauthorizedNotified = ref(false)
 
@@ -621,7 +620,7 @@ const startCountdown = () => {
 // 获取绑定信息
 const fetchBindings = async () => {
     try {
-        const res = await axios.get(apiUrl + '/auth/bindings/')
+        const res = await axios.get('/auth/bindings/')
         bindings.value = res.data
         // 初始化表单
         updateUsernameForm.username = res.data.username || ''
@@ -638,7 +637,7 @@ const fetchBindings = async () => {
 // 获取2FA状态
 const fetch2FAStatus = async () => {
     try {
-        const res = await axios.get(apiUrl + '/auth/2fa/status/')
+        const res = await axios.get('/auth/2fa/status/')
         twoFactorStatus.value = res.data
     } catch (error: any) {
         if (error?.response?.status === 401) {
@@ -661,7 +660,7 @@ const sendBindCode = async () => {
     await bindPhoneFormRef.value.validateField('phone_number')
 
     try {
-        const resp = await axios.post(apiUrl + '/auth/phone/send-code/', {
+        const resp = await axios.post('/auth/phone/send-code/', {
             phone_number: normalizePhone(bindPhoneForm.phone_number)
         })
         if (resp.status === 200) {
@@ -680,7 +679,7 @@ const handleBindPhone = async () => {
 
     bindPhoneLoading.value = true
     try {
-        await axios.post(apiUrl + '/auth/bindings/bind-phone/', {
+        await axios.post('/auth/bindings/bind-phone/', {
             phone_number: normalizePhone(bindPhoneForm.phone_number),
             code: bindPhoneForm.code
         })
@@ -701,7 +700,7 @@ const handleUnbindPhone = async () => {
         await ElMessageBox.confirm('确定要解绑手机号吗？', '提示', {
             ...defaultConfirmOptions
         })
-        await axios.delete(apiUrl + '/auth/bindings/unbind-phone/')
+        await axios.delete('/auth/bindings/unbind-phone/')
         ElMessage.success('手机号解绑成功')
         await fetchBindings()
     } catch (error: any) {
@@ -717,7 +716,7 @@ const handleUnbindSocial = async (provider: string) => {
         await ElMessageBox.confirm(`确定要解绑${provider === 'github' ? 'GitHub' : provider}吗？`, '提示', {
             ...defaultConfirmOptions
         })
-        await axios.delete(apiUrl + `/auth/bindings/unbind-social/${provider}/`)
+        await axios.delete(`/auth/bindings/unbind-social/${provider}/`)
         ElMessage.success('解绑成功')
         await fetchBindings()
     } catch (error: any) {
@@ -734,7 +733,7 @@ const bindGitHub = () => {
 
     const form = document.createElement('form')
     form.method = 'POST'
-    form.action = apiUrl + '/_allauth/browser/v1/auth/provider/redirect'
+    form.action = '/api/_allauth/browser/v1/auth/provider/redirect'
     form.style.display = 'none'
 
     const providerInput = document.createElement('input')
@@ -767,7 +766,7 @@ const handleUpdateUsername = async () => {
     updateUsernameLoading.value = true
     try {
         const newUsername = updateUsernameForm.username
-        await axios.patch(apiUrl + '/auth/profile/update_me/', {
+        await axios.patch('/auth/profile/update_me/', {
             username: newUsername
         })
         ElMessage.success('用户名修改成功')
@@ -788,7 +787,7 @@ const sendEmailBindCode = async () => {
     if (!updateEmailFormRef.value) return
     await updateEmailFormRef.value.validateField('email')
     try {
-        const resp = await axios.post(apiUrl + '/auth/bindings/send-email-code/', {
+        const resp = await axios.post('/auth/bindings/send-email-code/', {
             email: updateEmailForm.email
         })
         if (resp.status === 200) {
@@ -807,7 +806,7 @@ const handleConfirmBindEmail = async () => {
 
     updateEmailLoading.value = true
     try {
-        await axios.post(apiUrl + '/auth/bindings/bind-email/', {
+        await axios.post('/auth/bindings/bind-email/', {
             email: updateEmailForm.email,
             code: updateEmailForm.code
         })
@@ -828,7 +827,7 @@ const handleUnbindEmail = async () => {
         await ElMessageBox.confirm('确定要解绑邮箱吗？', '提示', {
             ...defaultConfirmOptions
         })
-        await axios.delete(apiUrl + '/auth/bindings/unbind-email/')
+        await axios.delete('/auth/bindings/unbind-email/')
         ElMessage.success('邮箱解绑成功')
         await fetchBindings()
     } catch (error: any) {
@@ -845,7 +844,7 @@ const handleSetPassword = async () => {
 
     setPasswordLoading.value = true
     try {
-        await axios.post(apiUrl + '/auth/profile/set_password/', {
+        await axios.post('/auth/profile/set_password/', {
             new_password: setPasswordForm.new_password
         })
         ElMessage.success('密码设置成功')
@@ -874,7 +873,7 @@ const handleDeleteAccount = async () => {
 
         deleteAccountLoading.value = true
         try {
-            await axios.delete(apiUrl + '/auth/profile/delete_account/')
+            await axios.delete('/auth/profile/delete_account/')
             ElMessage.success('账户已删除')
             // 清除本地存储
             localStorage.clear()
@@ -912,7 +911,7 @@ const handleCancelDeleteAccount = () => {
 // 启用TOTP
 const handleEnableTOTP = async () => {
     try {
-        const res = await axios.get(apiUrl + '/auth/2fa/totp/qrcode/')
+        const res = await axios.get('/auth/2fa/totp/qrcode/')
         totpQRCode.value = res.data.qr_code
         totpSecret.value = res.data.secret
         showTOTPDialog.value = true
@@ -938,7 +937,7 @@ const handleConfirmTOTP = async () => {
 
     totpLoading.value = true
     try {
-        await axios.post(apiUrl + '/auth/2fa/totp/enable/', {
+        await axios.post('/auth/2fa/totp/enable/', {
             code: totpForm.code
         })
         ElMessage.success('TOTP已启用')
@@ -966,7 +965,7 @@ const handleConfirmDisableTOTP = async () => {
 
     disableTOTPLoading.value = true
     try {
-        await axios.post(apiUrl + '/auth/2fa/totp/disable/', {
+        await axios.post('/auth/2fa/totp/disable/', {
             code: disableTOTPForm.code
         })
         ElMessage.success('TOTP已禁用')

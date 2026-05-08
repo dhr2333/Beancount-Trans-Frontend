@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const apiUrl = import.meta.env.VITE_API_URL;
+const apiUrl = import.meta.env.DEV
+    ? (import.meta.env.VITE_API_URL || '/api')
+    : '/api';
 
 // 手动刷新令牌的函数（用于特殊情况）
 const handleRefresh = async () => {

@@ -10,8 +10,7 @@ import type {
   ReconciliationExecuteResponse,
   RevokeReconciliationResponse
 } from '../types/reconciliation'
-
-const API_BASE = import.meta.env.VITE_API_URL + '/reconciliation'
+const API_BASE = `/reconciliation`
 
 /**
  * 获取待办任务列表

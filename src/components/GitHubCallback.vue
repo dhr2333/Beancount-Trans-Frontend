@@ -7,19 +7,18 @@
 
 <script lang="ts" setup>
 import { onMounted } from 'vue';
-import axios from 'axios';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { emitTaskBannerRefresh } from '../utils/accountEvents';
 import { initTourState } from '../utils/userTour';
+import axios from '../utils/request';
 
 const router = useRouter();
-const apiUrl = import.meta.env.VITE_API_URL;
 
 onMounted(async () => {
     try {
         // 向后端请求用户信息
-        const response = await axios.get(apiUrl + '/_allauth/browser/v1/auth/github/token', {
+        const response = await axios.get('/_allauth/browser/v1/auth/github/token', {
             withCredentials: true, // 如果后端使用了 cookies 进行认证
         });
 

@@ -128,7 +128,7 @@ router.beforeEach(async (to, from, next) => {
   // 对于需要认证的页面，检查手机号绑定状态
   try {
     const axios = (await import('./utils/request')).default;
-    await axios.get(import.meta.env.VITE_API_URL + '/auth/profile/me/');
+    await axios.get('/auth/profile/me/');
     // 如果成功，说明已绑定手机号，可以继续
     next();
   } catch (error: any) {

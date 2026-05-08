@@ -157,8 +157,6 @@ import router from '~/routers'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 import { initTourState } from '../../utils/userTour'
 
-const apiUrl = import.meta.env.VITE_API_URL
-
 // 登录相关（默认手机号页；无短信时由 public-config 切到账密）
 const smsEnabled = ref(true)
 /** 与后端 PHONE_BINDING_REQUIRED 对齐；未拉到 public-config 前默认为 true */
@@ -168,7 +166,7 @@ const loginLoading = ref(false)
 
 onMounted(async () => {
   try {
-    const { data } = await axios.get(`${apiUrl.replace(/\/$/, '')}/auth/public-config/`)
+    const { data } = await axios.get(`/auth/public-config/`)
     if (data && typeof data.sms_enabled === 'boolean') {
       smsEnabled.value = data.sms_enabled
     }
@@ -298,7 +296,7 @@ const sendLoginCode = async () => {
   await phoneLoginFormRef.value.validateField('phone_number')
 
   try {
-    const resp = await axios.post(apiUrl + '/auth/phone/send-code/', {
+    const resp = await axios.post('/auth/phone/send-code/', {
       phone_number: normalizePhone(phoneLoginForm.phone_number)
     })
     if (resp.status === 200) {
@@ -316,7 +314,7 @@ const sendEmailLoginCode = async () => {
   await emailLoginFormRef.value.validateField('email')
 
   try {
-    const resp = await axios.post(apiUrl + '/auth/email/send-code/', {
+    const resp = await axios.post('/auth/email/send-code/', {
       email: emailLoginForm.email.trim()
     })
     if (resp.status === 200) {
@@ -362,7 +360,7 @@ const handleUsernameLogin = async () => {
         payload.totp_code = usernameLoginForm.totp_code
       }
 
-      res = await axios.post(apiUrl + '/auth/phone/login-by-password/', payload)
+      res = await axios.post('/auth/phone/login-by-password/', payload)
 
       const { setAuthTokens } = await import('../../utils/auth')
       setAuthTokens(
@@ -391,7 +389,7 @@ const handleUsernameLogin = async () => {
         payload.totp_code = usernameLoginForm.totp_code
       }
 
-      res = await axios.post(apiUrl + '/auth/username/login-by-password/', payload)
+      res = await axios.post('/auth/username/login-by-password/', payload)
 
       const { setAuthTokens } = await import('../../utils/auth')
       setAuthTokens(
@@ -441,7 +439,7 @@ const handlePhoneLoginByCode = async () => {
 
   loginLoading.value = true
   try {
-    const res = await axios.post(apiUrl + '/auth/phone/login-by-code/', {
+    const res = await axios.post('/auth/phone/login-by-code/', {
       phone_number: normalizePhone(phoneLoginForm.phone_number),
       code: phoneLoginForm.code
     })
@@ -486,7 +484,7 @@ const handleEmailLogin = async () => {
 
   loginLoading.value = true
   try {
-    const res = await axios.post(apiUrl + '/auth/email/login-by-code/', {
+    const res = await axios.post('/auth/email/login-by-code/', {
       email: emailLoginForm.email.trim(),
       code: emailLoginForm.code
     })
@@ -527,7 +525,7 @@ const loginWithGitHub = () => {
 
   const form = document.createElement('form')
   form.method = 'POST'
-  form.action = apiUrl + '/_allauth/browser/v1/auth/provider/redirect'
+  form.action = '/api/_allauth/browser/v1/auth/provider/redirect'
   form.style.display = 'none'
 
   const providerInput = document.createElement('input')

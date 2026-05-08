@@ -54,7 +54,6 @@ import { ElMessage } from 'element-plus'
 import { Phone, Message } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 
-const apiUrl = import.meta.env.VITE_API_URL
 const router = useRouter()
 
 const sending = ref(false)
@@ -101,7 +100,7 @@ const normalizePhone = (value: string) => {
 const sendCode = async () => {
     if (sendDisabled.value) return
     try {
-        await axios.post(apiUrl + '/auth/phone/send-code/', {
+        await axios.post('/auth/phone/send-code/', {
             phone_number: normalizePhone(form.phone),
         })
         ElMessage.success('验证码已发送')
@@ -120,7 +119,7 @@ const handleSubmit = async () => {
     submitting.value = true
     try {
         // 执行绑定操作
-        const resp = await axios.post(apiUrl + '/auth/bindings/bind-phone/', {
+        const resp = await axios.post('/auth/bindings/bind-phone/', {
             phone_number: normalizePhone(form.phone),
             code: form.code.trim(),
         })
