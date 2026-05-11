@@ -287,7 +287,7 @@
 import { Folder, Document, Plus, Lock, UploadFilled, FolderOpened } from '@element-plus/icons-vue'
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import axios from '../../utils/request'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { TagProps } from 'element-plus'
 import { parse } from 'path'
 import { startUserTour, continueUserTour, shouldResumeTour, getTourProgress, resumeTourFromStep, initTourState, saveTourProgress, TOUR_FIRST_PARSE_FILE_NAME } from '../../utils/userTour'
@@ -1409,6 +1409,22 @@ async function cancelSingleFile(fileItem: FileItem) {
     if (!['pending', 'processing', 'parsed'].includes(fileItem.parse_status || '')) {
         ElMessage.warning('只能取消待解析、解析中或已解析的文件');
         return;
+    }
+
+    if (fileItem.parse_status === 'parsed') {
+        try {
+            await ElMessageBox.confirm(
+                `将清除文件“${fileItem.name}”的解析结果，是否继续？`,
+                '确认清除解析结果',
+                {
+                    confirmButtonText: '确认',
+                    cancelButtonText: '取消',
+                    type: 'warning',
+                }
+            );
+        } catch {
+            return;
+        }
     }
 
     await cancelParse([fileItem.id]);
