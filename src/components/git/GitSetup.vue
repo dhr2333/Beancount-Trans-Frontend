@@ -60,7 +60,7 @@
         <el-alert title="注意事项" type="info" :closable="false" show-icon class="notice-alert">
           <ul class="notice-list">
             <li><strong>平台创建</strong>：仅在集成的 Gitea 上新建仓库（模板或空库）</li>
-            <li><strong>关联远程</strong>：填写 SSH 克隆地址即可；平台会生成<strong>只读拉取</strong>用的 Deploy Key（公钥加到远程）并给出 Webhook 配置，本地推送仍使用您自己的 Git 凭据</li>
+            <li><strong>关联远程</strong>：仅支持关联 GitHub SSH 仓库；平台会生成<strong>只读拉取</strong>用的 Deploy Key（公钥加到远程）并给出 Webhook 配置，本地推送仍使用您自己的 Git 凭据</li>
             <li>仓库体积建议控制在约 20MB 以内，适合个人账本</li>
           </ul>
         </el-alert>
@@ -82,7 +82,7 @@
         <div class="card-header">
           <div>
             <h3>关联或创建仓库</h3>
-            <el-text type="info" size="small">关联已有远程，或由平台在 Gitea 上新建仓库</el-text>
+            <el-text type="info" size="small">关联已有 GitHub 远程，或由平台在 Gitea 上新建仓库</el-text>
           </div>
         </div>
       </template>
@@ -99,7 +99,7 @@
                 <el-tag type="warning" size="small">已有 SSH 仓库</el-tag>
               </div>
             </div>
-            <p class="path-desc">仓库已在 GitHub / GitLab / Gitea 上：填写 SSH 克隆地址。关联成功后在本页仓库卡片中配置 Webhook，并将平台公钥以只读 Deploy Key 加入远程。</p>
+            <p class="path-desc">仓库已在 GitHub 上：填写 SSH 克隆地址。关联成功后在本页仓库卡片中配置 Webhook，并将平台公钥以只读 Deploy Key 加入远程。</p>
           </el-card>
 
           <el-card class="option-card path-card" :body-style="{ padding: '20px' }" shadow="hover"
@@ -129,7 +129,7 @@
         <div class="card-header">
           <div>
             <h3>关联远程仓库</h3>
-            <el-text type="info" size="small">请使用 SSH 克隆地址（git@… 或 ssh://…）</el-text>
+            <el-text type="info" size="small">请使用 GitHub SSH 克隆地址（git@… 或 ssh://…）</el-text>
           </div>
         </div>
       </template>
@@ -256,7 +256,7 @@ const selectedOption = ref<boolean | undefined>(undefined)
 
 const linkForm = ref({
   remote_ssh_url: '',
-  provider: 'github' as 'github' | 'gitlab' | 'gitea' | 'other',
+  provider: 'github' as const,
   default_branch: 'main',
   external_full_name: ''
 })
@@ -333,7 +333,7 @@ const submitLink = async () => {
       external_full_name: linkForm.value.external_full_name.trim()
     })
     ElMessage.success(
-      '关联成功。请在下方「Git 仓库管理」中复制 Webhook 与公钥并完成远程配置；Webhook Secret 仅首次展示，请立即保存。'
+      '关联成功。请在下方「Git 仓库管理」中复制 Webhook 与公钥，并完成 GitHub 配置；Webhook Secret 仅首次展示，请立即保存。'
     )
     emit('created', repository)
   } catch (error: unknown) {

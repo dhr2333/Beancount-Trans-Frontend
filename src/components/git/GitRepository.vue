@@ -142,8 +142,8 @@
             <div class="instruction-content link-step-panel">
               <p>平台通过 Deploy Key 公钥从您的远程仓库拉取账本，与您在本地执行 <code>git push</code> 时使用的账户或 SSH
                 密钥<strong>无关</strong>。</p>
-              <p>在 <strong>GitHub / GitLab / Gitea</strong> 打开该仓库 → <strong>Settings</strong> → <strong>Deploy
-                  keys</strong>（或同类入口）→
+              <p>在 <strong>GitHub</strong> 打开该仓库 → <strong>Settings</strong> → <strong>Deploy
+                  keys</strong> →
                 粘贴下方公钥，并勾选<strong>只读</strong>。</p>
               <template v-if="repository.deploy_key_public">
                 <el-input type="textarea" :rows="4" :model-value="repository.deploy_key_public" readonly
@@ -161,9 +161,9 @@
           <el-collapse-item v-if="isLinkedRemote" title="步骤 2：配置 Webhook（推送后自动拉取）" name="link-webhook">
             <div class="instruction-content link-step-panel">
               <p>
-                在仓库的 <strong>Webhooks</strong> 中新增一条：<strong>Payload URL</strong> 使用下方地址；<strong>Content type</strong>
+                在 GitHub 仓库的 <strong>Settings → Webhooks</strong> 中新增一条：<strong>Payload URL</strong> 使用下方地址；<strong>Content type</strong>
                 选择
-                <code>application/json</code>；事件勾选 <strong>push</strong>。将平台提供的 Secret 填入托管方要求的字段。
+                <code>application/json</code>；事件勾选 <strong>Just the push event</strong>。将平台提供的 Secret 填入 GitHub 的 <strong>Secret</strong> 字段。
               </p>
               <p>
                 仅当推送分支为默认分支 <code>{{ defaultBranch }}</code> 时，平台才会执行拉取；也可随时使用页头的 <strong>立即同步</strong> 手动拉取。
@@ -191,7 +191,7 @@
                 </el-button>
               </template>
               <p v-else-if="repository.webhook_callback_url" class="secret-missing-hint">
-                若此处未显示 Secret，可能已刷新过页面；请在各托管平台按文档更新密钥，或删除仓库后重新关联以获取新 Secret。
+                若此处未显示 Secret，可能已刷新过页面；请在 GitHub 中按文档更新密钥，或删除仓库后重新关联以获取新 Secret。
               </p>
             </div>
           </el-collapse-item>
@@ -217,7 +217,7 @@ EOF</code></pre>
               <template v-else>
                 <p>下载 Deploy Key 私钥后，在本地配置 <code>IdentityFile</code> 指向该文件，或使用 <code>ssh-agent</code> 加载密钥，确保能访问上方「SSH
                   克隆地址」。</p>
-                <p>在 GitHub / GitLab / Gitea 仓库设置中添加 Deploy Key，并粘贴「Deploy Key 公钥」。</p>
+                <p>在 GitHub 仓库设置中添加 Deploy Key，并粘贴「Deploy Key 公钥」。</p>
               </template>
             </div>
           </el-collapse-item>
