@@ -69,7 +69,14 @@
         </div>
 
         <!-- 任务状态对话框  -->
-        <el-dialog v-model="parseDialogVisible" title="解析任务进度" width="600px">
+        <el-dialog
+            v-model="parseDialogVisible"
+            title="解析任务进度"
+            width="600px"
+            :show-close="false"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+        >
             <el-progress :percentage="parseProgressPercentage" :status="parseStatus" />
             <div class="task-info">
                 <p>任务组ID: {{ activeTaskGroupIds.length > 0 ? activeTaskGroupIds[activeTaskGroupIds.length - 1] : '' }}</p>
@@ -110,9 +117,19 @@
                 </el-table-column>
             </el-table>
             <template #footer>
-                <el-button @click="parseDialogVisible = false" :disabled="isProcessing">关闭</el-button>
+                <el-button @click="handleParseDialogClose">{{ parseDialogCloseText }}</el-button>
             </template>
         </el-dialog>
+
+        <div v-if="showParseProgressEntry" class="parse-progress-entry">
+            <div class="parse-progress-entry__content">
+                <div class="parse-progress-entry__title">解析中任务</div>
+                <div class="parse-progress-entry__meta">
+                    后台继续中，当前进度 {{ completedTasks }}/{{ totalTasks }}，状态：{{ parseStatusText }}
+                </div>
+            </div>
+            <el-button type="primary" @click="reopenParseDialog">查看进度</el-button>
+        </div>
 
         <!-- 文件列表 (带拖拽区域) -->
         <div 
@@ -781,6 +798,7 @@ function handleTourStepChanged() {
 
 // 组件卸载时清理
 onUnmounted(() => {
+    stopPolling();
     if (tourStateCheckInterval) {
         clearInterval(tourStateCheckInterval);
         tourStateCheckInterval = null;
@@ -1205,6 +1223,10 @@ const parseProgressPercentage = computed(() => {
     return totalTasks.value > 0 ? Math.round((completedTasks.value / totalTasks.value) * 100) : 0;
 });
 
+const showParseProgressEntry = computed(() => isProcessing.value && !parseDialogVisible.value);
+
+const parseDialogCloseText = computed(() => isProcessing.value ? '后台继续' : '关闭');
+
 const parseStatus = computed<'' | 'success' | 'warning' | 'exception'>(() => {
     if (parseProgressPercentage.value === 100) return 'success';
     if (isProcessing.value) return 'warning';
@@ -1215,6 +1237,19 @@ const parseStatusText = computed(() => {
     if (parseProgressPercentage.value === 100) return '解析完成';
     return isProcessing.value ? '处理中...' : '等待开始';
 });
+
+function handleParseDialogClose() {
+    const isTaskRunning = isProcessing.value;
+    parseDialogVisible.value = false;
+
+    if (isTaskRunning) {
+        ElMessage.info('解析任务正在后台继续，可通过“解析中任务”入口查看进度');
+    }
+}
+
+function reopenParseDialog() {
+    parseDialogVisible.value = true;
+}
 
 async function parseSingleFile(fileItem: FileItem) {
     // 确保是文件类型
@@ -1673,6 +1708,34 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
 .task-info {
     margin: 15px 0;
     line-height: 1.8;
+}
+
+.parse-progress-entry {
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    border: 1px solid var(--ep-color-primary-light-5);
+    border-radius: 8px;
+    background: var(--ep-color-primary-light-9);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.parse-progress-entry__content {
+    min-width: 0;
+}
+
+.parse-progress-entry__title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ep-text-color-primary);
+}
+
+.parse-progress-entry__meta {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--ep-text-color-regular);
 }
 
 .parse-failed-hint {
