@@ -252,7 +252,7 @@ git push origin {{ defaultBranch }}</code></pre>
               <div class="advanced-title">
                 高级设置
                 <el-text type="info" size="small" class="ml-2">
-                  （{{ isLinkedRemote ? '删除仓库' : 'Deploy Key 重置、删除仓库' }}）
+                  （{{ isLinkedRemote ? '删除同步配置' : 'Deploy Key 重置、删除仓库' }}）
                 </el-text>
               </div>
             </template>
@@ -282,15 +282,21 @@ git push origin {{ defaultBranch }}</code></pre>
               <!-- 删除仓库 -->
               <div class="setting-item" :class="{ 'first-item': isLinkedRemote }">
                 <div class="setting-info">
-                  <span class="setting-label text-danger">删除仓库</span>
-                  <span class="setting-desc">永久删除 Git 仓库配置，此操作不可恢复</span>
+                  <span class="setting-label text-danger">{{ isLinkedRemote ? '删除同步配置' : '删除仓库' }}</span>
+                  <span class="setting-desc">
+                    {{ isLinkedRemote ? '删除后将停止平台与该远程仓库的同步，不会删除远程仓库中的代码' : '永久删除 Git 仓库配置，此操作不可恢复' }}
+                  </span>
                 </div>
                 <div class="setting-actions">
-                  <el-popconfirm title="确定要删除仓库吗？这将停止同步并清除配置。" @confirm="confirmDeleteRepository" width="260">
+                  <el-popconfirm
+                    :title="isLinkedRemote ? '确定要删除同步配置吗？这将停止同步并清除平台内配置，但不会删除远程仓库中的代码。' : '确定要删除仓库吗？这将停止同步并清除配置。'"
+                    @confirm="confirmDeleteRepository"
+                    width="260"
+                  >
                     <template #reference>
                       <el-button type="danger" plain size="small" :loading="deletingRepository">
                         <el-icon class="el-icon--left"><i-ep-delete /></el-icon>
-                        删除仓库
+                        {{ isLinkedRemote ? '取消关联' : '删除仓库' }}
                       </el-button>
                     </template>
                   </el-popconfirm>
