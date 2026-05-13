@@ -67,7 +67,7 @@ export interface CreateRepositoryRequest {
 
 export interface LinkRepositoryRequest {
   remote_ssh_url: string
-  provider?: 'github' | 'gitlab' | 'gitea' | 'other'
+  provider?: 'github'
   default_branch?: string
   external_full_name?: string
 }

@@ -65,7 +65,7 @@
                             <el-table-column label="关键字" prop="key"></el-table-column>
 
                             <!-- 支出模板特有字段 -->
-                            <el-table-column v-if="template.type === 'expense'" label="商家"
+                            <el-table-column v-if="template.type === 'expense'" label="对方"
                                 prop="payee"></el-table-column>
                             <el-table-column v-if="template.type === 'expense'" label="支出账户">
                                 <template #default="{ row }">

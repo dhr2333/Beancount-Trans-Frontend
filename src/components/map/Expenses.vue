@@ -3,7 +3,7 @@
     <!-- 搜索和操作栏 -->
     <div class="toolbar">
       <div class="search-section">
-        <el-input v-model="search" placeholder="搜索关键字、商家、账户、标签" clearable @input="handleSearch">
+        <el-input v-model="search" placeholder="搜索关键字、对方、账户、标签" clearable @input="handleSearch">
           <template #prefix>
             <el-icon>
               <Search />
@@ -50,7 +50,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="商家" prop="payee" min-width="120" width="auto">
+      <el-table-column label="对方" prop="payee" min-width="120" width="auto">
         <template #default="{ row }">
           <span v-if="row.payee">{{ row.payee }}</span>
           <el-text v-else type="info" size="small">-</el-text>
@@ -135,26 +135,26 @@
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="关键字" prop="key">
-            <el-input v-model="ruleForm.key" placeholder="王者荣耀" />
+            <el-input v-model="ruleForm.key" placeholder="如王者荣耀" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="商家" prop="payee">
-            <el-input v-model="ruleForm.payee" placeholder="腾讯（可选）" />
+          <el-form-item label="对方" prop="payee">
+            <el-input v-model="ruleForm.payee" placeholder="如腾讯、星巴克" />
           </el-form-item>
         </el-col>
       </el-row>
 
       <el-form-item label="映射账户" prop="expend">
-        <AccountSelector v-model="ruleForm.expend" placeholder="选择账户" @change="handleAccountChange" />
+        <AccountSelector v-model="ruleForm.expend" placeholder="请选择或搜索账户" @change="handleAccountChange" />
       </el-form-item>
 
       <el-form-item label="货币代码" prop="currency">
-        <el-input v-model="ruleForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable />
+        <el-input v-model="ruleForm.currency" placeholder="如 CNY、USD" clearable />
       </el-form-item>
 
       <el-form-item label="标签" prop="tag_ids">
-        <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="选择标签（可多选）" />
+        <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签（可多选）" />
       </el-form-item>
 
       <el-form-item>
@@ -169,26 +169,26 @@
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="关键字" prop="key">
-            <el-input v-model="ruleForm.key" />
+            <el-input v-model="ruleForm.key" placeholder="如王者荣耀" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="商家" prop="payee">
-            <el-input v-model="ruleForm.payee" />
+          <el-form-item label="对方" prop="payee">
+            <el-input v-model="ruleForm.payee" placeholder="如腾讯、星巴克" />
           </el-form-item>
         </el-col>
       </el-row>
 
       <el-form-item label="映射账户" prop="expend">
-        <AccountSelector v-model="ruleForm.expend" placeholder="选择账户" @change="handleAccountChange" />
+        <AccountSelector v-model="ruleForm.expend" placeholder="请选择或搜索账户" @change="handleAccountChange" />
       </el-form-item>
 
       <el-form-item label="货币代码" prop="currency">
-        <el-input v-model="ruleForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable />
+        <el-input v-model="ruleForm.currency" placeholder="如 CNY、USD" clearable />
       </el-form-item>
 
       <el-form-item label="标签" prop="tag_ids">
-        <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="选择标签（可多选）" />
+        <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签（可多选）" />
       </el-form-item>
 
       <el-form-item>
@@ -283,12 +283,12 @@
       <!-- 表单 -->
       <el-form ref="batchUpdateFormRef" :model="batchUpdateForm" label-width="100px" status-icon>
         <el-form-item label="映射账户">
-          <AccountSelector v-model="batchUpdateForm.expend" placeholder="选择新的映射账户（留空保持不变）"
+          <AccountSelector v-model="batchUpdateForm.expend" placeholder="请选择或搜索账户（留空保持不变）"
             @change="handleBatchAccountChange" />
         </el-form-item>
 
         <el-form-item label="货币代码">
-          <el-input v-model="batchUpdateForm.currency" placeholder="请输入新的货币代码（留空保持不变）" clearable />
+          <el-input v-model="batchUpdateForm.currency" placeholder="如 CNY、USD（留空保持不变）" clearable />
         </el-form-item>
       </el-form>
 
@@ -375,7 +375,7 @@ interface Expense {
 
 // 页面增加优先级提示
 const showTooltip = ref(true)
-const payeetipContent = ref("若商家存在，优先级 + 50 ,映射账户中每存在一个 ':' ，优先级以 ':' 数量 * 100计算 ");
+const payeetipContent = ref("若对方存在，优先级 + 50 ,映射账户中每存在一个 ':' ，优先级以 ':' 数量 * 100计算 ");
 const expendtipContent = ref("优先级越高则映射账户越精准。例如关键字为蜜雪冰城的条目，优先级为 2 * 100 + 50 = 250")
 const currencyContent = ref("若该货币与格式化输出中的基础货币模板不同，则会使用\"@@\"来指定总成本，建议储值类使用非CNY货币，留空默认为\"CNY\"")
 

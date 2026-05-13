@@ -17,10 +17,6 @@
                             {{ data.description }}
                         </el-tag>
                     </template>
-                    <el-tag v-if="showDetails && data.mapping_count && data.mapping_count.total > 0" type="info" size="small"
-                        class="mapping-tag">
-                        {{ data.mapping_count.total }}映射
-                    </el-tag>
                 </div>
             </template>
         </el-cascader>
@@ -37,12 +33,6 @@
                         <el-tag v-if="selectedAccount.description" type="info">
                             {{ selectedAccount.description }}
                         </el-tag>
-                    </div>
-                    <div v-if="selectedAccount.mapping_count" class="mapping-stats">
-                        <span class="label">映射统计：</span>
-                        <el-tag type="warning" size="small">{{ selectedAccount.mapping_count.expense }}支出</el-tag>
-                        <el-tag type="success" size="small">{{ selectedAccount.mapping_count.assets }}资产</el-tag>
-                        <el-tag type="primary" size="small">{{ selectedAccount.mapping_count.income }}收入</el-tag>
                     </div>
                 </div>
             </el-card>
@@ -390,8 +380,7 @@ onBeforeUnmount(() => {
     font-weight: 500;
 }
 
-.node-tag,
-.mapping-tag {
+.node-tag {
     margin: 0;
 }
 
@@ -417,18 +406,11 @@ onBeforeUnmount(() => {
     color: #303133;
 }
 
-.currencies,
-.mapping-stats {
+.currencies {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 4px;
-}
-
-.label {
-    font-size: 12px;
-    color: #909399;
-    min-width: 60px;
 }
 
 .currency-tag {
@@ -442,8 +424,7 @@ onBeforeUnmount(() => {
         align-items: flex-start;
     }
 
-    .currencies,
-    .mapping-stats {
+    .currencies {
         flex-wrap: wrap;
     }
 }

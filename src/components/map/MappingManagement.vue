@@ -140,8 +140,8 @@
                 <el-form-item label="关键字" prop="key">
                     <el-input v-model="quickCreateForm.key" placeholder="输入关键字" />
                 </el-form-item>
-                <el-form-item v-if="quickCreateForm.type === 'expense'" label="商家" prop="payee">
-                    <el-input v-model="quickCreateForm.payee" placeholder="输入商家名称（可选）" />
+                <el-form-item v-if="quickCreateForm.type === 'expense'" label="对方" prop="payee">
+                    <el-input v-model="quickCreateForm.payee" placeholder="如腾讯、星巴克" />
                 </el-form-item>
                 <el-form-item v-if="quickCreateForm.type === 'assets'" label="账户描述" prop="full">
                     <el-input v-model="quickCreateForm.full" placeholder="输入账户描述（可选）" />
@@ -150,11 +150,11 @@
                     <el-input v-model="quickCreateForm.payer" placeholder="输入付款方（可选）" />
                 </el-form-item> -->
                 <el-form-item label="映射账户" prop="accountId">
-                    <AccountSelector v-model="quickCreateForm.accountId" placeholder="选择映射账户"
+                    <AccountSelector v-model="quickCreateForm.accountId" placeholder="请选择或搜索账户"
                         @change="handleAccountChange" />
                 </el-form-item>
                 <el-form-item v-if="quickCreateForm.type === 'expense'" label="货币代码" prop="currency">
-                    <el-input v-model="quickCreateForm.currency" placeholder="请输入货币代码（如CNY、USD等）" clearable>
+                    <el-input v-model="quickCreateForm.currency" placeholder="如 CNY、USD" clearable>
                         <template #prepend>货币</template>
                     </el-input>
                 </el-form-item>
@@ -189,7 +189,7 @@ const activeTab = ref('expense')
 
 // 提示信息
 const showTooltip = ref(true)
-const payeetipContent = ref("💡 提示：关键字用于匹配账单中的描述信息，映射账户用于指定该交易应归入的账户。商家信息有助于提高映射的准确性。")
+const payeetipContent = ref("💡 提示：关键字用于匹配账单中的描述信息，映射账户用于指定该交易应归入的账户。对方信息有助于提高映射的准确性。")
 
 // 匿名用户提示
 const showAnonymousPrompt = ref(false)

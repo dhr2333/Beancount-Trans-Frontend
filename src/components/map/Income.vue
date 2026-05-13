@@ -147,7 +147,7 @@
             </el-row>
 
             <el-form-item label="映射账户" prop="income">
-                <AccountSelector v-model="ruleForm.income" placeholder="选择账户" @change="handleAccountChange" />
+                <AccountSelector v-model="ruleForm.income" placeholder="请选择或搜索账户" @change="handleAccountChange" />
             </el-form-item>
 
             <!-- <el-form-item label="关联货币" prop="currency_ids">
@@ -155,7 +155,7 @@
             </el-form-item> -->
 
             <el-form-item label="关联标签" prop="tag_ids">
-                <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="选择标签（可多选）" />
+                <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签（可多选）" />
             </el-form-item>
 
             <el-form-item>
@@ -181,7 +181,7 @@
             </el-row>
 
             <el-form-item label="映射账户" prop="income">
-                <AccountSelector v-model="ruleForm.income" placeholder="选择账户" @change="handleAccountChange" />
+                <AccountSelector v-model="ruleForm.income" placeholder="请选择或搜索账户" @change="handleAccountChange" />
             </el-form-item>
 
             <!-- <el-form-item label="关联货币" prop="currency_id">
@@ -190,7 +190,7 @@
             </el-form-item> -->
 
             <el-form-item label="关联标签" prop="tag_ids">
-                <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="选择标签（可多选）" />
+                <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签（可多选）" />
             </el-form-item>
 
             <el-form-item>
