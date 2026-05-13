@@ -23,9 +23,48 @@
         highlight-current-row>
         <el-table-column label="Beancount 条目预览" min-width="400">
           <template #default="scope">
-            <div :class="getEntryClasses(scope.row.uuid, scope.row.edited_formatted)">
-              <el-input v-model="scope.row.edited_formatted" type="textarea" :rows="7" class="entry-preview"
-                placeholder="单击进入编辑模式" @blur="handleEntryEdit(scope.row.uuid, scope.row.edited_formatted)" />
+            <div
+              :class="getEntryClasses(scope.row.uuid, scope.row.edited_formatted)"
+            >
+              <template v-if="!isEntryTextEditMode(scope.row.uuid)">
+                <div
+                  class="entry-preview-render"
+                  role="textbox"
+                  tabindex="0"
+                  @click="onEntryPreviewShellClick(scope.row, $event)"
+                  @keydown.enter.prevent="startTextEdit(scope.row.uuid)"
+                >
+                  <div
+                    v-for="(pline, li) in buildLineSegments(scope.row.edited_formatted)"
+                    :key="li"
+                    class="entry-preview-line"
+                  >
+                    <template v-for="(seg, si) in pline.segments" :key="`${li}-${si}`">
+                      <button
+                        v-if="seg.kind === 'account'"
+                        type="button"
+                        class="entry-preview-account-link"
+                        @click.stop="openAccountAssistFromSegment(scope.row, seg, $event)"
+                      >
+                        {{ seg.text }}
+                      </button>
+                      <span v-else class="entry-preview-plain">{{ seg.text }}</span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+              <el-input
+                v-else
+                :ref="(el) => setEntryInputRef(scope.row.uuid, el)"
+                v-model="scope.row.edited_formatted"
+                type="textarea"
+                :autosize="{ minRows: 7, maxRows: 40 }"
+                class="entry-preview"
+                placeholder="编辑 Beancount 条目；失焦后返回预览。过账行中账户在预览模式下点击可更换"
+                @blur="onEntryTextareaBlur(scope.row)"
+                @input="clearTabCompleteSession(scope.row.uuid)"
+                @keydown.tab="bindEntryPreviewTab(scope.row)"
+              />
               <div v-if="errorEntries[scope.row.uuid]" class="validation-message error-message">
                 {{ errorEntries[scope.row.uuid] }}
               </div>
@@ -122,11 +161,55 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 点击预览内账户：浮动选择器（Teleport 至 body，兼容 EP 2.3 无 trigger=manual 类型） -->
+    <Teleport to="body">
+      <div
+        v-if="accountPopover.visible"
+        class="parse-review-account-overlay"
+        @click.self="closeAccountAssistOverlay"
+      >
+        <div
+          class="parse-review-account-panel"
+          :style="accountAssistPanelStyle"
+          @click.stop
+        >
+          <div class="parse-review-account-original">{{ accountPopover.originalToken }}</div>
+          <el-input
+            ref="accountOverlayQueryRef"
+            v-model="accountAssistQuery"
+            class="parse-review-account-query"
+            clearable
+            placeholder="输入筛选或完整账户名；↑↓ 选择，回车 / Tab 确认"
+            @keydown="onOverlayQueryKeydown"
+          />
+          <ul
+            v-if="overlayAccountMatches.length > 0"
+            ref="accountSuggestionsListRef"
+            class="parse-review-account-suggestions"
+            role="listbox"
+          >
+            <li
+              v-for="(name, idx) in overlayAccountMatches"
+              :key="name"
+              role="option"
+              :class="[
+                'parse-review-account-suggestion-item',
+                { 'is-active': idx === overlayActiveIndex }
+              ]"
+              @click="applyAccountReplacementByName(name)"
+            >
+              {{ name }}
+            </li>
+          </ul>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
@@ -166,6 +249,555 @@ const parseResult = ref<ParseResult | null>(null)
 
 const errorEntries = ref<Record<string, string>>({})
 const validationWarnings = ref<Record<string, string>>({})
+
+/** 与后端 /account/tree/ 及 AccountSelector 注入结构一致 */
+const accountTreeForAssist = ref<any[]>([])
+const flatAccountNames = ref<string[]>([])
+const entryInputRefs = new Map<string, { textarea?: HTMLTextAreaElement }>()
+
+/** 某条条目是否处于整段 textarea 编辑模式（默认 false = 结构化预览） */
+const entryTextEditMode = ref<Record<string, boolean>>({})
+
+const isEntryTextEditMode = (uuid: string) => !!entryTextEditMode.value[uuid]
+
+const setEntryTextEditMode = (uuid: string, on: boolean) => {
+  if (on) {
+    entryTextEditMode.value = { ...entryTextEditMode.value, [uuid]: true }
+  } else {
+    const next = { ...entryTextEditMode.value }
+    delete next[uuid]
+    entryTextEditMode.value = next
+  }
+}
+
+const accountPopover = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  entryUuid: '',
+  replaceStart: 0,
+  replaceEnd: 0,
+  originalToken: ''
+})
+
+const accountAssistQuery = ref('')
+const accountOverlayQueryRef = ref<{ focus: () => void } | null>(null)
+const accountSuggestionsListRef = ref<HTMLUListElement | null>(null)
+/** 浮层建议列表当前高亮下标（↑↓ 移动，回车 / Tab 应用该项） */
+const overlayActiveIndex = ref(0)
+
+type TabCompleteSession = { start: number; end: number; candidatesKey: string; idx: number }
+const tabCompleteByUuid = ref<Record<string, TabCompleteSession | undefined>>({})
+
+const accountAssistPanelStyle = computed(() => {
+  const pad = 8
+  const panelW = 360
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+  const left = Math.max(pad, Math.min(accountPopover.value.x, vw - panelW - pad))
+  const top = Math.max(pad, Math.min(accountPopover.value.y + pad, vh - 200))
+  return {
+    position: 'fixed' as const,
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${panelW}px`,
+    zIndex: 3001
+  }
+})
+
+function closeAccountAssistOverlay() {
+  accountPopover.value.visible = false
+  accountAssistQuery.value = ''
+}
+
+const onEscapeCloseOverlay = (ev: KeyboardEvent) => {
+  if (ev.key === 'Escape' && accountPopover.value.visible) {
+    closeAccountAssistOverlay()
+  }
+}
+
+/** 查询串是否为账户名的有序子序列（如 wefu → …WechatFund） */
+function isOrderedSubsequence(haystackLower: string, needleLower: string): boolean {
+  if (!needleLower) return true
+  let i = 0
+  for (let j = 0; j < haystackLower.length && i < needleLower.length; j++) {
+    if (haystackLower[j] === needleLower[i]) i++
+  }
+  return i === needleLower.length
+}
+
+function accountMatchesAssistQuery(account: string, qLower: string): boolean {
+  if (!qLower) return false
+  const al = account.toLowerCase()
+  if (al.includes(qLower)) return true
+  return isOrderedSubsequence(al, qLower)
+}
+
+const overlayAccountMatches = computed(() => {
+  if (!accountPopover.value.visible) return []
+  const q = accountAssistQuery.value.trim().toLowerCase()
+  if (!q) return []
+  const hits = flatAccountNames.value.filter((a) => accountMatchesAssistQuery(a, q))
+  hits.sort((a, b) => {
+    const al = a.toLowerCase()
+    const bl = b.toLowerCase()
+    const ai = al.includes(q) ? 0 : 1
+    const bi = bl.includes(q) ? 0 : 1
+    if (ai !== bi) return ai - bi
+    if (a.length !== b.length) return a.length - b.length
+    return a.localeCompare(b)
+  })
+  return hits.slice(0, 80)
+})
+
+watch(overlayAccountMatches, async () => {
+  overlayActiveIndex.value = 0
+  await nextTick()
+  const ul = accountSuggestionsListRef.value
+  const active = ul?.querySelector('.parse-review-account-suggestion-item.is-active')
+  active?.scrollIntoView({ block: 'nearest' })
+})
+
+watch(overlayActiveIndex, async () => {
+  await nextTick()
+  const ul = accountSuggestionsListRef.value
+  if (!ul) return
+  const active = ul.querySelector('.parse-review-account-suggestion-item.is-active')
+  active?.scrollIntoView({ block: 'nearest' })
+})
+
+watch(
+  () => accountPopover.value.visible,
+  async (visible) => {
+    if (visible) {
+      window.addEventListener('keydown', onEscapeCloseOverlay)
+      accountAssistQuery.value = ''
+      await nextTick()
+      await nextTick()
+      accountOverlayQueryRef.value?.focus?.()
+    } else {
+      window.removeEventListener('keydown', onEscapeCloseOverlay)
+      accountAssistQuery.value = ''
+    }
+  }
+)
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onEscapeCloseOverlay)
+})
+
+/** 根为五大类，段内允许非空白（含中文等） */
+const ACCOUNT_FULL_RE = /^(?:Assets|Expenses|Income|Liabilities|Equity)(?::[^\s]+)*$/
+const POSTING_LINE_RE = /^\s+[!\*]?\s*(?:Assets|Expenses|Income|Liabilities|Equity)(?::|$)/
+/** 从过账行提取账户子串（不含行首缩进与金额） */
+const POSTING_ACCOUNT_IN_LINE =
+  /^\s+[!\*]?\s*((?:Assets|Expenses|Income|Liabilities|Equity)(?::[^\s]+)*)(?=\s|$)/
+
+type PreviewAccountSegment = {
+  kind: 'account'
+  text: string
+  token: string
+  absStart: number
+  absEnd: number
+}
+type PreviewTextSegment = { kind: 'text'; text: string }
+type PreviewSegment = PreviewAccountSegment | PreviewTextSegment
+type PreviewLine = { segments: PreviewSegment[] }
+
+function parseSingleLineToSegments(line: string, lineBase: number): PreviewSegment[] {
+  if (!isPostingLine(line)) {
+    return [{ kind: 'text', text: line }]
+  }
+  const m = POSTING_ACCOUNT_IN_LINE.exec(line)
+  if (!m || !ACCOUNT_FULL_RE.test(m[1])) {
+    return [{ kind: 'text', text: line }]
+  }
+  const token = m[1]
+  const from = m.index !== undefined ? m.index : 0
+  const idxToken = line.indexOf(token, from)
+  if (idxToken < 0) {
+    return [{ kind: 'text', text: line }]
+  }
+  const absStart = lineBase + idxToken
+  const absEnd = absStart + token.length
+  const prefix = line.slice(0, idxToken)
+  const suffix = line.slice(idxToken + token.length)
+  const segs: PreviewSegment[] = []
+  if (prefix) segs.push({ kind: 'text', text: prefix })
+  segs.push({ kind: 'account', text: token, token, absStart, absEnd })
+  if (suffix) segs.push({ kind: 'text', text: suffix })
+  return segs.length ? segs : [{ kind: 'text', text: line }]
+}
+
+/** 将全文拆成多行，每行若干 text / account 片段（含全文下标） */
+function buildLineSegments(fullText: string): PreviewLine[] {
+  const lines = fullText.split('\n')
+  const out: PreviewLine[] = []
+  let offset = 0
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    out.push({ segments: parseSingleLineToSegments(line, offset) })
+    offset += line.length
+    if (i < lines.length - 1) offset += 1
+  }
+  return out
+}
+
+function rebuildFlatAccountNames() {
+  const set = new Set<string>()
+  const walk = (nodes: any[]) => {
+    for (const n of nodes) {
+      if (n.account) set.add(n.account)
+      if (n.children?.length) walk(n.children)
+    }
+  }
+  walk(accountTreeForAssist.value)
+  flatAccountNames.value = Array.from(set).sort((a, b) => a.localeCompare(b))
+}
+
+async function loadAccountTreeAssist() {
+  try {
+    const response = await axios.get('/account/tree/')
+    let data: any[] = []
+    if (Array.isArray(response.data)) data = response.data as any[]
+    else if (response.data && Array.isArray(response.data.results)) {
+      data = response.data.results as any[]
+    }
+    accountTreeForAssist.value = data
+    rebuildFlatAccountNames()
+  } catch {
+    accountTreeForAssist.value = []
+    flatAccountNames.value = []
+  }
+}
+
+function getLineBounds(text: string, index: number) {
+  let lineStart = 0
+  let i = index
+  while (i > 0 && text[i - 1] !== '\n') i--
+  lineStart = i
+  let lineEnd = index
+  while (lineEnd < text.length && text[lineEnd] !== '\n') lineEnd++
+  return { lineStart, lineEnd, line: text.slice(lineStart, lineEnd) }
+}
+
+function isPostingLine(line: string) {
+  return POSTING_LINE_RE.test(line)
+}
+
+/** 全局下标 pos 落在过账行账户 token 内时，返回该 token 在全文中的起止 */
+function findAccountRangeAtGlobalIndex(text: string, pos: number) {
+  const { lineStart, line } = getLineBounds(text, pos)
+  if (!isPostingLine(line)) return null
+  const m = POSTING_ACCOUNT_IN_LINE.exec(line)
+  if (!m) return null
+  const token = m[1]
+  if (!ACCOUNT_FULL_RE.test(token)) return null
+  const from = m.index !== undefined ? m.index : 0
+  const relAccStart = line.indexOf(token, from)
+  if (relAccStart < 0) return null
+  const absStart = lineStart + relAccStart
+  const absEnd = absStart + token.length
+  if (pos < absStart || pos > absEnd) return null
+  return { start: absStart, end: absEnd, token }
+}
+
+function openAccountAssist(payload: {
+  entryUuid: string
+  replaceStart: number
+  replaceEnd: number
+  originalToken: string
+  clientX: number
+  clientY: number
+}) {
+  accountPopover.value = {
+    visible: true,
+    x: payload.clientX,
+    y: payload.clientY,
+    entryUuid: payload.entryUuid,
+    replaceStart: payload.replaceStart,
+    replaceEnd: payload.replaceEnd,
+    originalToken: payload.originalToken
+  }
+}
+
+function openAccountAssistFromSegment(row: FormattedEntry, seg: PreviewAccountSegment, e: MouseEvent) {
+  openAccountAssist({
+    entryUuid: row.uuid,
+    replaceStart: seg.absStart,
+    replaceEnd: seg.absEnd,
+    originalToken: seg.token,
+    clientX: e.clientX,
+    clientY: e.clientY
+  })
+}
+
+/** 将视口坐标映射为与 `edited_formatted` 一致的字符偏移（块级行间为换行符） */
+function getCharOffsetInPreviewRoot(
+  root: HTMLElement,
+  clientX: number,
+  clientY: number
+): number | null {
+  const doc = root.ownerDocument
+  if (!doc) return null
+  let node: Node | null = null
+  let offset = 0
+  const d = doc as Document & {
+    caretRangeFromPoint?: (x: number, y: number) => Range | null
+    caretPositionFromPoint?: (x: number, y: number) => CaretPosition | null
+  }
+  const range = d.caretRangeFromPoint?.(clientX, clientY)
+  if (range) {
+    node = range.startContainer
+    offset = range.startOffset
+  } else {
+    const pos = d.caretPositionFromPoint?.(clientX, clientY)
+    if (pos) {
+      node = pos.offsetNode
+      offset = pos.offset
+    }
+  }
+  if (!node || !root.contains(node)) return null
+  try {
+    const pre = doc.createRange()
+    pre.selectNodeContents(root)
+    pre.setEnd(node, offset)
+    return pre.toString().replace(/\r\n/g, '\n').length
+  } catch {
+    return null
+  }
+}
+
+function onEntryPreviewShellClick(row: FormattedEntry, e: MouseEvent) {
+  const t = e.target as HTMLElement
+  if (t.closest('.entry-preview-account-link')) return
+  const root = e.currentTarget
+  const max = row.edited_formatted?.length ?? 0
+  let caret = max
+  if (root instanceof HTMLElement) {
+    const raw = getCharOffsetInPreviewRoot(root, e.clientX, e.clientY)
+    if (raw !== null) caret = Math.min(Math.max(0, raw), max)
+  }
+  startTextEdit(row.uuid, caret)
+}
+
+function startTextEdit(uuid: string, caret?: number) {
+  clearTabCompleteSession(uuid)
+  setEntryTextEditMode(uuid, true)
+  nextTick(() => {
+    nextTick(() => {
+      const ta = entryInputRefs.get(uuid)?.textarea
+      ta?.focus()
+      if (ta && typeof caret === 'number' && caret >= 0) {
+        const c = Math.min(caret, ta.value.length)
+        ta.setSelectionRange(c, c)
+      }
+    })
+  })
+}
+
+async function onEntryTextareaBlur(row: FormattedEntry) {
+  try {
+    await handleEntryEdit(row.uuid, row.edited_formatted)
+  } finally {
+    setEntryTextEditMode(row.uuid, false)
+  }
+}
+
+function onOverlayQueryKeydown(e: Event | KeyboardEvent) {
+  if (!(e instanceof KeyboardEvent)) return
+  const list = overlayAccountMatches.value
+  if (e.key === 'ArrowDown') {
+    if (!list.length) return
+    e.preventDefault()
+    overlayActiveIndex.value = Math.min(overlayActiveIndex.value + 1, list.length - 1)
+    return
+  }
+  if (e.key === 'ArrowUp') {
+    if (!list.length) return
+    e.preventDefault()
+    overlayActiveIndex.value = Math.max(overlayActiveIndex.value - 1, 0)
+    return
+  }
+  if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
+    if (list.length) {
+      e.preventDefault()
+      const idx = Math.min(Math.max(0, overlayActiveIndex.value), list.length - 1)
+      void applyAccountReplacementByName(list[idx])
+      return
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      void applyOverlayAccountByInput()
+    }
+  }
+}
+
+function setEntryInputRef(uuid: string, el: unknown) {
+  if (el && typeof el === 'object') {
+    const comp = el as { textarea?: HTMLTextAreaElement }
+    if (comp.textarea instanceof HTMLTextAreaElement) {
+      entryInputRefs.set(uuid, comp)
+      return
+    }
+  }
+  entryInputRefs.delete(uuid)
+}
+
+function clearTabCompleteSession(uuid: string) {
+  delete tabCompleteByUuid.value[uuid]
+}
+
+const bindEntryPreviewTab = (row: FormattedEntry) => (e: Event) => {
+  if (e instanceof KeyboardEvent) {
+    handleEntryPreviewTab(row, e)
+  }
+}
+
+function longestCommonPrefix(strs: string[]): string {
+  if (!strs.length) return ''
+  let s = strs[0]
+  for (let k = 1; k < strs.length; k++) {
+    const t = strs[k]
+    let j = 0
+    while (j < s.length && j < t.length && s[j] === t[j]) j++
+    s = s.slice(0, j)
+    if (!s) return ''
+  }
+  return s
+}
+
+const handleEntryPreviewTab = (row: FormattedEntry, e: KeyboardEvent) => {
+  if (e.shiftKey) return
+  const input = entryInputRefs.get(row.uuid)
+  const ta = input?.textarea
+  if (!ta) return
+
+  const text = row.edited_formatted
+  const cur = ta.selectionStart
+  const range = findAccountRangeAtGlobalIndex(text, cur)
+  if (!range) return
+  if (cur < range.start || cur > range.end) return
+
+  const typed = text.slice(range.start, cur)
+  if (typed.length < 1) return
+
+  const names = flatAccountNames.value.filter((a) => a.startsWith(typed))
+  if (names.length === 0) return
+
+  const fullToken = text.slice(range.start, range.end)
+  if (names.length === 1 && names[0] === fullToken && cur === range.end) return
+
+  e.preventDefault()
+
+  const candidatesKey = names.join('\0')
+  let sess = tabCompleteByUuid.value[row.uuid]
+  if (
+    !sess ||
+    sess.start !== range.start ||
+    sess.end !== range.end ||
+    sess.candidatesKey !== candidatesKey
+  ) {
+    sess = { start: range.start, end: range.end, candidatesKey, idx: 0 }
+    tabCompleteByUuid.value[row.uuid] = sess
+  }
+
+  const lcp = longestCommonPrefix(names)
+  if (lcp.length > typed.length) {
+    const newText = text.slice(0, range.start) + lcp + text.slice(range.end)
+    row.edited_formatted = newText
+    delete tabCompleteByUuid.value[row.uuid]
+    nextTick(() => {
+      const nc = range.start + lcp.length
+      ta.setSelectionRange(nc, nc)
+    })
+    return
+  }
+
+  if (names.length > 1) {
+    const pick = names[sess!.idx % names.length]
+    sess!.idx += 1
+    const newText = text.slice(0, range.start) + pick + text.slice(range.end)
+    row.edited_formatted = newText
+    nextTick(() => {
+      const nc = range.start + pick.length
+      ta.setSelectionRange(nc, nc)
+    })
+    return
+  }
+
+  const pick = names[0]
+  const newText = text.slice(0, range.start) + pick + text.slice(range.end)
+  row.edited_formatted = newText
+  delete tabCompleteByUuid.value[row.uuid]
+  nextTick(() => {
+    const nc = range.start + pick.length
+    ta.setSelectionRange(nc, nc)
+  })
+}
+
+async function applyAccountReplacementByName(accountName: string) {
+  const pop = accountPopover.value
+  if (!pop.visible || !pop.entryUuid) return
+
+  const row = formattedEntries.value.find((r) => r.uuid === pop.entryUuid)
+  if (!row) return
+
+  const t = row.edited_formatted
+  const oldText = t
+  const newText = t.slice(0, pop.replaceStart) + accountName + t.slice(pop.replaceEnd)
+  row.edited_formatted = newText
+
+  accountPopover.value.visible = false
+  accountAssistQuery.value = ''
+
+  const focusPos = pop.replaceStart + accountName.length
+  try {
+    await persistEntryEdit(pop.entryUuid, newText)
+  } catch (error: any) {
+    row.edited_formatted = oldText
+    ElMessage.error(error.response?.data?.error || '更新编辑内容失败')
+    return
+  }
+  if (isEntryTextEditMode(pop.entryUuid)) {
+    const input = entryInputRefs.get(pop.entryUuid)
+    const ta = input?.textarea
+    if (ta) {
+      nextTick(() => {
+        ta.focus()
+        ta.setSelectionRange(focusPos, focusPos)
+      })
+    }
+  }
+}
+
+async function applyOverlayAccountByInput() {
+  const q = accountAssistQuery.value.trim()
+  if (!q) {
+    ElMessage.warning('请输入账户名或从下方列表选择')
+    return
+  }
+  if (flatAccountNames.value.includes(q)) {
+    await applyAccountReplacementByName(q)
+    return
+  }
+  const lower = q.toLowerCase()
+  const exactCi = flatAccountNames.value.filter((a) => a.toLowerCase() === lower)
+  if (exactCi.length === 1) {
+    await applyAccountReplacementByName(exactCi[0])
+    return
+  }
+  const subs = overlayAccountMatches.value
+  if (subs.length === 1) {
+    await applyAccountReplacementByName(subs[0])
+    return
+  }
+  if (subs.length > 1) {
+    ElMessage.warning('请用 ↑↓ 选择一条，或补充筛选至仅一条后再回车')
+    return
+  }
+  ElMessage.warning('未找到匹配的账户，请检查输入')
+}
 
 // 内联新增映射相关
 const mappingDialog = ref({
@@ -399,25 +1031,28 @@ const handleKeywordSelect = async (uuid: string, selectedKey: string) => {
   }
 }
 
+async function persistEntryEdit(uuid: string, editedFormatted: string) {
+  if (errorEntries.value[uuid]) {
+    delete errorEntries.value[uuid]
+  }
+
+  const response = await updateEntryEdit(taskId.value, uuid, {
+    edited_formatted: editedFormatted
+  })
+
+  if (response.data.validation_warning) {
+    validationWarnings.value[uuid] = response.data.validation_warning
+  } else {
+    delete validationWarnings.value[uuid]
+  }
+
+  ElMessage.success('编辑内容已保存')
+}
+
 // 处理条目编辑
 const handleEntryEdit = async (uuid: string, editedFormatted: string) => {
   try {
-    // 每次编辑后清除错误状态
-    if (errorEntries.value[uuid]) {
-      delete errorEntries.value[uuid]
-    }
-
-    const response = await updateEntryEdit(taskId.value, uuid, {
-      edited_formatted: editedFormatted
-    })
-    
-    if (response.data.validation_warning) {
-      validationWarnings.value[uuid] = response.data.validation_warning
-    } else {
-      delete validationWarnings.value[uuid]
-    }
-
-    ElMessage.success('编辑内容已保存')
+    await persistEntryEdit(uuid, editedFormatted)
   } catch (error: any) {
     ElMessage.error(error.response?.data?.error || '更新编辑内容失败')
   }
@@ -436,7 +1071,9 @@ const getEntryClasses = (uuid: string, editedFormatted: string) => {
     {
       'has-error': isError,
       'has-warning': isWarning,
-      'has-other': isOther && !isError && !isWarning // 错误和警告优先级更高
+      'has-other': isOther && !isError && !isWarning, // 错误和警告优先级更高
+      'is-entry-preview-mode': !isEntryTextEditMode(uuid),
+      'is-entry-edit-mode': isEntryTextEditMode(uuid)
     }
   ]
 }
@@ -594,7 +1231,8 @@ const handleBack = () => {
 }
 
 onMounted(() => {
-  loadResults()
+  void loadResults()
+  void loadAccountTreeAssist()
 })
 </script>
 
@@ -634,10 +1272,15 @@ onMounted(() => {
 
 .entry-preview-wrapper {
   position: relative;
+  flex-shrink: 0;
+  min-height: calc(7 * 1.6em + 10px + 2px);
+  font-size: 12px;
+  line-height: 1.6;
   
   &.has-error {
     :deep(.el-textarea__inner),
-    :deep(.ep-textarea__inner) {
+    :deep(.ep-textarea__inner),
+    .entry-preview-render {
       border-color: var(--el-color-danger);
       box-shadow: 0 0 0 1px var(--el-color-danger) inset;
     }
@@ -645,7 +1288,8 @@ onMounted(() => {
   
   &.has-warning {
     :deep(.el-textarea__inner),
-    :deep(.ep-textarea__inner) {
+    :deep(.ep-textarea__inner),
+    .entry-preview-render {
       border-color: var(--el-color-warning);
       box-shadow: 0 0 0 1px var(--el-color-warning) inset;
     }
@@ -653,7 +1297,8 @@ onMounted(() => {
   
   &.has-other {
     :deep(.el-textarea__inner),
-    :deep(.ep-textarea__inner) {
+    :deep(.ep-textarea__inner),
+    .entry-preview-render {
       border-color: var(--ep-color-primary, var(--el-color-primary));
       box-shadow: 0 0 0 1px var(--ep-color-primary, var(--el-color-primary)) inset;
       background-color: var(--ep-color-primary-light-9, var(--el-color-primary-light-9));
@@ -664,9 +1309,10 @@ onMounted(() => {
 // 暗黑模式下：避免 primary-light-* 过亮导致文本对比度差
 :deep(html.dark) .entry-preview-wrapper.has-other {
   :deep(.el-textarea__inner),
-  :deep(.ep-textarea__inner) {
-    color: var(--el-text-color-primary, var(--ep-text-color-primary));
-    background-color: var(--ep-color-primary-dark-2, var(--el-color-primary-dark-2));
+  :deep(.ep-textarea__inner),
+  .entry-preview-render {
+    /* el-config-provider namespace=ep：暗黑语义在 --ep-*，--el-* 在 dist/index.css 中仍为亮色 */
+    color: var(--ep-text-color-primary, var(--el-text-color-primary));
     background-color: color-mix(
       in srgb,
       var(--ep-color-primary, var(--el-color-primary)) 18%,
@@ -693,13 +1339,146 @@ onMounted(() => {
   }
 }
 
+// 预览块与编辑 textarea 共用同一套「占位尺寸」。
+// border-box 下 min-height 须包含 7 行内容高度（line-height 1.6 → 7×1.6em）+ 上下 padding(10px) + 上下 border(2px)，否则少于 7 行时外框会偏矮。
+$entry-preview-inner-padding: 5px 11px;
+$entry-preview-inner-radius: var(--el-border-radius-base);
+$entry-preview-inner-border: 1px solid;
+$entry-preview-min-height: calc(7 * 1.6em + 10px + 2px);
+
 .entry-preview {
+  width: 100%;
+
+  :deep(.el-textarea),
+  :deep(.ep-textarea) {
+    display: block;
+  }
+
   :deep(.el-textarea__inner),
   :deep(.ep-textarea__inner) {
+    box-sizing: border-box;
     font-family: Monaco, Consolas, 'Courier New', monospace;
     font-size: 12px;
     line-height: 1.6;
+    min-height: $entry-preview-min-height;
+    padding: $entry-preview-inner-padding;
+    border-radius: $entry-preview-inner-radius;
+    border-width: 1px;
+    border-style: solid;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
+    background-color: var(--ep-input-bg-color, var(--el-input-bg-color, var(--ep-fill-color-blank, var(--el-fill-color-blank))));
+    color: var(--ep-input-text-color, var(--el-input-text-color, var(--ep-text-color-regular, var(--el-text-color-regular))));
+    border-color: var(--ep-input-border-color, var(--el-input-border-color, var(--ep-border-color, var(--el-border-color))));
   }
+}
+
+.entry-preview-render {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  min-height: $entry-preview-min-height;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: $entry-preview-inner-padding;
+  border-radius: $entry-preview-inner-radius;
+  border: $entry-preview-inner-border
+    var(--ep-input-border-color, var(--el-input-border-color, var(--ep-border-color, var(--el-border-color))));
+  background-color: var(
+    --ep-input-bg-color,
+    var(--el-input-bg-color, var(--ep-fill-color-blank, var(--el-fill-color-blank)))
+  );
+  color: var(
+    --ep-input-text-color,
+    var(--el-input-text-color, var(--ep-text-color-regular, var(--el-text-color-regular)))
+  );
+  cursor: text;
+  outline: none;
+  transition: border-color 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+// 无校验态：预览外框为默认输入框色；修改态外框为主题色（与预览区分）
+.entry-preview-wrapper.is-entry-preview-mode:not(.has-error):not(.has-warning):not(.has-other) {
+  .entry-preview-render {
+    border-color: var(--ep-input-border-color, var(--el-input-border-color, var(--ep-border-color, var(--el-border-color))));
+  }
+
+  .entry-preview-render:hover {
+    border-color: var(
+      --ep-input-hover-border-color,
+      var(--el-input-hover-border-color, var(--ep-border-color-hover, var(--el-border-color-hover)))
+    );
+  }
+
+  .entry-preview-render:focus-visible {
+    border-color: var(
+      --ep-input-hover-border-color,
+      var(--el-input-hover-border-color, var(--ep-border-color-hover, var(--el-border-color-hover)))
+    );
+    box-shadow: none;
+  }
+}
+
+.entry-preview-wrapper.is-entry-edit-mode:not(.has-error):not(.has-warning):not(.has-other) {
+  :deep(.el-textarea__inner),
+  :deep(.ep-textarea__inner) {
+    border-color: var(--ep-color-primary, var(--el-color-primary));
+    box-shadow: none;
+  }
+
+  :deep(.el-textarea__inner:hover),
+  :deep(.ep-textarea__inner:hover) {
+    border-color: var(--ep-color-primary, var(--el-color-primary));
+  }
+
+  :deep(.el-textarea__inner:focus),
+  :deep(.ep-textarea__inner:focus) {
+    border-color: var(--ep-color-primary, var(--el-color-primary));
+    box-shadow: none;
+  }
+}
+
+.entry-preview-wrapper.has-error .entry-preview-render:focus-visible {
+  border-color: var(--el-color-danger);
+  box-shadow: 0 0 0 1px var(--el-color-danger) inset;
+}
+
+.entry-preview-wrapper.has-warning .entry-preview-render:focus-visible {
+  border-color: var(--el-color-warning);
+  box-shadow: 0 0 0 1px var(--el-color-warning) inset;
+}
+
+.entry-preview-wrapper.has-other .entry-preview-render:focus-visible {
+  border-color: var(--ep-color-primary, var(--el-color-primary));
+  box-shadow: 0 0 0 1px var(--ep-color-primary, var(--el-color-primary)) inset;
+}
+
+.entry-preview-line {
+  display: block;
+}
+
+.entry-preview-account-link {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  text-decoration: none;
+  vertical-align: baseline;
+}
+
+.entry-preview-account-link:hover {
+  color: var(--ep-color-primary, var(--el-color-primary));
+}
+
+.entry-preview-plain {
+  cursor: text;
 }
 
 .ai-classification-container {
@@ -786,5 +1565,82 @@ onMounted(() => {
     font-size: 12px;
     line-height: 1.6;
   }
+}
+</style>
+
+<style lang="scss">
+.parse-review-account-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background-color: color-mix(
+    in srgb,
+    var(--ep-overlay-color-lighter, var(--el-overlay-color-lighter, #000)) 12%,
+    transparent
+  );
+}
+
+.parse-review-account-panel {
+  background-color: var(--ep-bg-color-overlay, var(--ep-bg-color, var(--el-bg-color)));
+  border: 1px solid var(--ep-border-color, var(--el-border-color));
+  border-radius: var(--ep-border-radius-base, var(--el-border-radius-base));
+  padding: 8px;
+  box-shadow: var(--ep-box-shadow, var(--el-box-shadow));
+}
+
+.parse-review-account-original {
+  font-family: Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  border-radius: var(--ep-border-radius-small, var(--el-border-radius-small));
+  background-color: var(--ep-fill-color-light, var(--el-fill-color-light));
+  color: var(--ep-text-color-primary, var(--el-text-color-primary));
+  word-break: break-all;
+}
+
+.parse-review-account-query {
+  width: 100%;
+
+  .ep-input__wrapper,
+  .el-input__wrapper {
+    background-color: var(--ep-fill-color-blank, var(--el-fill-color-blank));
+    box-shadow: 0 0 0 1px var(--ep-input-border-color, var(--el-input-border-color)) inset;
+  }
+
+  .ep-input__inner,
+  .el-input__inner {
+    color: var(--ep-text-color-regular, var(--el-text-color-regular));
+  }
+}
+
+.parse-review-account-suggestions {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--ep-border-color-lighter, var(--el-border-color-lighter));
+  border-radius: var(--ep-border-radius-small, var(--el-border-radius-small));
+  background-color: var(--ep-fill-color-blank, var(--el-fill-color-blank));
+}
+
+.parse-review-account-suggestion-item {
+  padding: 6px 10px;
+  font-family: Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--ep-text-color-regular, var(--el-text-color-regular));
+}
+
+.parse-review-account-suggestion-item:hover,
+.parse-review-account-suggestion-item.is-active {
+  background-color: var(--ep-fill-color-light, var(--el-fill-color-light));
+  color: var(--ep-text-color-primary, var(--el-text-color-primary));
+}
+
+html.dark .parse-review-account-suggestion-item.is-active {
+  background-color: var(--ep-fill-color-dark, var(--el-fill-color-dark));
 }
 </style>
