@@ -97,6 +97,48 @@
             </div>
         </div>
 
+        <!-- 示例清理指引：自有账单已写入账本且仍存在示例时显示 -->
+        <div v-if="showSampleCleanupHint" class="sample-cleanup-banner" role="note">
+            <el-icon class="sample-cleanup-banner__icon" :size="20">
+                <InfoFilled />
+            </el-icon>
+            <div class="sample-cleanup-banner__content">
+                <p class="sample-cleanup-banner__lead">
+                    您已有账单写入账本。建议删除示例文件，避免与真实账目重复计入报表。
+                </p>
+                <p class="sample-cleanup-banner__meta">
+                    需要时可
+                    <router-link to="/trans" class="sample-cleanup-banner__route-link">前往账单解析页</router-link>
+                    下载示例，或从
+                    <el-link
+                        :href="SAMPLE_BILL_DOWNLOAD_URLS.wechat"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        type="primary"
+                        class="sample-cleanup-banner__inline-link"
+                    >微信</el-link>
+                    /
+                    <el-link
+                        :href="SAMPLE_BILL_DOWNLOAD_URLS.alipay"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        type="primary"
+                        class="sample-cleanup-banner__inline-link"
+                    >支付宝</el-link>
+                    示例链接重新获取。
+                </p>
+            </div>
+            <el-button
+                type="warning"
+                plain
+                :loading="isCleaningSampleBills"
+                :disabled="shouldDisableDownloadAndDelete"
+                @click="cleanupSampleBills"
+            >
+                删除示例账单
+            </el-button>
+        </div>
+
         <!-- 任务状态对话框  -->
         <el-dialog
             v-model="parseDialogVisible"
@@ -194,6 +236,14 @@
                             <component :is="row.node_type === 'directory' ? Folder : Document" />
                         </el-icon>
                         <span class="ml-2">{{ row.name }}</span>
+                        <el-tag
+                            v-if="row.node_type === 'file' && isSampleBillFile(row.name)"
+                            type="info"
+                            size="small"
+                            class="sample-file-tag"
+                        >
+                            示例
+                        </el-tag>
                     </div>
                 </template>
             </el-table-column>
@@ -347,6 +397,7 @@ import {
     TOUR_FIRST_PARSE_FILE_NAME,
     SAMPLE_BILL_FILE_NAMES,
     BILLS_EXPORT_DOCS_URL,
+    SAMPLE_BILL_DOWNLOAD_URLS,
 } from '../../utils/userTour'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 import { useRouter, useRoute } from 'vue-router'
@@ -781,6 +832,73 @@ const uploadHintVariant = computed<UploadHintVariant | null>(() => {
 });
 
 const showUploadHint = computed(() => uploadHintVariant.value !== null);
+
+function isSampleBillFile(fileName: string): boolean {
+    return sampleBillFileNameSet.has(fileName);
+}
+
+/** 自有账单已解析并写入账本（parsed；pending_review 尚未写入） */
+function isUserBillWrittenToLedger(file: FileItem): boolean {
+    return file.node_type === 'file'
+        && !isSampleBillFile(file.name)
+        && file.parse_status === 'parsed';
+}
+
+const sampleFilesInDirectory = computed(() =>
+    items.value.filter((item) => item.node_type === 'file' && isSampleBillFile(item.name)),
+);
+
+const hasUserBillWrittenToLedger = computed(() =>
+    items.value.some(isUserBillWrittenToLedger),
+);
+
+const showSampleCleanupHint = computed(() => {
+    if (isGlobalSearch.value && searchQuery.value) {
+        return false;
+    }
+    return hasUserBillWrittenToLedger.value && sampleFilesInDirectory.value.length > 0;
+});
+
+const isCleaningSampleBills = ref(false);
+
+async function cleanupSampleBills() {
+    if (shouldDisableDownloadAndDelete.value) {
+        ElMessage.warning('导览进行中，请先完成导览步骤');
+        return;
+    }
+
+    const targets = sampleFilesInDirectory.value;
+    if (targets.length === 0) {
+        return;
+    }
+
+    const names = targets.map((f) => f.name).join('、');
+    try {
+        await ElMessageBox.confirm(
+            `将删除 ${targets.length} 个示例文件（${names}）及其解析结果，是否继续？`,
+            '删除示例账单',
+            { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+        );
+    } catch {
+        return;
+    }
+
+    isCleaningSampleBills.value = true;
+    try {
+        await Promise.all(
+            targets.map((file) =>
+                axios.delete(`/files/${file.id}/`, { headers: headers.value }),
+            ),
+        );
+        ElMessage.success('示例账单已删除');
+        await loadDirectoryContent();
+    } catch (error) {
+        ElMessage.error('删除示例账单失败');
+        console.error(error);
+    } finally {
+        isCleaningSampleBills.value = false;
+    }
+}
 
 // 初始化加载
 onMounted(async () => {
@@ -1817,6 +1935,61 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
 .upload-hint-banner__inline-link {
     font-size: inherit;
     vertical-align: baseline;
+}
+
+.sample-cleanup-banner {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border: 1px solid var(--ep-color-info-light-5);
+    border-radius: 8px;
+    background: var(--ep-color-info-light-9);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.sample-cleanup-banner__icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--ep-color-info);
+}
+
+.sample-cleanup-banner__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.sample-cleanup-banner__lead {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ep-text-color-primary);
+}
+
+.sample-cleanup-banner__meta {
+    margin: 6px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ep-text-color-regular);
+}
+
+.sample-cleanup-banner__route-link {
+    color: var(--ep-color-primary);
+    text-decoration: none;
+}
+
+.sample-cleanup-banner__route-link:hover {
+    text-decoration: underline;
+}
+
+.sample-cleanup-banner__inline-link {
+    font-size: inherit;
+    vertical-align: baseline;
+}
+
+.sample-file-tag {
+    margin-left: 8px;
+    flex-shrink: 0;
 }
 
 .parse-progress-entry {
