@@ -11,6 +11,31 @@
 
         <!-- 工具栏 -->
         <div class="toolbar">
+            <div class="toolbar-primary-actions">
+                <el-button
+                    id="tour-upload-button"
+                    type="primary"
+                    :disabled="isTourStep2"
+                    @click="triggerUpload"
+                >
+                    <el-icon>
+                        <UploadFilled />
+                    </el-icon>
+                    上传账单
+                </el-button>
+                <el-button plain @click="showCreateFolderDialog">
+                    <el-icon>
+                        <Folder />
+                    </el-icon>
+                    新建文件夹
+                </el-button>
+            </div>
+
+            <!-- 隐藏的上传组件 -->
+            <el-upload :show-file-list="false" :http-request="customUpload" :before-upload="validateUpload">
+                <button ref="uploadTrigger" style="display: none"></button>
+            </el-upload>
+
             <el-input v-model="searchQuery" placeholder="搜索文件" class="search-input" clearable>
                 <template #prefix>
                     <el-icon>
@@ -26,32 +51,6 @@
                     </el-select>
                 </template>
             </el-input>
-            <el-dropdown @command="handleNewCommand">
-                <el-button type="primary">
-                    <el-icon>
-                        <Plus />
-                    </el-icon>新建
-                </el-button>
-                <template #dropdown>
-                    <el-dropdown-menu>
-                        <el-dropdown-item command="folder">
-                            <el-icon>
-                                <Folder />
-                            </el-icon>新建文件夹
-                        </el-dropdown-item>
-                        <el-dropdown-item command="file">
-                            <el-icon>
-                                <Document />
-                            </el-icon>文件上传（选择/拖拽）
-                        </el-dropdown-item>
-                    </el-dropdown-menu>
-                </template>
-            </el-dropdown>
-
-            <!-- 隐藏的上传组件 -->
-            <el-upload :show-file-list="false" :http-request="customUpload" :before-upload="validateUpload">
-                <button ref="uploadTrigger" style="display: none"></button>
-            </el-upload>
 
             <el-select v-model="batchAction" placeholder="批量操作" class="batch-select"
                 :disabled="selectedItems.length === 0" @change="executeBatchAction">
@@ -301,7 +300,7 @@
 </template>
 
 <script setup lang="ts">
-import { Folder, Document, Plus, Lock, UploadFilled, FolderOpened } from '@element-plus/icons-vue'
+import { Folder, Document, Lock, UploadFilled, FolderOpened } from '@element-plus/icons-vue'
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import axios from '../../utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -375,15 +374,12 @@ const statusFilterOptions = [
     { value: 'cancelled', label: '取消解析' }
 ]
 
-function handleNewCommand(command: string) {
-    if (command === 'folder') {
-        showCreateFolderDialog()
-    } else if (command === 'file') {
-        // 触发隐藏的上传按钮
-        if (uploadTrigger.value) {
-            uploadTrigger.value.click()
-        }
+function triggerUpload() {
+    if (isTourStep2.value) {
+        ElMessage.warning('导览进行中，请先完成当前步骤');
+        return;
     }
+    uploadTrigger.value?.click();
 }
 
 async function customUpload(options: any) {
@@ -1647,6 +1643,13 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
     gap: 10px;
     margin-bottom: 20px;
     flex-wrap: nowrap;
+}
+
+.toolbar-primary-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
 .batch-select {
