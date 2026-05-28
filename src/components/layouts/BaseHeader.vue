@@ -137,6 +137,19 @@ const openExternal = (url: string) => {
 };
 
 /**
+ * 新标签打开（若被拦截则提示，但不跳转当前页）
+ */
+const openInNewTab = (url: string) => {
+  const win = window.open(url, '_blank', 'noopener,noreferrer')
+  if (!win) {
+    // 可能被浏览器拦截弹窗；为避免“原标签页也跳转”，这里只提示用户允许弹窗
+    // ElMessage.warning('浏览器拦截了新标签打开，请允许弹出式窗口后重试')
+    return false
+  }
+  return true
+}
+
+/**
  * 处理菜单选择事件
  */
 const handleSelect = (_key: string, _keyPath: string[]) => {
@@ -166,7 +179,8 @@ const openFavaInstance = async () => {
     // 静态多实例（FAVA_DEPLOY_MODE=static）：后端返回 JSON { url, deploy_mode }
     const data = response.data as { url?: string; deploy_mode?: string } | undefined
     if (response.status === 200 && data?.url && data.deploy_mode === 'static') {
-      window.location.href = data.url
+      const opened = openInNewTab(data.url)
+      if (opened) ElMessage.success('已在新标签打开 Fava，关闭标签即可返回平台')
       return
     }
 
@@ -174,7 +188,8 @@ const openFavaInstance = async () => {
       // 动态容器：302 跟随后的最终 URL
       const redirectPath = response.request.responseURL;
       const newUrl = new URL(redirectPath, window.location.origin);
-      window.location.href = newUrl.toString();
+      const opened = openInNewTab(newUrl.toString())
+      if (opened) ElMessage.success('已在新标签打开 Fava，关闭标签即可返回平台')
     } else {
       throw new Error('未收到重定向响应');
     }

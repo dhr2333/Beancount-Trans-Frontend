@@ -11,6 +11,31 @@
 
         <!-- 工具栏 -->
         <div class="toolbar">
+            <div class="toolbar-primary-actions">
+                <el-button
+                    id="tour-upload-button"
+                    type="primary"
+                    :disabled="isTourStep2"
+                    @click="triggerUpload"
+                >
+                    <el-icon>
+                        <UploadFilled />
+                    </el-icon>
+                    上传账单
+                </el-button>
+                <el-button plain @click="showCreateFolderDialog">
+                    <el-icon>
+                        <Folder />
+                    </el-icon>
+                    新建文件夹
+                </el-button>
+            </div>
+
+            <!-- 隐藏的上传组件 -->
+            <el-upload :show-file-list="false" :http-request="customUpload" :before-upload="validateUpload">
+                <button ref="uploadTrigger" style="display: none"></button>
+            </el-upload>
+
             <el-input v-model="searchQuery" placeholder="搜索文件" class="search-input" clearable>
                 <template #prefix>
                     <el-icon>
@@ -26,32 +51,6 @@
                     </el-select>
                 </template>
             </el-input>
-            <el-dropdown @command="handleNewCommand">
-                <el-button type="primary">
-                    <el-icon>
-                        <Plus />
-                    </el-icon>新建
-                </el-button>
-                <template #dropdown>
-                    <el-dropdown-menu>
-                        <el-dropdown-item command="folder">
-                            <el-icon>
-                                <Folder />
-                            </el-icon>新建文件夹
-                        </el-dropdown-item>
-                        <el-dropdown-item command="file">
-                            <el-icon>
-                                <Document />
-                            </el-icon>文件上传（选择/拖拽）
-                        </el-dropdown-item>
-                    </el-dropdown-menu>
-                </template>
-            </el-dropdown>
-
-            <!-- 隐藏的上传组件 -->
-            <el-upload :show-file-list="false" :http-request="customUpload" :before-upload="validateUpload">
-                <button ref="uploadTrigger" style="display: none"></button>
-            </el-upload>
 
             <el-select v-model="batchAction" placeholder="批量操作" class="batch-select"
                 :disabled="selectedItems.length === 0" @change="executeBatchAction">
@@ -66,6 +65,76 @@
         <!-- 上传进度条（独立显示，不影响工具栏布局） -->
         <div v-if="uploadProgress > 0 && uploadProgress < 100" class="upload-progress-container">
             <el-progress :percentage="uploadProgress" :stroke-width="6" status="success" />
+        </div>
+
+        <!-- 上传指引：空目录 / 仅文件夹 / 仅示例账单时显示 -->
+        <div v-if="showUploadHint" id="tour-upload-hint" class="upload-hint-banner" role="note">
+            <el-icon class="upload-hint-banner__icon" :size="20">
+            </el-icon>
+            <div class="upload-hint-banner__content">
+                <p class="upload-hint-banner__lead">
+                    <template v-if="uploadHintVariant === 'sample-only'">
+                        当前为示例账单，仅供体验。上传自己的账单前，请先从各渠道导出（
+                    </template>
+                    <template v-else>
+                        当前目录尚无账单文件。上传前请先从各渠道导出账单（
+                    </template>
+                    <el-link
+                        :href="BILLS_EXPORT_DOCS_URL"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        type="primary"
+                        class="upload-hint-banner__inline-link"
+                    >
+                        查看导出方法
+                    </el-link>
+                    ）。
+                </p>
+                <p class="upload-hint-banner__tip">
+                    建议只导出一个完整自然月的账单，避免跨月数据导致重复或错乱。
+                </p>
+            </div>
+        </div>
+
+        <!-- 示例清理指引：自有账单已写入账本且仍存在示例时显示 -->
+        <div v-if="showSampleCleanupHint" class="sample-cleanup-banner" role="note">
+            <el-icon class="sample-cleanup-banner__icon" :size="20">
+            </el-icon>
+            <div class="sample-cleanup-banner__content">
+                <p class="sample-cleanup-banner__lead">
+                    您已有账单写入账本。建议删除示例文件，避免与真实账目重复计入报表。
+                </p>
+                <p class="sample-cleanup-banner__meta">
+                    需要时可
+                    <router-link to="/trans" class="sample-cleanup-banner__route-link">前往账单解析页</router-link>
+                    下载示例，或从
+                    <el-link
+                        :href="SAMPLE_BILL_DOWNLOAD_URLS.wechat"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        type="primary"
+                        class="sample-cleanup-banner__inline-link"
+                    >微信</el-link>
+                    /
+                    <el-link
+                        :href="SAMPLE_BILL_DOWNLOAD_URLS.alipay"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        type="primary"
+                        class="sample-cleanup-banner__inline-link"
+                    >支付宝</el-link>
+                    示例链接重新获取。
+                </p>
+            </div>
+            <el-button
+                type="warning"
+                plain
+                :loading="isCleaningSampleBills"
+                :disabled="shouldDisableDownloadAndDelete"
+                @click="cleanupSampleBills"
+            >
+                删除示例账单
+            </el-button>
         </div>
 
         <!-- 任务状态对话框  -->
@@ -165,6 +234,14 @@
                             <component :is="row.node_type === 'directory' ? Folder : Document" />
                         </el-icon>
                         <span class="ml-2">{{ row.name }}</span>
+                        <el-tag
+                            v-if="row.node_type === 'file' && isSampleBillFile(row.name)"
+                            type="info"
+                            size="small"
+                            class="sample-file-tag"
+                        >
+                            示例
+                        </el-tag>
                     </div>
                 </template>
             </el-table-column>
@@ -301,13 +378,25 @@
 </template>
 
 <script setup lang="ts">
-import { Folder, Document, Plus, Lock, UploadFilled, FolderOpened } from '@element-plus/icons-vue'
+import { Folder, Document, Lock, UploadFilled, FolderOpened, InfoFilled } from '@element-plus/icons-vue'
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import axios from '../../utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { TagProps } from 'element-plus'
 import { parse } from 'path'
-import { startUserTour, continueUserTour, shouldResumeTour, getTourProgress, resumeTourFromStep, initTourState, saveTourProgress, TOUR_FIRST_PARSE_FILE_NAME } from '../../utils/userTour'
+import {
+    startUserTour,
+    continueUserTour,
+    shouldResumeTour,
+    getTourProgress,
+    resumeTourFromStep,
+    initTourState,
+    saveTourProgress,
+    TOUR_FIRST_PARSE_FILE_NAME,
+    SAMPLE_BILL_FILE_NAMES,
+    BILLS_EXPORT_DOCS_URL,
+    SAMPLE_BILL_DOWNLOAD_URLS,
+} from '../../utils/userTour'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 import { useRouter, useRoute } from 'vue-router'
 import { checkAndResumeTour, isRouteMatchForStep } from '../../utils/tourRecovery'
@@ -375,15 +464,12 @@ const statusFilterOptions = [
     { value: 'cancelled', label: '取消解析' }
 ]
 
-function handleNewCommand(command: string) {
-    if (command === 'folder') {
-        showCreateFolderDialog()
-    } else if (command === 'file') {
-        // 触发隐藏的上传按钮
-        if (uploadTrigger.value) {
-            uploadTrigger.value.click()
-        }
+function triggerUpload() {
+    if (isTourStep2.value) {
+        ElMessage.warning('导览进行中，请先完成当前步骤');
+        return;
     }
+    uploadTrigger.value?.click();
 }
 
 async function customUpload(options: any) {
@@ -720,6 +806,97 @@ const tourParseTargetFileName = computed(() => {
   const preferred = fileRows.find((f) => f.name === TOUR_FIRST_PARSE_FILE_NAME);
   return (preferred && preferred.name) || (fileRows[0] && fileRows[0].name) || '';
 });
+
+const sampleBillFileNameSet = new Set<string>(SAMPLE_BILL_FILE_NAMES);
+
+type UploadHintVariant = 'no-files' | 'sample-only';
+
+const uploadHintVariant = computed<UploadHintVariant | null>(() => {
+    if (isGlobalSearch.value && searchQuery.value) {
+        return null;
+    }
+
+    const files = items.value.filter((item) => item.node_type === 'file');
+
+    if (files.length === 0) {
+        return 'no-files';
+    }
+
+    if (files.every((file) => sampleBillFileNameSet.has(file.name))) {
+        return 'sample-only';
+    }
+
+    return null;
+});
+
+const showUploadHint = computed(() => uploadHintVariant.value !== null);
+
+function isSampleBillFile(fileName: string): boolean {
+    return sampleBillFileNameSet.has(fileName);
+}
+
+/** 自有账单已解析并写入账本（parsed；pending_review 尚未写入） */
+function isUserBillWrittenToLedger(file: FileItem): boolean {
+    return file.node_type === 'file'
+        && !isSampleBillFile(file.name)
+        && file.parse_status === 'parsed';
+}
+
+const sampleFilesInDirectory = computed(() =>
+    items.value.filter((item) => item.node_type === 'file' && isSampleBillFile(item.name)),
+);
+
+const hasUserBillWrittenToLedger = computed(() =>
+    items.value.some(isUserBillWrittenToLedger),
+);
+
+const showSampleCleanupHint = computed(() => {
+    if (isGlobalSearch.value && searchQuery.value) {
+        return false;
+    }
+    return hasUserBillWrittenToLedger.value && sampleFilesInDirectory.value.length > 0;
+});
+
+const isCleaningSampleBills = ref(false);
+
+async function cleanupSampleBills() {
+    if (shouldDisableDownloadAndDelete.value) {
+        ElMessage.warning('导览进行中，请先完成导览步骤');
+        return;
+    }
+
+    const targets = sampleFilesInDirectory.value;
+    if (targets.length === 0) {
+        return;
+    }
+
+    const names = targets.map((f) => f.name).join('、');
+    try {
+        await ElMessageBox.confirm(
+            `将删除 ${targets.length} 个示例文件（${names}）及其解析结果，是否继续？`,
+            '删除示例账单',
+            { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+        );
+    } catch {
+        return;
+    }
+
+    isCleaningSampleBills.value = true;
+    try {
+        await Promise.all(
+            targets.map((file) =>
+                axios.delete(`/files/${file.id}/`, { headers: headers.value }),
+            ),
+        );
+        ElMessage.success('示例账单已删除');
+        await loadDirectoryContent();
+    } catch (error) {
+        ElMessage.error('删除示例账单失败');
+        console.error(error);
+    } finally {
+        isCleaningSampleBills.value = false;
+    }
+}
 
 // 初始化加载
 onMounted(async () => {
@@ -1649,6 +1826,13 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
     flex-wrap: nowrap;
 }
 
+.toolbar-primary-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
 .batch-select {
     width: 140px;
 }
@@ -1708,6 +1892,102 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
 .task-info {
     margin: 15px 0;
     line-height: 1.8;
+}
+
+.upload-hint-banner {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border: 1px solid var(--ep-color-warning-light-5);
+    border-radius: 8px;
+    background: var(--ep-color-warning-light-9);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.upload-hint-banner__icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--ep-color-warning);
+}
+
+.upload-hint-banner__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.upload-hint-banner__lead {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ep-text-color-primary);
+}
+
+.upload-hint-banner__tip {
+    margin: 6px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ep-color-warning-dark-2);
+}
+
+.upload-hint-banner__inline-link {
+    font-size: inherit;
+    vertical-align: baseline;
+}
+
+.sample-cleanup-banner {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border: 1px solid var(--ep-color-info-light-5);
+    border-radius: 8px;
+    background: var(--ep-color-info-light-9);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.sample-cleanup-banner__icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--ep-color-info);
+}
+
+.sample-cleanup-banner__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.sample-cleanup-banner__lead {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ep-text-color-primary);
+}
+
+.sample-cleanup-banner__meta {
+    margin: 6px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ep-text-color-regular);
+}
+
+.sample-cleanup-banner__route-link {
+    color: var(--ep-color-primary);
+    text-decoration: none;
+}
+
+.sample-cleanup-banner__route-link:hover {
+    text-decoration: underline;
+}
+
+.sample-cleanup-banner__inline-link {
+    font-size: inherit;
+    vertical-align: baseline;
+}
+
+.sample-file-tag {
+    margin-left: 8px;
+    flex-shrink: 0;
 }
 
 .parse-progress-entry {

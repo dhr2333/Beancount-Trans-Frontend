@@ -16,6 +16,18 @@ const STORAGE_KEYS = {
 /** 导览第三步默认引导用户解析的案例文件名，可改为 完整测试_微信.csv 以引导解析微信账单 */
 export const TOUR_FIRST_PARSE_FILE_NAME = '完整测试_支付宝.csv';
 
+/** 新用户目录中的示例账单文件名（与后端 sample_files 一致） */
+export const SAMPLE_BILL_FILE_NAMES = ['完整测试_微信.csv', '完整测试_支付宝.csv'] as const;
+
+export const BILLS_EXPORT_DOCS_URL =
+  'https://trans.dhr2333.cn/docs/%E6%93%8D%E4%BD%9C%E6%8C%87%E5%8D%97/bills-export-methods';
+
+/** 示例账单公开下载地址（与账单解析页 Trans.vue 一致） */
+export const SAMPLE_BILL_DOWNLOAD_URLS = {
+  wechat: 'https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E5%BE%AE%E4%BF%A1.csv',
+  alipay: 'https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E6%94%AF%E4%BB%98%E5%AE%9D.csv',
+} as const;
+
 // 创建引导实例
 type DriverConfig = NonNullable<Parameters<typeof driver>[0]>
 type DriverSteps = NonNullable<DriverConfig['steps']>
