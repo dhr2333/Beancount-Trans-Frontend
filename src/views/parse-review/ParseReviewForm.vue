@@ -175,12 +175,18 @@
           @click.stop
         >
           <div class="parse-review-account-original">{{ accountPopover.originalToken }}</div>
+          <div
+            v-if="accountDescriptionByName[accountPopover.originalToken]"
+            class="parse-review-account-desc"
+          >
+            {{ accountDescriptionByName[accountPopover.originalToken] }}
+          </div>
           <el-input
             ref="accountOverlayQueryRef"
             v-model="accountAssistQuery"
             class="parse-review-account-query"
             clearable
-            placeholder="输入筛选或完整账户名；↑↓ 选择，回车 / Tab 确认"
+            placeholder="输入账户名或描述筛选；↑↓ 选择，回车 / Tab 确认"
             @keydown="onOverlayQueryKeydown"
           />
           <ul
@@ -190,16 +196,19 @@
             role="listbox"
           >
             <li
-              v-for="(name, idx) in overlayAccountMatches"
-              :key="name"
+              v-for="(item, idx) in overlayAccountMatches"
+              :key="item.account"
               role="option"
               :class="[
                 'parse-review-account-suggestion-item',
                 { 'is-active': idx === overlayActiveIndex }
               ]"
-              @click="applyAccountReplacementByName(name)"
+              @click="applyAccountReplacementByName(item.account)"
             >
-              {{ name }}
+              <span class="parse-review-account-suggestion-name">{{ item.account }}</span>
+              <span v-if="item.description" class="parse-review-account-suggestion-desc">
+                {{ item.description }}
+              </span>
             </li>
           </ul>
         </div>
@@ -251,8 +260,17 @@ const errorEntries = ref<Record<string, string>>({})
 const validationWarnings = ref<Record<string, string>>({})
 
 /** 与后端 /account/tree/ 及 AccountSelector 注入结构一致 */
+type AccountAssistItem = { account: string; description: string }
 const accountTreeForAssist = ref<any[]>([])
-const flatAccountNames = ref<string[]>([])
+const flatAccounts = ref<AccountAssistItem[]>([])
+const flatAccountNames = computed(() => flatAccounts.value.map((a) => a.account))
+const accountDescriptionByName = computed(() => {
+  const map: Record<string, string> = {}
+  for (const item of flatAccounts.value) {
+    if (item.description) map[item.account] = item.description
+  }
+  return map
+})
 const entryInputRefs = new Map<string, { textarea?: HTMLTextAreaElement }>()
 
 /** 某条条目是否处于整段 textarea 编辑模式（默认 false = 结构化预览） */
@@ -291,7 +309,7 @@ const tabCompleteByUuid = ref<Record<string, TabCompleteSession | undefined>>({}
 
 const accountAssistPanelStyle = computed(() => {
   const pad = 8
-  const panelW = 360
+  const panelW = 420
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800
   const left = Math.max(pad, Math.min(accountPopover.value.x, vw - panelW - pad))
@@ -326,26 +344,31 @@ function isOrderedSubsequence(haystackLower: string, needleLower: string): boole
   return i === needleLower.length
 }
 
-function accountMatchesAssistQuery(account: string, qLower: string): boolean {
+function accountMatchTier(item: AccountAssistItem, qLower: string): number {
+  const al = item.account.toLowerCase()
+  const dl = (item.description || '').toLowerCase()
+  if (al.includes(qLower)) return 0
+  if (dl.includes(qLower)) return 1
+  if (isOrderedSubsequence(al, qLower)) return 2
+  return 3
+}
+
+function accountMatchesAssistQuery(item: AccountAssistItem, qLower: string): boolean {
   if (!qLower) return false
-  const al = account.toLowerCase()
-  if (al.includes(qLower)) return true
-  return isOrderedSubsequence(al, qLower)
+  return accountMatchTier(item, qLower) < 3
 }
 
 const overlayAccountMatches = computed(() => {
   if (!accountPopover.value.visible) return []
   const q = accountAssistQuery.value.trim().toLowerCase()
   if (!q) return []
-  const hits = flatAccountNames.value.filter((a) => accountMatchesAssistQuery(a, q))
+  const hits = flatAccounts.value.filter((a) => accountMatchesAssistQuery(a, q))
   hits.sort((a, b) => {
-    const al = a.toLowerCase()
-    const bl = b.toLowerCase()
-    const ai = al.includes(q) ? 0 : 1
-    const bi = bl.includes(q) ? 0 : 1
+    const ai = accountMatchTier(a, q)
+    const bi = accountMatchTier(b, q)
     if (ai !== bi) return ai - bi
-    if (a.length !== b.length) return a.length - b.length
-    return a.localeCompare(b)
+    if (a.account.length !== b.account.length) return a.account.length - b.account.length
+    return a.account.localeCompare(b.account)
   })
   return hits.slice(0, 80)
 })
@@ -443,16 +466,20 @@ function buildLineSegments(fullText: string): PreviewLine[] {
   return out
 }
 
-function rebuildFlatAccountNames() {
-  const set = new Set<string>()
+function rebuildFlatAccounts() {
+  const map = new Map<string, string>()
   const walk = (nodes: any[]) => {
     for (const n of nodes) {
-      if (n.account) set.add(n.account)
+      if (n.account) {
+        map.set(n.account, (n.description ?? '').trim())
+      }
       if (n.children?.length) walk(n.children)
     }
   }
   walk(accountTreeForAssist.value)
-  flatAccountNames.value = Array.from(set).sort((a, b) => a.localeCompare(b))
+  flatAccounts.value = Array.from(map.entries())
+    .map(([account, description]) => ({ account, description }))
+    .sort((a, b) => a.account.localeCompare(b.account))
 }
 
 async function loadAccountTreeAssist() {
@@ -464,10 +491,10 @@ async function loadAccountTreeAssist() {
       data = response.data.results as any[]
     }
     accountTreeForAssist.value = data
-    rebuildFlatAccountNames()
+    rebuildFlatAccounts()
   } catch {
     accountTreeForAssist.value = []
-    flatAccountNames.value = []
+    flatAccounts.value = []
   }
 }
 
@@ -623,7 +650,7 @@ function onOverlayQueryKeydown(e: Event | KeyboardEvent) {
     if (list.length) {
       e.preventDefault()
       const idx = Math.min(Math.max(0, overlayActiveIndex.value), list.length - 1)
-      void applyAccountReplacementByName(list[idx])
+      void applyAccountReplacementByName(list[idx].account)
       return
     }
     if (e.key === 'Enter') {
@@ -774,7 +801,7 @@ async function applyAccountReplacementByName(accountName: string) {
 async function applyOverlayAccountByInput() {
   const q = accountAssistQuery.value.trim()
   if (!q) {
-    ElMessage.warning('请输入账户名或从下方列表选择')
+    ElMessage.warning('请输入账户名、描述或从下方列表选择')
     return
   }
   if (flatAccountNames.value.includes(q)) {
@@ -787,9 +814,20 @@ async function applyOverlayAccountByInput() {
     await applyAccountReplacementByName(exactCi[0])
     return
   }
+  const exactDesc = flatAccounts.value.filter(
+    (a) => a.description && a.description.toLowerCase() === lower
+  )
+  if (exactDesc.length === 1) {
+    await applyAccountReplacementByName(exactDesc[0].account)
+    return
+  }
+  if (exactDesc.length > 1) {
+    ElMessage.warning('多个账户具有相同描述，请用 ↑↓ 选择一条，或补充筛选后再回车')
+    return
+  }
   const subs = overlayAccountMatches.value
   if (subs.length === 1) {
-    await applyAccountReplacementByName(subs[0])
+    await applyAccountReplacementByName(subs[0].account)
     return
   }
   if (subs.length > 1) {
@@ -1593,11 +1631,18 @@ $entry-preview-min-height: calc(7 * 1.6em + 10px + 2px);
   font-size: 12px;
   line-height: 1.6;
   padding: 6px 8px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   border-radius: var(--ep-border-radius-small, var(--el-border-radius-small));
   background-color: var(--ep-fill-color-light, var(--el-fill-color-light));
   color: var(--ep-text-color-primary, var(--el-text-color-primary));
   word-break: break-all;
+}
+
+.parse-review-account-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 0 8px 8px;
+  color: var(--ep-text-color-secondary, var(--el-text-color-secondary));
 }
 
 .parse-review-account-query {
@@ -1627,11 +1672,31 @@ $entry-preview-min-height: calc(7 * 1.6em + 10px + 2px);
 }
 
 .parse-review-account-suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 6px 10px;
-  font-family: Monaco, Consolas, 'Courier New', monospace;
   font-size: 12px;
   cursor: pointer;
   color: var(--ep-text-color-regular, var(--el-text-color-regular));
+}
+
+.parse-review-account-suggestion-name {
+  flex: 1;
+  min-width: 0;
+  font-family: Monaco, Consolas, 'Courier New', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parse-review-account-suggestion-desc {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ep-text-color-secondary, var(--el-text-color-secondary));
 }
 
 .parse-review-account-suggestion-item:hover,
