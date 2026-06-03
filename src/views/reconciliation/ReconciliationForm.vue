@@ -127,7 +127,8 @@
                     <div v-if="row.amount !== undefined && row.amount !== null" class="date-picker-wrapper">
                       <el-date-picker v-model="row.date" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD"
                         :clearable="true" placeholder="默认为对账日期" :max-date="asOfDate ? new Date(asOfDate) : undefined"
-                        :min-date="getMinDate()" class="no-border-date-picker" placement="bottom-start"
+                        :min-date="getMinDate()" :default-value="allocationDatePickerDefault"
+                        class="no-border-date-picker" placement="bottom-start"
                         :teleported="true" :popper-options="{
                           modifiers: [
                             {
@@ -518,6 +519,15 @@ const computedAsOfDate = computed(() => {
     return d.toISOString().split('T')[0]
   }
   return today.toISOString().split('T')[0]
+})
+
+// 差额分配日期面板默认定位：对账截止日前 15 天（月间隔对账时减少翻页）
+const allocationDatePickerDefault = computed(() => {
+  const base = computedAsOfDate.value
+    ? new Date(`${computedAsOfDate.value}T12:00:00`)
+    : new Date()
+  base.setDate(base.getDate() - 15)
+  return base
 })
 
 // 仅当「as_of_date 与上次相同」或「某条差额分配日期 ≤ 上次对账日期」时显示撤销按钮
