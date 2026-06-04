@@ -367,7 +367,7 @@ async function loadReconciliationData() {
       // 无草稿且无预填时，根据是否首次对账设置默认账户
       const defaultEquityAccountName = response.data.is_first_reconciliation
         ? 'Equity:Opening-Balances'
-        : 'Equity:Adjustments'
+        : (response.data.default_allocation_account || 'Equity:Adjustments')
 
       const defaultAccount = findAccountByName(accountTree.value, defaultEquityAccountName)
 
