@@ -26,13 +26,18 @@
             <el-card size="small">
                 <div class="preview-content">
                     <div class="account-info">
-                        <h4>{{ selectedAccount.account }}</h4>
-                        <el-tag :type="getAccountTypeColor(selectedAccount.account_type)">
-                            {{ selectedAccount.account_type }}
-                        </el-tag>
-                        <el-tag v-if="selectedAccount.description" type="info">
-                            {{ selectedAccount.description }}
-                        </el-tag>
+                        <div class="account-path">{{ selectedAccount.account }}</div>
+                        <div
+                            v-if="selectedAccount.account_type || selectedAccount.description"
+                            class="account-meta"
+                        >
+                            <el-tag v-if="selectedAccount.account_type" :type="getAccountTypeColor(selectedAccount.account_type)">
+                                {{ selectedAccount.account_type }}
+                            </el-tag>
+                            <el-tag v-if="selectedAccount.description" type="info">
+                                {{ selectedAccount.description }}
+                            </el-tag>
+                        </div>
                     </div>
                 </div>
             </el-card>
@@ -394,16 +399,26 @@ onBeforeUnmount(() => {
 
 .account-info {
     display: flex;
-    align-items: center;
-    gap: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
     margin-bottom: 8px;
 }
 
-.account-info h4 {
+.account-path {
     margin: 0;
     font-size: 14px;
     font-weight: 600;
-    color: #303133;
+    line-height: 1.4;
+    color: var(--el-text-color-primary, #303133);
+    word-break: break-word;
+}
+
+.account-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
 }
 
 .currencies {
@@ -419,11 +434,6 @@ onBeforeUnmount(() => {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-    .account-info {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
     .currencies {
         flex-wrap: wrap;
     }

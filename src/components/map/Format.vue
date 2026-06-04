@@ -46,6 +46,22 @@
                             <template #prepend>手续费模板</template>
                         </el-input>
 
+                        <el-input v-model="reconciliationFallbackAccount"
+                            placeholder="输入对账兜底账户（如：Equity:Adjustments）" clearable class="template-input">
+                            <template #prepend>
+                                <div class="label-with-tip">
+                                    <span>对账兜底账户</span>
+                                    <el-tooltip
+                                        content="非首次对账的默认差额分配账户"
+                                        placement="top">
+                                        <el-icon class="tip-icon">
+                                            <Warning />
+                                        </el-icon>
+                                    </el-tooltip>
+                                </div>
+                            </template>
+                        </el-input>
+
                         <el-form-item prop="currency" :rules="[
                             {
                                 pattern: /^[A-Z][A-Z0-9'._-]{0,22}([A-Z0-9])?$/,
@@ -185,6 +201,7 @@ interface Config {
     show_discount: boolean
     income_template?: string
     commission_template?: string
+    reconciliation_fallback_account?: string
     currency?: string
     ai_model?: string
     deepseek_apikey?: string
@@ -197,6 +214,7 @@ const activePanels = ref(['basic', 'template', 'parsing'])
 const formatSettings = ref<string[]>([])
 const incomeTemplate = ref('')
 const commissionTemplate = ref('')
+const reconciliationFallbackAccount = ref('Equity:Adjustments')
 const currency = ref('')
 const aiModel = ref('BERT') // 默认使用 BERT
 const deepseek_apikey = ref('')
@@ -232,6 +250,7 @@ const convertToFrontend = (config: Config) => {
         flag: config.flag,
         incomeTemplate: config.income_template || '',
         commissionTemplate: config.commission_template || '',
+        reconciliationFallbackAccount: config.reconciliation_fallback_account || 'Equity:Adjustments',
         currency: config.currency || 'CNY',
         aiModel: config.ai_model || 'BERT',
         deepseek_apikey: config.deepseek_apikey || '',
@@ -258,6 +277,7 @@ const loadConfig = async () => {
         formatSettings.value = frontendConfig.formatSettings
         incomeTemplate.value = frontendConfig.incomeTemplate
         commissionTemplate.value = frontendConfig.commissionTemplate
+        reconciliationFallbackAccount.value = frontendConfig.reconciliationFallbackAccount
         flagSymbol.value = frontendConfig.flag
         currency.value = frontendConfig.currency
         parsingModePreference.value = frontendConfig.parsingModePreference
@@ -306,6 +326,7 @@ const currentConfig = computed(() => {
         show_discount: formatSettings.value.includes('showDiscount'),
         income_template: incomeTemplate.value,
         commission_template: commissionTemplate.value,
+        reconciliation_fallback_account: reconciliationFallbackAccount.value,
         currency: currency.value,
         ai_model: aiModel.value,
         parsing_mode_preference: parsingModePreference.value
@@ -359,6 +380,7 @@ const resetToDefault = async () => {
             show_discount: true,
             income_template: 'Income:Discount',
             commission_template: 'Expenses:Finance:Commission',
+            reconciliation_fallback_account: 'Equity:Adjustments',
             currency: 'CNY',
             ai_model: 'BERT',
             parsing_mode_preference: 'review',

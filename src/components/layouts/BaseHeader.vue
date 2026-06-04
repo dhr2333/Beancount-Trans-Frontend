@@ -162,7 +162,7 @@ const handleSelect = (_key: string, _keyPath: string[]) => {
  */
 const openFavaInstance = async () => {
   if (!localStorage.getItem('access')) {
-    ElMessage.info('请先登录');
+    ElMessage.info('未认证，请登录后重试');
     return;
   }
 

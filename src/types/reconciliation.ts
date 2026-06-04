@@ -108,6 +108,7 @@ export interface ReconciliationStartResponse {
   as_of_date: string
   default_currency: string | null
   is_first_reconciliation: boolean
+  default_allocation_account: string
   last_reconciliation_date: string | null
   last_completed_task_id: number | null
   last_reconciliation_transaction_items?: Array<{
