@@ -72,7 +72,14 @@ or
           <div class="ai-classification-container">
             <div class="current-selection">
               <span class="label">当前分类：</span>
-              <el-tag v-if="scope.row.ai_choose" type="success" class="selected-tag">{{ scope.row.ai_choose }}</el-tag>
+              <el-tag
+                v-if="scope.row.ai_choose"
+                type="success"
+                class="selected-tag is-editable"
+                @click="openEditCurrentMappingForRow(scope.row, scope.$index)"
+              >
+                {{ scope.row.ai_choose }}
+              </el-tag>
               <span v-else class="no-category-tip">无分类建议</span>
             </div>
               <div v-if="scope.row.ai_candidates && scope.row.ai_candidates.length > 0" class="candidates">
@@ -87,14 +94,14 @@ or
                     ({{ candidate.score }})
                   </span>
                 </el-tag>
-                  <el-button size="small" plain @click="handleOpenMappingDialog(scope.row, scope.$index)" class="add-mapping-btn">
+                  <el-button size="small" plain @click="openCreateMappingForRow(scope.row, scope.$index)" class="add-mapping-btn">
                     <el-icon><Plus /></el-icon> 新增映射
                   </el-button>
               </div>
             </div>
             <div v-else class="candidates">
               <span class="label muted">无候选分类</span>
-                <el-button size="small" plain @click="handleOpenMappingDialog(scope.row, scope.$index)" class="add-mapping-btn">
+                <el-button size="small" plain @click="openCreateMappingForRow(scope.row, scope.$index)" class="add-mapping-btn">
                   <el-icon><Plus /></el-icon> 新增映射
                 </el-button>
             </div>
@@ -103,10 +110,10 @@ or
       </el-table-column>
     </el-table>
   </div>
-  <el-dialog v-model="mappingDialog.visible" title="新增映射" width="500px">
+  <el-dialog v-model="mappingDialog.visible" :title="mappingDialogTitle" width="500px">
     <el-form ref="mappingFormRef" :model="mappingForm" :rules="mappingRules" label-width="100px">
       <el-form-item label="关键字" prop="key">
-        <el-input v-model="mappingForm.key" placeholder="请输入关键字" />
+        <el-input v-model="mappingForm.key" placeholder="请输入关键字" :disabled="mappingDialog.keyDisabled" />
       </el-form-item>
       <el-form-item label="映射账户" prop="accountId">
         <AccountSelector v-model="mappingForm.accountId" placeholder="请选择或搜索账户" />
@@ -125,13 +132,14 @@ or
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElPopover, type FormInstance, type FormRules } from 'element-plus';
-import { UploadFilled, DocumentCopy, Plus } from '@element-plus/icons-vue'
+import { ElMessage, ElPopover } from 'element-plus';
+import { UploadFilled, DocumentCopy, Plus, Edit } from '@element-plus/icons-vue'
 import { ref, computed, watch } from 'vue';
 import axios from '../../utils/request';
 import { hasAuthTokens } from '../../utils/auth';
 import type { UploadFile, UploadFiles } from 'element-plus'
 import AccountSelector from '../common/AccountSelector.vue';
+import { useInlineMappingDialog } from '../../composables/useInlineMappingDialog';
 
 
 const input = ref()
@@ -185,23 +193,17 @@ interface BillEntry {
 }
 const responseData = ref('')
 const responseList = ref<BillEntry[]>([]);
-const mappingFormRef = ref<FormInstance>()
-const mappingDialog = ref({
-  visible: false,
-  loading: false,
-  targetEntryId: '',
-  targetRowIndex: -1
-})
-const mappingForm = ref({
-  type: 'expense',
-  key: '',
-  accountId: null as number | null,
-  party: ''
-})
-const mappingRules: FormRules = {
-  key: [{ required: true, message: '请输入关键字', trigger: 'blur' }],
-  accountId: [{ required: true, message: '请选择映射账户', trigger: 'change' }]
-}
+
+const {
+  mappingFormRef,
+  mappingDialog,
+  mappingForm,
+  mappingRules,
+  mappingDialogTitle,
+  openForCreate,
+  openEditCurrentMapping,
+  handleMappingSubmit
+} = useInlineMappingDialog()
 
 
 const getUploadData = () => {
@@ -382,84 +384,52 @@ const handleAiChoose = async (rowIndex: number, key: string) => {
   }
 }
 
-const handleOpenMappingDialog = (row: BillEntry, rowIndex: number) => {
-  if (!hasAuthTokens()) {
-    ElMessage.info('未认证，请登录后重试')
-    return
-  }
-  mappingDialog.value.targetEntryId = row.id
-  mappingDialog.value.targetRowIndex = rowIndex
-  const defaultType = row.formatted.includes(' Income:') || row.formatted.includes('\nIncome:')
-    ? 'income'
-    : 'expense'
-  const defaultKey = row.ai_choose || row.ai_candidates?.[0]?.key || ''
-  mappingForm.value = {
-    type: defaultType,
-    key: defaultKey,
-    accountId: null,
-    party: ''
-  }
-  mappingDialog.value.visible = true
+const inferTransMappingType = (row: BillEntry) => {
+  if (row.formatted.includes(' Income:') || row.formatted.includes('\nIncome:')) return 'income' as const
+  return 'expense' as const
 }
 
-const handleMappingSubmit = async () => {
-  if (!mappingFormRef.value) return
-  try {
-    await mappingFormRef.value.validate()
-  } catch {
-    return
+const getTransCreateDefaults = (row: BillEntry) => {
+  const type = inferTransMappingType(row)
+  const key = row.ai_choose || row.ai_candidates?.[0]?.key || ''
+  return { type, key, party: '' }
+}
+
+const applyTransReparse = async (rowIndex: number, entryId: string, selectedKey: string) => {
+  if (rowIndex < 0 || !responseList.value[rowIndex]) {
+    throw new Error('映射目标条目不存在')
   }
-
-  mappingDialog.value.loading = true
-  try {
-    if (mappingForm.value.type === 'expense') {
-      await axios.post('/expense/', {
-        key: mappingForm.value.key,
-        expend_id: mappingForm.value.accountId,
-        payee: mappingForm.value.party,
-        currency: 'CNY'
-      })
-    } else {
-      await axios.post('/income/', {
-        key: mappingForm.value.key,
-        income_id: mappingForm.value.accountId,
-        payer: mappingForm.value.party
-      })
-    }
-
-    const rowIndex = mappingDialog.value.targetRowIndex
-    if (rowIndex < 0 || !responseList.value[rowIndex]) {
-      throw new Error('映射目标条目不存在')
-    }
-
-    const response = await axios.post('/translate/reparse', {
-      entry_id: mappingDialog.value.targetEntryId,
-      selected_key: mappingForm.value.key
-    })
-    const updatedData = response.data
-    responseList.value[rowIndex] = {
-      ...responseList.value[rowIndex],
-      formatted: updatedData.formatted,
-      ai_choose: updatedData.ai_choose || mappingForm.value.key,
-      ai_candidates: Array.isArray(updatedData.ai_candidates) ? updatedData.ai_candidates : responseList.value[rowIndex].ai_candidates
-    }
-    responseData.value = responseList.value.map(item => item.formatted).join('\n')
-
-    ElMessage.success('映射创建并重解析成功')
-    mappingDialog.value.visible = false
-  } catch (error: any) {
-    if (error.response?.status === 401) {
-      ElMessage.info('未认证，请登录后重试')
-    } else if (error.response?.status === 403) {
-      ElMessage.info('权限不足，请登录后重试')
-    } else if (error.response?.status === 400 && error.response.data?.non_field_errors) {
-      ElMessage.error(error.response.data.non_field_errors[0])
-    } else {
-      ElMessage.error(error.response?.data?.error || '创建映射失败，请稍后重试')
-    }
-  } finally {
-    mappingDialog.value.loading = false
+  const response = await axios.post('/translate/reparse', {
+    entry_id: entryId,
+    selected_key: selectedKey
+  })
+  const updatedData = response.data
+  responseList.value[rowIndex] = {
+    ...responseList.value[rowIndex],
+    formatted: updatedData.formatted,
+    ai_choose: updatedData.ai_choose || selectedKey,
+    ai_candidates: Array.isArray(updatedData.ai_candidates)
+      ? updatedData.ai_candidates
+      : responseList.value[rowIndex].ai_candidates
   }
+  responseData.value = responseList.value.map((item) => item.formatted).join('\n')
+}
+
+const buildTransMappingOptions = (row: BillEntry, rowIndex: number) => ({
+  row,
+  inferType: inferTransMappingType,
+  getSelectedKey: (r: BillEntry) => r.ai_choose,
+  getCreateDefaults: getTransCreateDefaults,
+  requireAuth: hasAuthTokens,
+  onReparse: (key: string) => applyTransReparse(rowIndex, row.id, key)
+})
+
+const openCreateMappingForRow = (row: BillEntry, rowIndex: number) => {
+  openForCreate(buildTransMappingOptions(row, rowIndex))
+}
+
+const openEditCurrentMappingForRow = (row: BillEntry, rowIndex: number) => {
+  openEditCurrentMapping(buildTransMappingOptions(row, rowIndex))
 }
 </script>
 <style>
@@ -527,6 +497,22 @@ const handleMappingSubmit = async () => {
   gap: 6px;
 }
 
+.selected-tag.is-editable {
+  cursor: pointer;
+  transition: all 0.3s;
+
+  .edit-hint {
+    margin-left: 4px;
+    font-size: 12px;
+    vertical-align: -0.1em;
+  }
+}
+
+.selected-tag.is-editable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
 .candidate-tag {
   cursor: pointer;
   transition: all 0.3s;
@@ -579,7 +565,8 @@ const handleMappingSubmit = async () => {
   margin-left: 8px;
 }
 
-:deep(html.dark) .candidate-tag:hover {
+:deep(html.dark) .candidate-tag:hover,
+:deep(html.dark) .selected-tag.is-editable:hover {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
