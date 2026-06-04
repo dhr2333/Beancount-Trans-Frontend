@@ -129,6 +129,7 @@ import { ElMessage, ElPopover, type FormInstance, type FormRules } from 'element
 import { UploadFilled, DocumentCopy, Plus } from '@element-plus/icons-vue'
 import { ref, computed, watch } from 'vue';
 import axios from '../../utils/request';
+import { hasAuthTokens } from '../../utils/auth';
 import type { UploadFile, UploadFiles } from 'element-plus'
 import AccountSelector from '../common/AccountSelector.vue';
 
@@ -382,6 +383,10 @@ const handleAiChoose = async (rowIndex: number, key: string) => {
 }
 
 const handleOpenMappingDialog = (row: BillEntry, rowIndex: number) => {
+  if (!hasAuthTokens()) {
+    ElMessage.info('未认证，请登录后重试')
+    return
+  }
   mappingDialog.value.targetEntryId = row.id
   mappingDialog.value.targetRowIndex = rowIndex
   const defaultType = row.formatted.includes(' Income:') || row.formatted.includes('\nIncome:')
@@ -443,7 +448,11 @@ const handleMappingSubmit = async () => {
     ElMessage.success('映射创建并重解析成功')
     mappingDialog.value.visible = false
   } catch (error: any) {
-    if (error.response?.status === 400 && error.response.data?.non_field_errors) {
+    if (error.response?.status === 401) {
+      ElMessage.info('未认证，请登录后重试')
+    } else if (error.response?.status === 403) {
+      ElMessage.info('权限不足，请登录后重试')
+    } else if (error.response?.status === 400 && error.response.data?.non_field_errors) {
       ElMessage.error(error.response.data.non_field_errors[0])
     } else {
       ElMessage.error(error.response?.data?.error || '创建映射失败，请稍后重试')
