@@ -1,7 +1,7 @@
 {
   "name": "beancount-trans-frontend",
   "private": true,
-  "version": "5.9.9",
+  "version": "5.9.10",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

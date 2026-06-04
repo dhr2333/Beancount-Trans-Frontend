@@ -1,3 +1,9 @@
+## [5.9.10](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.9...5.9.10) (2026-06-04)
+
+### Bug Fixes
+
+* defeat repair ([#65](https://github.com/dhr2333/Beancount-Trans-Frontend/issues/65)) ([cb626ce](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/cb626ce5714faee54175f7637355b783cb77bf07))
+
 ## [5.9.9](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.8...5.9.9) (2026-04-09)
 
 ### Bug Fixes
