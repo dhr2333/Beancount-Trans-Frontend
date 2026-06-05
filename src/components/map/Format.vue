@@ -47,12 +47,12 @@
                         </el-input>
 
                         <el-input v-model="reconciliationFallbackAccount"
-                            placeholder="输入对账兜底账户（如：Equity:Adjustments）" clearable class="template-input">
+                            placeholder="输入兜底账户（如：Equity:Adjustments）" clearable class="template-input">
                             <template #prepend>
                                 <div class="label-with-tip">
-                                    <span>对账兜底账户</span>
+                                    <span>兜底账户</span>
                                     <el-tooltip
-                                        content="非首次对账的默认差额分配账户"
+                                        content="无法匹配资产账户时的默认账户，也用于对账差额分配"
                                         placement="top">
                                         <el-icon class="tip-icon">
                                             <Warning />
