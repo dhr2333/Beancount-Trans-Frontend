@@ -216,6 +216,7 @@ import {
 import type { Tag, TagForm } from '../../types/tag'
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
 import { hasAuthTokens } from '../../utils/auth'
+import { extractApiErrorMessage } from '../../utils/errorHelper'
 import { shouldShowAnonymousPrompt } from '~/composables/useAnonymousPrompt'
 
 // 响应式数据
@@ -413,11 +414,12 @@ const handleSubmit = async () => {
         }
     } catch (error: any) {
         console.error('提交失败:', error)
-        if (error.response?.data) {
-            const errorMsg = JSON.stringify(error.response.data)
-            ElMessage.error(`操作失败: ${errorMsg}`)
+        if (error.response?.status === 401) {
+            ElMessage.info('未认证，请登录后重试')
+        } else if (error.response?.status === 400) {
+            ElMessage.error(extractApiErrorMessage(error.response?.data, '操作失败，请检查标签名称'))
         } else {
-            ElMessage.error('操作失败')
+            ElMessage.error(extractApiErrorMessage(error.response?.data, '操作失败'))
         }
     } finally {
         submitting.value = false
