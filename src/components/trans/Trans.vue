@@ -110,16 +110,19 @@ or
       </el-table-column>
     </el-table>
   </div>
-  <el-dialog v-model="mappingDialog.visible" :title="mappingDialogTitle" width="500px">
+  <el-dialog v-model="mappingDialog.visible" :title="mappingDialogTitle" width="600px">
     <el-form ref="mappingFormRef" :model="mappingForm" :rules="mappingRules" label-width="100px">
       <el-form-item label="关键字" prop="key">
-        <el-input v-model="mappingForm.key" placeholder="请输入关键字" :disabled="mappingDialog.keyDisabled" />
+        <el-input v-model="mappingForm.key" placeholder="请输入关键字" />
       </el-form-item>
       <el-form-item label="映射账户" prop="accountId">
         <AccountSelector v-model="mappingForm.accountId" placeholder="请选择或搜索账户" />
       </el-form-item>
       <el-form-item :label="mappingForm.type === 'expense' ? '对方' : '付款方'" prop="party">
         <el-input v-model="mappingForm.party" :placeholder="mappingForm.type === 'expense' ? '如腾讯、星巴克' : '选填：付款方信息'" />
+      </el-form-item>
+      <el-form-item label="标签" prop="tag_ids">
+        <TagSelector v-model="mappingForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签" />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -139,6 +142,7 @@ import axios from '../../utils/request';
 import { hasAuthTokens } from '../../utils/auth';
 import type { UploadFile, UploadFiles } from 'element-plus'
 import AccountSelector from '../common/AccountSelector.vue';
+import TagSelector from '../common/TagSelector.vue';
 import { useInlineMappingDialog } from '../../composables/useInlineMappingDialog';
 
 

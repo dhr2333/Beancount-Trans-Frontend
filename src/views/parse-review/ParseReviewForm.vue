@@ -146,10 +146,10 @@
     </el-dialog>
 
     <!-- 内联映射对话框（新增 / 编辑） -->
-    <el-dialog v-model="mappingDialog.visible" :title="mappingDialogTitle" width="500px">
+    <el-dialog v-model="mappingDialog.visible" :title="mappingDialogTitle" width="600px">
       <el-form :model="mappingForm" :rules="mappingRules" ref="mappingFormRef" label-width="100px">
         <el-form-item label="关键字" prop="key">
-          <el-input v-model="mappingForm.key" placeholder="请输入关键字" :disabled="mappingDialog.keyDisabled" />
+          <el-input v-model="mappingForm.key" placeholder="请输入关键字" />
         </el-form-item>
         <el-form-item label="映射账户" prop="accountId">
           <AccountSelector v-model="mappingForm.accountId"
@@ -157,6 +157,9 @@
         </el-form-item>
         <el-form-item :label="mappingForm.type === 'expense' ? '对方' : '付款方'" prop="party">
           <el-input v-model="mappingForm.party" :placeholder="mappingForm.type === 'expense' ? '如腾讯、星巴克' : '选填：付款方信息'" />
+        </el-form-item>
+        <el-form-item label="标签" prop="tag_ids">
+          <TagSelector v-model="mappingForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -229,6 +232,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit } from '@element-plus/icons-vue'
 import { useInlineMappingDialog } from '../../composables/useInlineMappingDialog'
 import AccountSelector from '../../components/common/AccountSelector.vue'
+import TagSelector from '../../components/common/TagSelector.vue'
 import axios from '../../utils/request'
 import {
   getParseResults,
