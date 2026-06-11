@@ -124,6 +124,7 @@
                     <div class="batch-buttons">
                         <el-button size="small" @click="handleBatchEnable">批量启用</el-button>
                         <el-button size="small" @click="handleBatchDisable">批量禁用</el-button>
+                        <el-button size="small" type="primary" @click="handleBatchUpdateAccount">批量修改账户</el-button>
                         <el-button size="small" type="danger" @click="handleBatchDelete">批量删除</el-button>
                     </div>
                 </template>
@@ -267,6 +268,67 @@
                 <el-button type="danger" @click="confirmBatchDelete" :loading="batchDeleteLoading"
                     :disabled="batchDeleteLoading">
                     {{ batchDeleteLoading ? '删除中...' : '确认删除' }}
+                </el-button>
+            </div>
+        </template>
+    </el-dialog>
+
+    <!-- 批量修改账户对话框 -->
+    <el-dialog v-model="batchUpdateAccountDialog" title="批量修改收入映射账户" width="600px" :close-on-click-modal="false">
+        <div class="batch-update-content">
+            <el-alert :title="`您即将修改 ${selectedItems.length} 个收入映射的映射账户`" type="info" :closable="false" show-icon
+                style="margin-bottom: 20px;">
+            </el-alert>
+
+            <div class="delete-items-list">
+                <div v-for="(item, index) in selectedItems" :key="item.id" class="delete-item">
+                    <div class="item-info">
+                        <div class="item-main">
+                            <el-tag type="primary" size="small">{{ item.key }}</el-tag>
+                            <span v-if="item.payer" class="item-payer">{{ item.payer }}</span>
+                        </div>
+                        <div class="item-account">
+                            {{ typeof item.income === 'object' ? item.income?.account : item.income }}
+                        </div>
+                    </div>
+                    <div class="item-index">{{ index + 1 }}</div>
+                </div>
+            </div>
+
+            <el-form ref="batchUpdateFormRef" :model="batchUpdateForm" label-width="100px" status-icon>
+                <el-form-item label="映射账户">
+                    <AccountSelector v-model="batchUpdateForm.income" placeholder="请选择目标映射账户"
+                        @change="handleBatchAccountChange" />
+                </el-form-item>
+            </el-form>
+
+            <div v-if="batchUpdateLoading" class="update-progress">
+                <el-progress :percentage="batchUpdateProgress"
+                    :status="batchUpdateProgress === 100 ? 'success' : undefined" :stroke-width="8" />
+                <p class="progress-text">正在更新映射... {{ batchUpdateProgress }}%</p>
+            </div>
+
+            <div v-if="batchUpdateErrors.length > 0" class="update-errors">
+                <el-alert title="部分更新失败" type="error" :closable="false" show-icon>
+                    <template #default>
+                        <ul class="error-list">
+                            <li v-for="error in batchUpdateErrors" :key="error" class="error-item">
+                                {{ error }}
+                            </li>
+                        </ul>
+                    </template>
+                </el-alert>
+            </div>
+        </div>
+
+        <template #footer>
+            <div class="dialog-footer">
+                <el-button @click="cancelBatchUpdateAccount" :disabled="batchUpdateLoading">
+                    取消
+                </el-button>
+                <el-button type="primary" @click="confirmBatchUpdateAccount" :loading="batchUpdateLoading"
+                    :disabled="batchUpdateLoading || !batchUpdateForm.income">
+                    {{ batchUpdateLoading ? '更新中...' : '确认更新' }}
                 </el-button>
             </div>
         </template>
@@ -798,6 +860,16 @@ const batchDeleteLoading = ref(false)
 const batchDeleteProgress = ref(0)
 const batchDeleteErrors = ref<string[]>([])
 
+// 批量修改账户相关状态
+const batchUpdateAccountDialog = ref(false)
+const batchUpdateLoading = ref(false)
+const batchUpdateProgress = ref(0)
+const batchUpdateErrors = ref<string[]>([])
+const batchUpdateFormRef = ref<FormInstance>()
+const batchUpdateForm = ref({
+    income: null as number | null
+})
+
 // 批量删除
 const handleBatchDelete = () => {
     if (selectedItems.value.length === 0) return
@@ -862,6 +934,67 @@ const cancelBatchDelete = () => {
     batchDeleteDialog.value = false
     batchDeleteErrors.value = []
     batchDeleteProgress.value = 0
+}
+
+const handleBatchUpdateAccount = () => {
+    if (selectedItems.value.length === 0) return
+    batchUpdateAccountDialog.value = true
+    batchUpdateErrors.value = []
+    batchUpdateProgress.value = 0
+    batchUpdateForm.value = { income: null }
+}
+
+const handleBatchAccountChange = () => {}
+
+const confirmBatchUpdateAccount = async () => {
+    if (selectedItems.value.length === 0 || !batchUpdateForm.value.income) return
+
+    batchUpdateLoading.value = true
+    batchUpdateProgress.value = 0
+    batchUpdateErrors.value = []
+
+    const totalItems = selectedItems.value.length
+    const errors: string[] = []
+
+    try {
+        const response = await axios.post('income/batch_update_account/', {
+            income_ids: selectedItems.value.map(item => item.id),
+            income_id: batchUpdateForm.value.income
+        })
+
+        const successCount = response.data?.updated_count ?? 0
+        batchUpdateProgress.value = 100
+
+        if (successCount === totalItems) {
+            ElMessage.success(`成功更新 ${successCount} 个收入映射`)
+            batchUpdateAccountDialog.value = false
+            await fetchData()
+            selectedItems.value = []
+        } else {
+            ElMessage.warning(`成功更新 ${successCount} 个映射，${totalItems - successCount} 个失败`)
+            batchUpdateErrors.value = [`${totalItems - successCount} 个映射更新失败`]
+        }
+    } catch (error: any) {
+        console.error('批量更新账户失败:', error)
+        if (error.response?.data?.error) {
+            errors.push(error.response.data.error)
+        } else if (error.response?.data?.detail) {
+            errors.push(error.response.data.detail)
+        } else {
+            errors.push('批量更新过程中发生未知错误')
+        }
+        batchUpdateErrors.value = errors
+        ElMessage.error('批量更新失败')
+    } finally {
+        batchUpdateLoading.value = false
+    }
+}
+
+const cancelBatchUpdateAccount = () => {
+    batchUpdateAccountDialog.value = false
+    batchUpdateErrors.value = []
+    batchUpdateProgress.value = 0
+    batchUpdateForm.value = { income: null }
 }
 
 // 高级排序方法：处理数字、英文和中文混合内容
@@ -1012,8 +1145,18 @@ const sortByAccount = (a: Income, b: Income): number => {
 }
 
 /* 批量删除对话框样式 */
-.batch-delete-content {
+.batch-delete-content,
+.batch-update-content {
     padding: 10px 0;
+}
+
+.update-progress {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.update-errors {
+    margin-top: 20px;
 }
 
 .delete-items-list {

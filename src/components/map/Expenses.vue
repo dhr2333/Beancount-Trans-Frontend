@@ -272,23 +272,29 @@
   <!-- 批量修改账户对话框 -->
   <el-dialog v-model="batchUpdateAccountDialog" title="批量修改支出映射账户" width="600px" :close-on-click-modal="false">
     <div class="batch-update-content">
-      <!-- 提示信息 -->
-      <el-alert :title="`您即将修改 ${selectedItems.length} 个支出映射的账户设置`" type="info" :closable="false" show-icon
+      <el-alert :title="`您即将修改 ${selectedItems.length} 个支出映射的映射账户`" type="info" :closable="false" show-icon
         style="margin-bottom: 20px;">
-        <template #default>
-          <p>请选择要修改的字段，留空的字段将保持不变。</p>
-        </template>
       </el-alert>
 
-      <!-- 表单 -->
+      <div class="delete-items-list">
+        <div v-for="(item, index) in selectedItems" :key="item.id" class="delete-item">
+          <div class="item-info">
+            <div class="item-main">
+              <el-tag type="primary" size="small">{{ item.key }}</el-tag>
+              <span v-if="item.payee" class="item-payee">{{ item.payee }}</span>
+            </div>
+            <div class="item-account">
+              {{ typeof item.expend === 'object' ? item.expend?.account : item.expend }}
+            </div>
+          </div>
+          <div class="item-index">{{ index + 1 }}</div>
+        </div>
+      </div>
+
       <el-form ref="batchUpdateFormRef" :model="batchUpdateForm" label-width="100px" status-icon>
         <el-form-item label="映射账户">
-          <AccountSelector v-model="batchUpdateForm.expend" placeholder="请选择或搜索账户（留空保持不变）"
+          <AccountSelector v-model="batchUpdateForm.expend" placeholder="请选择目标映射账户"
             @change="handleBatchAccountChange" />
-        </el-form-item>
-
-        <el-form-item label="货币代码">
-          <el-input v-model="batchUpdateForm.currency" placeholder="如 CNY、USD（留空保持不变）" clearable />
         </el-form-item>
       </el-form>
 
@@ -319,7 +325,7 @@
           取消
         </el-button>
         <el-button type="primary" @click="confirmBatchUpdateAccount" :loading="batchUpdateLoading"
-          :disabled="batchUpdateLoading || (!batchUpdateForm.expend && !batchUpdateForm.currency)">
+          :disabled="batchUpdateLoading || !batchUpdateForm.expend">
           {{ batchUpdateLoading ? '更新中...' : '确认更新' }}
         </el-button>
       </div>
@@ -875,8 +881,7 @@ const batchUpdateProgress = ref(0)
 const batchUpdateErrors = ref<string[]>([])
 const batchUpdateFormRef = ref<FormInstance>()
 const batchUpdateForm = ref({
-  expend: null as number | null,
-  currency: null as string | null
+  expend: null as number | null
 })
 
 // 批量删除
@@ -953,8 +958,7 @@ const handleBatchUpdateAccount = () => {
   batchUpdateProgress.value = 0
   // 重置表单
   batchUpdateForm.value = {
-    expend: null,
-    currency: null
+    expend: null
   }
 }
 
@@ -980,8 +984,7 @@ const confirmBatchUpdateAccount = async () => {
     // 准备批量更新数据
     const updateData = {
       expense_ids: selectedItems.value.map(item => item.id),
-      expend_id: batchUpdateForm.value.expend,
-      currency: batchUpdateForm.value.currency
+      expend_id: batchUpdateForm.value.expend
     }
 
     console.log('批量更新数据:', updateData)
@@ -1029,8 +1032,7 @@ const cancelBatchUpdateAccount = () => {
   batchUpdateErrors.value = []
   batchUpdateProgress.value = 0
   batchUpdateForm.value = {
-    expend: null,
-    currency: null
+    expend: null
   }
 }
 
