@@ -463,7 +463,7 @@ const resetToDefault = async () => {
             show_uuid: true,
             show_status: true,
             show_discount: true,
-            income_template: 'Income:Discount',
+            income_template: 'Income:Transfer:Organizational',
             commission_template: 'Expenses:Finance:Commission',
             reconciliation_fallback_account: 'Equity:Adjustments',
             currency: 'CNY',
