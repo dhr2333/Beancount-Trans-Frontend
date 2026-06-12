@@ -161,7 +161,6 @@
 
             <el-form-item>
                 <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
-                <el-button @click="resetForm(ruleFormRef)">重置</el-button>
             </el-form-item>
         </el-form>
     </el-dialog>
@@ -360,7 +359,6 @@ import { getAccountTypeColor } from '~/utils/accountTypeColor'
 
 const dialogError = ref(false)
 const loading = ref(false)
-const lastEditedData = ref<Partial<Income> | null>(null)
 
 // interface Currency {
 //     id: number
@@ -473,28 +471,15 @@ const handleSearch = () => {
 const dialogAdd = ref(false)
 
 const handleAdd = () => {
-    if (lastEditedData.value) {
-        // 使用上一次编辑的值
-        ruleForm.value = {
-            key: lastEditedData.value.key || '',
-            payer: lastEditedData.value.payer ?? null,
-            income: lastEditedData.value.income_id || null,
-            tag_ids: lastEditedData.value.tags?.map(tag => tag.id) ?? []
-            // currency_id: lastEditedData.value.currency_ids?.[0] || null
-        };
-    } else {
-        // 没有编辑记录则重置
-        ruleForm.value = {
-            key: '',
-            payer: null,
-            income: null,
-            tag_ids: []
-            // currency_id: null
-        };
-        if (ruleFormRef.value) {
-            ruleFormRef.value.resetFields();
-        }
+    ruleForm.value = {
+        key: '',
+        payer: null,
+        income: null,
+        tag_ids: []
     };
+    if (ruleFormRef.value) {
+        ruleFormRef.value.resetFields();
+    }
     dialogAdd.value = true;
 }
 
@@ -525,13 +510,6 @@ const rules = ref<FormRules>({
     // ],
 })
 
-// 弹窗重置
-const resetForm = (formEl: FormInstance | undefined) => {
-    if (!formEl) return
-    formEl.resetFields()
-}
-
-
 // 新增确认
 const submitForm = async (formEl: FormInstance | undefined) => {
     if (!formEl) return
@@ -559,7 +537,6 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                         ElMessage.success('新增成功')
                         dialogAdd.value = false
                         fetchData() // 新增刷新
-                        resetForm(formEl) // 重置表单
                         // console.log(response.data);
                     })
                     .catch(error => {
@@ -688,9 +665,6 @@ const handleImport = () => {
 const dialogEdit = ref(false)
 
 const handleEdit = (index: number, row: Income) => {
-    const { id, enable, ...rest } = row;
-    lastEditedData.value = rest;
-
     ruleForm.value.key = row.key
     ruleForm.value.payer = row.payer !== null ? row.payer : null
     ruleForm.value.income = typeof row.income === 'object' && row.income ? row.income.id : (typeof row.income === 'number' ? row.income : null)

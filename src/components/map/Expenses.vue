@@ -159,7 +159,6 @@
 
       <el-form-item>
         <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
-        <el-button @click="resetForm(ruleFormRef)">重置</el-button>
       </el-form-item>
     </el-form>
   </el-dialog>
@@ -356,7 +355,6 @@ import { getAccountTypeColor } from '~/utils/accountTypeColor'
 
 // const apiUrl = import.meta.env.VITE_API_URL;
 const dialogError = ref(false)
-const lastEditedData = ref<Partial<Expense> | null>(null)
 // console.log(import.meta.env);
 
 interface Expense {
@@ -470,32 +468,16 @@ const handleSearch = () => {
 const dialogAdd = ref(false)
 
 const handleAdd = () => {
-  if (lastEditedData.value) {
-    // 使用上一次编辑的值
-    const expendId = typeof lastEditedData.value.expend === 'object'
-      ? lastEditedData.value.expend?.id
-      : lastEditedData.value.expend
-
-    ruleForm.value = {
-      key: lastEditedData.value.key || '',
-      payee: lastEditedData.value.payee ?? null,
-      expend: typeof expendId === 'number' ? expendId : null,
-      currency: lastEditedData.value.currency || null,
-      tag_ids: lastEditedData.value.tags?.map(tag => tag.id) ?? []
-    };
-  } else {
-    // 没有编辑记录则重置
-    ruleForm.value = {
-      key: '',
-      payee: null,
-      expend: null,
-      currency: null,
-      tag_ids: []
-    };
-    if (ruleFormRef.value) {
-      ruleFormRef.value.resetFields();
-    }
+  ruleForm.value = {
+    key: '',
+    payee: null,
+    expend: null,
+    currency: null,
+    tag_ids: []
   };
+  if (ruleFormRef.value) {
+    ruleFormRef.value.resetFields();
+  }
   dialogAdd.value = true;
 }
 
@@ -525,12 +507,6 @@ const rules = ref<FormRules>({
     { required: false, message: '请选择货币', trigger: 'change' },
   ],
 })
-
-// 弹窗重置
-const resetForm = (formEl: FormInstance | undefined) => {
-  if (!formEl) return
-  formEl.resetFields()
-}
 
 // 新增确认
 const submitForm = async (formEl: FormInstance | undefined) => {
@@ -695,9 +671,6 @@ const handleImport = () => {
 const dialogEdit = ref(false)
 
 const handleEdit = (index: number, row: Expense) => {
-  const { id, enable, ...rest } = row;
-  lastEditedData.value = rest;
-
   ruleForm.value.key = row.key
   ruleForm.value.payee = row.payee !== null ? row.payee : null // 为了解决编辑时payee为null时的问题;
   ruleForm.value.expend = typeof row.expend === 'object' ? row.expend?.id : (typeof row.expend === 'number' ? row.expend : null)
