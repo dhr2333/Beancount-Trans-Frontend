@@ -3,7 +3,7 @@
     <AnonymousPrompt v-model="showAnonymousPrompt" @skip="handleSkipAnonymous" />
 
     <!-- 格式配置面板，只在非匿名用户或已跳过提示时显示 -->
-    <el-form v-if="!showAnonymousPrompt" :model="formModel" :rules="formRules" ref="configForm">
+    <el-form v-if="!showAnonymousPrompt" class="format-config" :model="formModel" :rules="formRules" ref="configForm">
         <el-collapse v-model="activePanels" class="config-panel">
             <!-- 基础设置 -->
             <el-collapse-item title="基础设置" name="basic" class="config-item">
@@ -36,19 +36,26 @@
                     
                     <!-- 收入模板组 -->
                     <div class="template-group">
-                        <el-input v-model="incomeTemplate" placeholder="输入自定义收入账户（如：Income:Discount）" clearable
-                            class="template-input">
-                            <template #prepend>优惠收入模板</template>
-                        </el-input>
+                        <div class="template-input-group">
+                            <div class="template-input-prepend">优惠收入模板</div>
+                            <div class="template-input-content">
+                                <AccountSelector v-model="incomeTemplateId" :account-tree="accountTree"
+                                    :show-details="false" placeholder="请选择收入账户"
+                                    @change="handleIncomeTemplateChange" />
+                            </div>
+                        </div>
 
-                        <el-input v-model="commissionTemplate" placeholder="输入手续费账户（如：Expenses:Finance:Commission）"
-                            clearable class="template-input">
-                            <template #prepend>手续费模板</template>
-                        </el-input>
+                        <div class="template-input-group">
+                            <div class="template-input-prepend">手续费模板</div>
+                            <div class="template-input-content">
+                                <AccountSelector v-model="commissionTemplateId" :account-tree="accountTree"
+                                    :show-details="false" placeholder="请选择手续费账户"
+                                    @change="handleCommissionTemplateChange" />
+                            </div>
+                        </div>
 
-                        <el-input v-model="reconciliationFallbackAccount"
-                            placeholder="输入兜底账户（如：Equity:Adjustments）" clearable class="template-input">
-                            <template #prepend>
+                        <div class="template-input-group">
+                            <div class="template-input-prepend">
                                 <div class="label-with-tip">
                                     <span>兜底账户</span>
                                     <el-tooltip
@@ -59,29 +66,38 @@
                                         </el-icon>
                                     </el-tooltip>
                                 </div>
-                            </template>
-                        </el-input>
+                            </div>
+                            <div class="template-input-content">
+                                <AccountSelector v-model="reconciliationFallbackAccountId" :account-tree="accountTree"
+                                    :show-details="false" placeholder="请选择兜底账户"
+                                    @change="handleReconciliationFallbackChange" />
+                            </div>
+                        </div>
 
-                        <el-form-item prop="currency" :rules="[
+                        <el-form-item prop="currency" class="template-form-item" :rules="[
                             {
                                 pattern: /^[A-Z][A-Z0-9'._-]{0,22}([A-Z0-9])?$/,
                                 message: '货币必须以大写字母开头，以大写字母/数字结尾，并且只能包含 [A-Z0-9\'._-]',
                                 trigger: 'blur'
                             }
                         ]">
-                            <el-input v-model="currency" placeholder="输入基础货币（如：CNY）" clearable class="template-input">
-                                <template #prepend>
+                            <div class="template-input-group">
+                                <div class="template-input-prepend">
                                     <div class="label-with-tip">
                                         <span>基础货币模板</span>
-                                        <el-tooltip content="货币必须以大写字母开头，以大写字母/数字结尾，并且只能包含 [A-Z0-9'._-]"
+                                        <el-tooltip
+                                            content="货币必须以大写字母开头，以大写字母/数字结尾，并且只能包含 [A-Z0-9'._-]"
                                             placement="top">
                                             <el-icon class="tip-icon">
                                                 <Warning />
                                             </el-icon>
                                         </el-tooltip>
                                     </div>
-                                </template>
-                            </el-input>
+                                </div>
+                                <div class="template-input-content">
+                                    <el-input v-model="currency" placeholder="输入基础货币（如：CNY）" clearable />
+                                </div>
+                            </div>
                         </el-form-item>
                     </div>
                 </div>
@@ -163,6 +179,7 @@ import { ElMessage } from 'element-plus'
 import { Warning } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
+import AccountSelector from '../common/AccountSelector.vue'
 import { hasAuthTokens } from '../../utils/auth'
 import { shouldShowAnonymousPrompt } from '~/composables/useAnonymousPrompt'
 import type { FormInstance } from 'element-plus'
@@ -191,6 +208,14 @@ const validateAndSubmit = async () => {
     }
 }
 
+interface AccountOption {
+    id: number
+    account: string
+    account_type?: string
+    description?: string
+    children?: AccountOption[]
+}
+
 interface Config {
     flag: string
     show_note: boolean
@@ -212,9 +237,13 @@ interface Config {
 // 响应式配置状态
 const activePanels = ref(['basic', 'template', 'parsing'])
 const formatSettings = ref<string[]>([])
+const accountTree = ref<AccountOption[]>([])
 const incomeTemplate = ref('')
 const commissionTemplate = ref('')
 const reconciliationFallbackAccount = ref('Equity:Adjustments')
+const incomeTemplateId = ref<number | null>(null)
+const commissionTemplateId = ref<number | null>(null)
+const reconciliationFallbackAccountId = ref<number | null>(null)
 const currency = ref('')
 const aiModel = ref('BERT') // 默认使用 BERT
 const deepseek_apikey = ref('')
@@ -267,10 +296,65 @@ const convertToFrontend = (config: Config) => {
     }
 }
 
+const findAccountByName = (accounts: AccountOption[], accountName: string): AccountOption | null => {
+    for (const account of accounts) {
+        if (account.account === accountName) {
+            return account
+        }
+        if (account.children) {
+            const found = findAccountByName(account.children, accountName)
+            if (found) return found
+        }
+    }
+    return null
+}
+
+const syncAccountIdsFromPaths = () => {
+    incomeTemplateId.value = incomeTemplate.value
+        ? findAccountByName(accountTree.value, incomeTemplate.value)?.id ?? null
+        : null
+    commissionTemplateId.value = commissionTemplate.value
+        ? findAccountByName(accountTree.value, commissionTemplate.value)?.id ?? null
+        : null
+    reconciliationFallbackAccountId.value = reconciliationFallbackAccount.value
+        ? findAccountByName(accountTree.value, reconciliationFallbackAccount.value)?.id ?? null
+        : null
+}
+
+const loadAccountTree = async () => {
+    try {
+        const response = await axios.get('/account/tree/')
+        if (Array.isArray(response.data)) {
+            accountTree.value = response.data as AccountOption[]
+        } else if (response.data && Array.isArray(response.data.results)) {
+            accountTree.value = response.data.results as AccountOption[]
+        } else {
+            accountTree.value = []
+        }
+    } catch {
+        accountTree.value = []
+    }
+}
+
+const handleIncomeTemplateChange = (account: AccountOption | null) => {
+    incomeTemplate.value = account?.account ?? ''
+}
+
+const handleCommissionTemplateChange = (account: AccountOption | null) => {
+    commissionTemplate.value = account?.account ?? ''
+}
+
+const handleReconciliationFallbackChange = (account: AccountOption | null) => {
+    reconciliationFallbackAccount.value = account?.account ?? ''
+}
+
 // 加载用户配置
 const loadConfig = async () => {
     try {
-        const { data } = await axios.get<Config>('config/')
+        const [, { data }] = await Promise.all([
+            loadAccountTree(),
+            axios.get<Config>('config/')
+        ])
         const frontendConfig = convertToFrontend(data)
         aiModel.value = frontendConfig.aiModel
         deepseek_apikey.value = frontendConfig.deepseek_apikey
@@ -281,6 +365,7 @@ const loadConfig = async () => {
         flagSymbol.value = frontendConfig.flag
         currency.value = frontendConfig.currency
         parsingModePreference.value = frontendConfig.parsingModePreference
+        syncAccountIdsFromPaths()
     } catch (error: any) {
         if (error.response && error.response.status == 401) {
             ElMessage.info('未认证，请登录后重试');
@@ -406,8 +491,66 @@ const resetToDefault = async () => {
     gap: 12px;
 }
 
-.template-input {
-    margin-bottom: 10px;
+.template-form-item {
+    margin-bottom: 0;
+}
+
+.template-form-item :deep(.el-form-item__content) {
+    line-height: normal;
+}
+
+.template-input-group {
+    display: flex;
+    width: 100%;
+    align-items: stretch;
+}
+
+.template-input-prepend {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0 20px;
+    background-color: var(--ep-fill-color-light, var(--el-fill-color-light));
+    color: var(--ep-text-color-regular, var(--el-text-color-regular));
+    border: 1px solid var(--ep-border-color, var(--el-border-color));
+    border-right: none;
+    border-radius: var(--ep-border-radius-base, var(--el-border-radius-base)) 0 0 var(--ep-border-radius-base, var(--el-border-radius-base));
+    font-size: var(--ep-font-size-base, var(--el-font-size-base));
+    white-space: nowrap;
+    box-shadow:
+        1px 0 0 0 var(--ep-border-color, var(--el-border-color)) inset,
+        0 1px 0 0 var(--ep-border-color, var(--el-border-color)) inset,
+        0 -1px 0 0 var(--ep-border-color, var(--el-border-color)) inset;
+}
+
+.template-input-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.template-input-content :deep(.account-selector) {
+    width: 100%;
+}
+
+.template-input-content :deep(.ep-input__wrapper),
+.template-input-content :deep(.el-input__wrapper) {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.template-input-group:focus-within .template-input-prepend {
+    border-color: var(--ep-color-primary, var(--el-color-primary));
+    box-shadow:
+        1px 0 0 0 var(--ep-color-primary, var(--el-color-primary)) inset,
+        0 1px 0 0 var(--ep-color-primary, var(--el-color-primary)) inset,
+        0 -1px 0 0 var(--ep-color-primary, var(--el-color-primary)) inset;
+}
+
+.tip-icon {
+    color: var(--ep-text-color-secondary, var(--el-text-color-secondary));
+    cursor: help;
 }
 
 .symbol-selector {
@@ -467,5 +610,27 @@ const resetToDefault = async () => {
     gap: 20px;
     margin-top: 30px;
     margin-bottom: 20px;
+}
+
+html.dark .format-config .template-input-prepend {
+    background-color: var(--ep-fill-color-dark, var(--el-fill-color-dark));
+    color: var(--ep-text-color-regular, var(--el-text-color-regular));
+    border-color: var(--ep-border-color, var(--el-border-color));
+    box-shadow:
+        1px 0 0 0 var(--ep-border-color, var(--el-border-color)) inset,
+        0 1px 0 0 var(--ep-border-color, var(--el-border-color)) inset,
+        0 -1px 0 0 var(--ep-border-color, var(--el-border-color)) inset;
+}
+
+html.dark .format-config .template-input-group:focus-within .template-input-prepend {
+    border-color: var(--ep-color-primary, var(--el-color-primary));
+    box-shadow:
+        1px 0 0 0 var(--ep-color-primary, var(--el-color-primary)) inset,
+        0 1px 0 0 var(--ep-color-primary, var(--el-color-primary)) inset,
+        0 -1px 0 0 var(--ep-color-primary, var(--el-color-primary)) inset;
+}
+
+html.dark .format-config .tip-icon {
+    color: var(--ep-text-color-secondary, var(--el-text-color-secondary));
 }
 </style>
