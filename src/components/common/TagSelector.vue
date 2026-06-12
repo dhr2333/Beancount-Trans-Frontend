@@ -69,7 +69,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { CascaderProps, CascaderValue, CascaderOption } from 'element-plus'
 import { fetchTagTree } from '../../api/tags'
-import type { Tag } from '../../types/tag'
+import type { Tag, TagSummary } from '../../types/tag'
 
 // Props 定义
 interface Props {
@@ -79,6 +79,7 @@ interface Props {
     disabled?: boolean
     showPreview?: boolean
     enabledOnly?: boolean // 是否只显示启用的标签
+    knownTags?: TagSummary[] // 已关联的标签摘要，用于展示已禁用的已选标签
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -87,7 +88,8 @@ const props = withDefaults(defineProps<Props>(), {
     placeholder: '请选择标签',
     disabled: false,
     showPreview: true,
-    enabledOnly: true
+    enabledOnly: true,
+    knownTags: () => []
 })
 
 // Emits
@@ -121,41 +123,88 @@ const cascaderProps: CascaderProps = {
     expandTrigger: 'hover'
 }
 
+const selectedIds = computed(() => {
+    if (props.multiple) {
+        return Array.isArray(props.modelValue)
+            ? props.modelValue.filter((value): value is number => typeof value === 'number')
+            : []
+    }
+    return typeof props.modelValue === 'number' ? [props.modelValue] : []
+})
+
+// 合并标签树与外部传入的已知标签（映射条目自带的标签信息）
+const resolvedFlatTags = computed(() => {
+    const byId = new Map<number, Tag>()
+
+    const flatten = (tags: Tag[]) => {
+        tags.forEach(tag => {
+            byId.set(tag.id, tag)
+            if (tag.children?.length) {
+                flatten(tag.children)
+            }
+        })
+    }
+    flatten(tagTree.value)
+
+    props.knownTags.forEach(tag => {
+        if (!byId.has(tag.id)) {
+            byId.set(tag.id, {
+                id: tag.id,
+                name: tag.name,
+                full_path: tag.full_path,
+                enable: tag.enable,
+                parent: null,
+                description: '',
+                owner: 0,
+                has_children: false,
+                created: '',
+                modified: '',
+            })
+        }
+    })
+
+    return Array.from(byId.values())
+})
+
 // 计算属性：过滤后的标签选项
 const tagOptions = computed<Tag[]>(() => {
-    console.log('TagSelector - 原始标签树:', tagTree.value)
+    if (!props.enabledOnly) {
+        return tagTree.value
+    }
 
-    if (props.enabledOnly) {
-        const filtered = filterEnabledTags(tagTree.value)
-        console.log('TagSelector - 过滤后的标签:', filtered)
+    const filtered = filterEnabledTags(structuredClone(tagTree.value) as Tag[])
+    if (props.multiple) {
         return filtered
     }
 
-    return tagTree.value
+    const selectedId = selectedIds.value[0]
+    if (selectedId === undefined) {
+        return filtered
+    }
+
+    const selectedTag = findTagById(tagTree.value, selectedId)
+    if (selectedTag && !selectedTag.enable && !findTagById(filtered, selectedId)) {
+        return [...filtered, { ...selectedTag, children: [] }]
+    }
+
+    return filtered
 })
 
 const cascaderOptions = computed<CascaderOption[]>(() => tagOptions.value as unknown as CascaderOption[])
 
-// 扁平化标签列表（用于多选模式）
-const flatTags = computed(() => {
-    const flatten = (tags: Tag[], result: Tag[] = []): Tag[] => {
-        tags.forEach(tag => {
-            result.push(tag)
-            if (tag.children && tag.children.length > 0) {
-                flatten(tag.children, result)
-            }
-        })
-        return result
-    }
-    return flatten(tagTree.value)
-})
-
-// 只显示启用的标签（用于多选模式）
+// 显示启用的标签，并保留已选中的禁用标签以便正确展示名称
 const enabledFlatTags = computed(() => {
-    if (props.enabledOnly) {
-        return flatTags.value.filter(tag => tag.enable)
+    if (!props.enabledOnly) {
+        return resolvedFlatTags.value
     }
-    return flatTags.value
+
+    const enabled = resolvedFlatTags.value.filter(tag => tag.enable)
+    const enabledIds = new Set(enabled.map(tag => tag.id))
+    const selectedDisabled = resolvedFlatTags.value.filter(
+        tag => !tag.enable && selectedIds.value.includes(tag.id) && !enabledIds.has(tag.id)
+    )
+
+    return [...enabled, ...selectedDisabled]
 })
 
 // 获取标签树形数据
@@ -163,7 +212,6 @@ const loadTagTree = async () => {
     try {
         loading.value = true
         const response = await fetchTagTree()
-        console.log('标签树数据:', response.data)
 
         if (Array.isArray(response.data)) {
             tagTree.value = response.data as Tag[]
@@ -209,7 +257,7 @@ const findTagById = (tags: Tag[], id: number): Tag | null => {
 
 // 从扁平列表中查找标签（快速查找方法）
 const findTagByIdFlat = (id: number): Tag | null => {
-    return flatTags.value.find(tag => tag.id === id) || null
+    return resolvedFlatTags.value.find(tag => tag.id === id) || null
 }
 
 // 获取标签完整路径
@@ -290,6 +338,12 @@ const removeTag = (tagId: number) => {
     selectedValues.value = selectedValues.value.filter(id => id !== tagId)
     handleChange()
 }
+
+watch(selectedIds, (ids) => {
+    if (ids.length > 0 && tagTree.value.length === 0) {
+        loadTagTree()
+    }
+}, { immediate: true })
 
 // 监听外部值变化
 watch(() => props.modelValue, (newValue) => {

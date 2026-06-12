@@ -190,7 +190,8 @@
             </el-form-item> -->
 
             <el-form-item label="关联标签" prop="tag_ids">
-                <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签（可多选）" />
+                <TagSelector v-model="ruleForm.tag_ids" :known-tags="editKnownTags" multiple :show-preview="false"
+                    placeholder="请选择标签（可多选）" />
             </el-form-item>
 
             <el-form-item>
@@ -469,8 +470,10 @@ const handleSearch = () => {
 
 // 新增
 const dialogAdd = ref(false)
+const editKnownTags = ref<Income['tags']>([])
 
 const handleAdd = () => {
+    editKnownTags.value = []
     ruleForm.value = {
         key: '',
         payer: null,
@@ -669,6 +672,7 @@ const handleEdit = (index: number, row: Income) => {
     ruleForm.value.payer = row.payer !== null ? row.payer : null
     ruleForm.value.income = typeof row.income === 'object' && row.income ? row.income.id : (typeof row.income === 'number' ? row.income : null)
     ruleForm.value.tag_ids = row.tags?.map(tag => tag.id) || []
+    editKnownTags.value = row.tags || []
     dialogEdit.value = true
     selectedId.value = row.id
     // console.log(index, row)
