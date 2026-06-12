@@ -100,6 +100,7 @@
                 </div>
                 <div class="card-actions" @click.stop>
                   <el-button type="primary" size="small" :loading="writingTaskIds.has(task.id)"
+                    :disabled="isReviewExpired(task)"
                     @click="handleDirectWrite(task)" class="direct-write-btn">
                     跳过
                   </el-button>
@@ -124,6 +125,7 @@ import {
 import { getTasks, updateTask } from '../../api/reconciliation'
 import { confirmWrite } from '../../api/parse-review'
 import type { ScheduledTask } from '../../types/reconciliation'
+import { isReviewExpired } from '../../types/reconciliation'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 
 const router = useRouter()
@@ -307,22 +309,25 @@ function isOverdue(dateString: string | null): boolean {
 
 function handleStart(task: ScheduledTask) {
   if (task.task_type === 'parse_review') {
+    if (isReviewExpired(task)) {
+      ElMessage.warning('解析待办已过期，系统将自动写入')
+      return
+    }
     router.push(`/parse-review/${task.id}`)
   } else {
     router.push(`/reconciliation/${task.id}`)
   }
 }
 
-// 计算剩余时间（基于 expires_at 或 created）
+// 计算剩余时间（基于 review_expires_at 或 created）
 function getRemainingTime(task: ScheduledTask): string {
-  // 优先使用 expires_at（如果存在）- 这是缓存的实际过期时间
-  if (task.expires_at) {
-    const expiryTime = task.expires_at * 1000  // expires_at 是 Unix 时间戳（秒），转换为毫秒
+  if (task.review_expires_at) {
+    const expiryTime = task.review_expires_at * 1000
     const now = Date.now()
     const remainingMs = expiryTime - now
 
     if (remainingMs <= 0) {
-      return '已过期'
+      return '已过期，等待自动写入'
     }
 
     const remainingHours = Math.floor(remainingMs / (3600 * 1000))
@@ -343,7 +348,7 @@ function getRemainingTime(task: ScheduledTask): string {
   const remainingMs = totalHours * 3600 * 1000 - elapsed
 
   if (remainingMs <= 0) {
-    return '已过期'
+    return '已过期，等待自动写入'
   }
 
   const remainingHours = Math.floor(remainingMs / (3600 * 1000))
@@ -394,6 +399,10 @@ async function handleDateChange(taskId: number, newDate: string) {
 // 跳过审核直接写入
 async function handleDirectWrite(task: ScheduledTask) {
   if (task.task_type !== 'parse_review') return
+  if (isReviewExpired(task)) {
+    ElMessage.warning('解析待办已过期，系统将自动写入')
+    return
+  }
 
   try {
     await ElMessageBox.confirm(
