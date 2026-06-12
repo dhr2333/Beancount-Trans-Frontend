@@ -80,7 +80,8 @@
       <el-table-column label="标签" min-width="180" width="auto">
         <template #default="{ row }">
           <div v-if="row.tags && row.tags.length > 0" class="tags-cell">
-            <el-tag v-for="tag in row.tags" :key="tag.id" size="small" style="margin-right: 4px; margin-bottom: 4px;">
+            <el-tag v-for="tag in row.tags" :key="tag.id" size="small"
+              :type="tag.enable !== false ? undefined : 'info'" style="margin-right: 4px; margin-bottom: 4px;">
               {{ tag.full_path }}
             </el-tag>
           </div>

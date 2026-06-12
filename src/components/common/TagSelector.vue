@@ -4,8 +4,14 @@
         <el-select v-if="multiple" v-model="selectedValues" multiple filterable :placeholder="placeholder"
             @change="handleChange" @visible-change="handleVisibleChange" style="width: 100%;" :disabled="disabled"
             v-loading="loading">
+            <template #tag>
+                <el-tag v-for="tagId in selectedValues" :key="tagId" closable size="small"
+                    :type="isTagClosed(tagId) ? 'info' : undefined" @close="removeTag(tagId)">
+                    {{ getTagFullPath(tagId) }}
+                </el-tag>
+            </template>
             <el-option v-for="tag in enabledFlatTags" :key="tag.id" :label="tag.full_path" :value="tag.id">
-                <div class="tag-option">
+                <div class="tag-option" :class="{ 'tag-option-closed': !tag.enable }">
                     <span class="tag-label">{{ tag.full_path }}</span>
                     <el-tag v-if="tag.description" size="small" type="info" class="tag-desc">
                         {{ tag.description }}
@@ -23,7 +29,7 @@
             :placeholder="placeholder" @change="handleChange" @visible-change="handleVisibleChange" style="width: 100%;"
             :disabled="disabled" class="tag-cascader">
             <template #default="{ node, data }">
-                <div class="cascader-node">
+                <div class="cascader-node" :class="{ 'tag-option-closed': data.enable === false }">
                     <span class="node-label">{{ data.name }}</span>
                     <el-tag v-if="data.description" size="small" type="info" class="desc-tag">
                         {{ data.description }}
@@ -57,7 +63,7 @@
         <!-- 已选标签预览（多选模式） -->
         <div v-if="multiple && selectedValues.length > 0 && showPreview" class="selected-tags-preview">
             <el-tag v-for="tagId in selectedValues" :key="tagId" closable @close="removeTag(tagId)" size="small"
-                class="selected-tag">
+                class="selected-tag" :type="isTagClosed(tagId) ? 'info' : undefined">
                 {{ getTagFullPath(tagId) }}
             </el-tag>
         </div>
@@ -266,6 +272,11 @@ const getTagFullPath = (id: number): string => {
     return tag?.full_path || `标签#${id}`
 }
 
+const isTagClosed = (id: number): boolean => {
+    const tag = findTagByIdFlat(id)
+    return tag ? !tag.enable : false
+}
+
 // 自定义过滤方法 - 不区分大小写搜索
 const customFilterMethod = (node: any, keyword: string) => {
     if (!keyword) return true
@@ -412,6 +423,11 @@ defineExpose({
     flex: 1;
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
     font-size: 13px;
+}
+
+.tag-option-closed .tag-label,
+.tag-option-closed .node-label {
+    color: var(--el-text-color-secondary);
 }
 
 .tag-desc {
