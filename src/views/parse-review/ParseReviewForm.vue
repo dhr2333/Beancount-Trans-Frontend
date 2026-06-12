@@ -230,7 +230,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit } from '@element-plus/icons-vue'
-import { useInlineMappingDialog } from '../../composables/useInlineMappingDialog'
+import { useInlineMappingDialog, defaultMappingKeyFromOriginalRow } from '../../composables/useInlineMappingDialog'
 import AccountSelector from '../../components/common/AccountSelector.vue'
 import TagSelector from '../../components/common/TagSelector.vue'
 import axios from '../../utils/request'
@@ -865,16 +865,8 @@ const inferParseReviewMappingType = (row: FormattedEntry) => {
 
 const getParseReviewCreateDefaults = (row: FormattedEntry) => {
   const type = inferParseReviewMappingType(row)
-  let key = row.selected_expense_key?.trim() || ''
-  let party = ''
-  if (!key && row.original_row) {
-    if (row.original_row.counterparty) {
-      key = row.original_row.counterparty
-    } else if (row.original_row.commodity) {
-      key = row.original_row.commodity.substring(0, 10)
-    }
-  }
-  return { type, key, party }
+  const key = defaultMappingKeyFromOriginalRow(row.original_row)
+  return { type, key, party: '' }
 }
 
 const applyReparseToEntry = async (entryUuid: string, selectedKey: string) => {

@@ -143,7 +143,7 @@ import { hasAuthTokens } from '../../utils/auth';
 import type { UploadFile, UploadFiles } from 'element-plus'
 import AccountSelector from '../common/AccountSelector.vue';
 import TagSelector from '../common/TagSelector.vue';
-import { useInlineMappingDialog } from '../../composables/useInlineMappingDialog';
+import { useInlineMappingDialog, defaultMappingKeyFromOriginalRow } from '../../composables/useInlineMappingDialog';
 
 
 const input = ref()
@@ -190,6 +190,8 @@ interface BillEntry {
   id: string;
   formatted: string;
   ai_choose: string;
+  counterparty?: string;
+  commodity?: string;
   ai_candidates?: Array<{
     key: string;
     score?: number;
@@ -373,7 +375,9 @@ const handleAiChoose = async (rowIndex: number, key: string) => {
       responseList.value[rowIndex] = {
         ...responseList.value[rowIndex], // 保留原有属性
         formatted: updatedData.formatted, // 更新格式化内容
-        ai_choose: updatedData.ai_choose || key
+        ai_choose: updatedData.ai_choose || key,
+        counterparty: updatedData.counterparty ?? responseList.value[rowIndex].counterparty,
+        commodity: updatedData.commodity ?? responseList.value[rowIndex].commodity
       };
 
       // 更新整个结果文本框
@@ -395,7 +399,10 @@ const inferTransMappingType = (row: BillEntry) => {
 
 const getTransCreateDefaults = (row: BillEntry) => {
   const type = inferTransMappingType(row)
-  const key = row.ai_choose || row.ai_candidates?.[0]?.key || ''
+  const key = defaultMappingKeyFromOriginalRow({
+    counterparty: row.counterparty,
+    commodity: row.commodity
+  })
   return { type, key, party: '' }
 }
 
@@ -412,6 +419,8 @@ const applyTransReparse = async (rowIndex: number, entryId: string, selectedKey:
     ...responseList.value[rowIndex],
     formatted: updatedData.formatted,
     ai_choose: updatedData.ai_choose || selectedKey,
+    counterparty: updatedData.counterparty ?? responseList.value[rowIndex].counterparty,
+    commodity: updatedData.commodity ?? responseList.value[rowIndex].commodity,
     ai_candidates: Array.isArray(updatedData.ai_candidates)
       ? updatedData.ai_candidates
       : responseList.value[rowIndex].ai_candidates

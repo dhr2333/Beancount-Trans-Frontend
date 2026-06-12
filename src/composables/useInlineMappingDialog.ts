@@ -4,6 +4,24 @@ import axios from '../utils/request'
 
 export type MappingType = 'expense' | 'income'
 
+const MAPPING_KEY_MAX_LENGTH = 16
+
+/** 从账单原始行的对方/商品信息生成新增映射的默认关键字 */
+export function defaultMappingKeyFromOriginalRow(originalRow?: {
+  counterparty?: string
+  commodity?: string
+}): string {
+  const counterparty = originalRow?.counterparty?.trim()
+  if (counterparty && counterparty !== '/') {
+    return counterparty.substring(0, MAPPING_KEY_MAX_LENGTH)
+  }
+  const commodity = originalRow?.commodity?.trim()
+  if (commodity) {
+    return commodity.substring(0, MAPPING_KEY_MAX_LENGTH)
+  }
+  return ''
+}
+
 interface MappingListItem {
   id: number
   key: string
