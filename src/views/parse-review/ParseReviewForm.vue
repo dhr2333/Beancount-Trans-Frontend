@@ -9,15 +9,25 @@
         </el-text> -->
       </div>
       <div class="header-right">
-        <el-button @click="handleReparseAll" :loading="loading.reparseAll">
+        <el-button @click="handleReparseAll" :loading="loading.reparseAll" :disabled="reviewExpired">
           重新解析
         </el-button>
         <el-button @click="handleBack">返回</el-button>
       </div>
     </div>
 
+    <el-alert
+      v-if="reviewExpired"
+      type="warning"
+      :closable="false"
+      show-icon
+      title="解析待办已过期，系统将自动写入"
+      description="审核截止时间已过，无法再编辑或确认写入。"
+      class="expired-banner"
+    />
+
     <!-- 加载状态 -->
-    <div v-loading="loading.results" class="content-container">
+    <div v-loading="loading.results" class="content-container" :class="{ 'is-review-expired': reviewExpired }">
       <!-- 解析结果表格 -->
       <el-table v-if="formattedEntries.length > 0" :data="formattedEntries" style="width: 100%" border
         highlight-current-row>
@@ -124,11 +134,11 @@
 
     <!-- 底部操作栏 -->
     <div class="action-bar">
-      <el-button @click="handlePreview" :disabled="formattedEntries.length === 0">
+      <el-button @click="handlePreview" :disabled="formattedEntries.length === 0 || reviewExpired">
         预览
       </el-button>
       <el-button type="primary" @click="handleConfirmWrite" :loading="loading.confirm"
-        :disabled="formattedEntries.length === 0">
+        :disabled="formattedEntries.length === 0 || reviewExpired">
         确认写入
       </el-button>
     </div>
@@ -244,6 +254,7 @@ import {
 import { getTask } from '../../api/reconciliation'
 import type { FormattedEntry, ParseResult, ErrorEntry } from '../../types/parse-review'
 import type { ScheduledTask } from '../../types/reconciliation'
+import { isReviewExpired } from '../../types/reconciliation'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 
 const route = useRoute()
@@ -903,18 +914,17 @@ const openEditCurrentMappingForRow = (row: FormattedEntry) => {
   openEditCurrentMapping(buildParseReviewMappingOptions(row))
 }
 
-// 计算剩余时间（基于 expires_at 或 created）
+// 计算剩余时间（基于 review_expires_at 或 created）
 const remainingTime = computed(() => {
   if (!taskInfo.value) return null
 
-  // 优先使用 parseResult 中的 expires_at（这是缓存的实际过期时间）
-  if (parseResult.value?.expires_at) {
-    const expiryTime = parseResult.value.expires_at * 1000  // expires_at 是 Unix 时间戳（秒），转换为毫秒
+  if (parseResult.value?.review_expires_at) {
+    const expiryTime = parseResult.value.review_expires_at * 1000
     const now = Date.now()
     const remainingMs = expiryTime - now
 
     if (remainingMs <= 0) {
-      return '已过期'
+      return '已过期，等待自动写入'
     }
 
     const remainingHours = Math.floor(remainingMs / (3600 * 1000))
@@ -927,14 +937,13 @@ const remainingTime = computed(() => {
     }
   }
 
-  // 回退到使用 taskInfo.expires_at（如果序列化器返回了）
-  if (taskInfo.value.expires_at) {
-    const expiryTime = taskInfo.value.expires_at * 1000
+  if (taskInfo.value.review_expires_at) {
+    const expiryTime = taskInfo.value.review_expires_at * 1000
     const now = Date.now()
     const remainingMs = expiryTime - now
 
     if (remainingMs <= 0) {
-      return '已过期'
+      return '已过期，等待自动写入'
     }
 
     const remainingHours = Math.floor(remainingMs / (3600 * 1000))
@@ -947,7 +956,6 @@ const remainingTime = computed(() => {
     }
   }
 
-  // 最后回退到使用 created（兼容旧数据）
   const createdTime = new Date(taskInfo.value.created).getTime()
   const now = Date.now()
   const elapsed = now - createdTime
@@ -955,7 +963,7 @@ const remainingTime = computed(() => {
   const remainingMs = totalHours * 3600 * 1000 - elapsed
 
   if (remainingMs <= 0) {
-    return '已过期'
+    return '已过期，等待自动写入'
   }
 
   const remainingHours = Math.floor(remainingMs / (3600 * 1000))
@@ -966,6 +974,16 @@ const remainingTime = computed(() => {
   } else {
     return `${remainingMinutes}分钟`
   }
+})
+
+const reviewExpired = computed(() => {
+  if (parseResult.value?.review_expires_at) {
+    return Date.now() >= parseResult.value.review_expires_at * 1000
+  }
+  if (taskInfo.value) {
+    return isReviewExpired(taskInfo.value)
+  }
+  return false
 })
 
 // 加载待办任务信息和解析结果
@@ -1257,6 +1275,15 @@ onMounted(() => {
 .content-container {
   min-height: 400px;
   margin-bottom: 24px;
+
+  &.is-review-expired {
+    pointer-events: none;
+    opacity: 0.75;
+  }
+}
+
+.expired-banner {
+  margin-bottom: 16px;
 }
 
 .entry-preview-wrapper {

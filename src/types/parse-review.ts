@@ -37,7 +37,7 @@ export interface ParseResult {
   file_id: number
   formatted_data: FormattedEntry[]
   created_at: number
-  expires_at: number
+  review_expires_at: number
 }
 
 /**

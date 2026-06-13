@@ -59,9 +59,18 @@ export interface ScheduledTask {
   account_type: string | null
   file_name?: string | null  // 解析待办的文件名
   file_id?: number | null  // 解析待办的文件ID
-  expires_at?: number | null  // 解析待办的缓存过期时间（Unix 时间戳，秒）
+  review_expires_at?: number | null  // 解析待办的用户审核截止时间（Unix 时间戳，秒）
   created: string
   modified: string
+}
+
+/** 解析待办是否已过用户审核截止时间 */
+export function isReviewExpired(task: Pick<ScheduledTask, 'review_expires_at' | 'created'>): boolean {
+  if (task.review_expires_at) {
+    return Date.now() >= task.review_expires_at * 1000
+  }
+  const createdTime = new Date(task.created).getTime()
+  return Date.now() >= createdTime + 24 * 3600 * 1000
 }
 
 /**
