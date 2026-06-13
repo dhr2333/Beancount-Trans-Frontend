@@ -7,7 +7,9 @@ import type {
   ReparseRequest,
   ReparseResponse,
   UpdateEditRequest,
-  UpdateEditResponse
+  UpdateEditResponse,
+  UpdateTagsRequest,
+  UpdateTagsResponse
 } from '../types/parse-review'
 
 /**
@@ -37,6 +39,20 @@ export function updateEntryEdit(
 ): Promise<{ data: UpdateEditResponse }> {
   return axios.put(
     `/translate/parse-review/${taskId}/entries/${entryUuid}/edit`,
+    request
+  )
+}
+
+/**
+ * 更新条目标签（添加/移除）
+ */
+export function patchEntryTags(
+  taskId: number,
+  entryUuid: string,
+  request: UpdateTagsRequest
+): Promise<{ data: UpdateTagsResponse }> {
+  return axios.patch(
+    `/translate/parse-review/${taskId}/entries/${entryUuid}/tags`,
     request
   )
 }

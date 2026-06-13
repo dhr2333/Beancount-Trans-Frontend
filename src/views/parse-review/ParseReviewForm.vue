@@ -50,8 +50,44 @@
                     class="entry-preview-line"
                   >
                     <template v-for="(seg, si) in pline.segments" :key="`${li}-${si}`">
+                      <span
+                        v-if="seg.kind === 'tag'"
+                        class="entry-preview-tag-chip"
+                        @click.stop
+                      >
+                        <el-tooltip placement="top" :show-after="200">
+                          <template #content>
+                            <div class="entry-preview-tag-tooltip">
+                              <div
+                                v-for="(source, sidx) in getTagSourcesForPath(scope.row, seg.path)"
+                                :key="sidx"
+                                class="entry-preview-tag-source-line"
+                              >
+                                <button
+                                  v-if="source.type === 'mapping' && source.key"
+                                  type="button"
+                                  class="entry-preview-tag-source-link"
+                                  @click.stop="openEditMappingForRowByKey(scope.row, source)"
+                                >
+                                  {{ formatTagSourceLabel(source) }}
+                                </button>
+                                <span v-else>{{ formatTagSourceLabel(source) }}</span>
+                              </div>
+                            </div>
+                          </template>
+                          <span class="entry-preview-tag-link">{{ seg.text }}</span>
+                        </el-tooltip>
+                        <button
+                          type="button"
+                          class="entry-preview-tag-remove"
+                          aria-label="移除标签"
+                          @click.stop="removeTagFromEntry(scope.row, seg.path)"
+                        >
+                          ×
+                        </button>
+                      </span>
                       <button
-                        v-if="seg.kind === 'account'"
+                        v-else-if="seg.kind === 'account'"
                         type="button"
                         class="entry-preview-account-link"
                         @click.stop="openAccountAssistFromSegment(scope.row, seg, $event)"
@@ -60,6 +96,14 @@
                       </button>
                       <span v-else class="entry-preview-plain">{{ seg.text }}</span>
                     </template>
+                    <button
+                      v-if="pline.isHeader"
+                      type="button"
+                      class="entry-preview-tag-add"
+                      @click.stop="openTagAssist(scope.row, $event)"
+                    >
+                      + 标签
+                    </button>
                   </div>
                 </div>
               </template>
@@ -232,6 +276,56 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- 点击预览内标签：添加标签浮层 -->
+    <Teleport to="body">
+      <div
+        v-if="tagPopover.visible"
+        class="parse-review-tag-overlay"
+        @click.self="closeTagAssistOverlay"
+      >
+        <div
+          class="parse-review-tag-panel"
+          :style="tagAssistPanelStyle"
+          @click.stop
+        >
+          <div class="parse-review-tag-panel-title">添加标签</div>
+          <el-input
+            ref="tagOverlayQueryRef"
+            v-model="tagAssistQuery"
+            class="parse-review-tag-query"
+            clearable
+            placeholder="搜索标签路径；↑↓ 选择，回车添加"
+            @keydown="onTagOverlayQueryKeydown"
+          />
+          <ul
+            v-if="overlayTagMatches.length > 0"
+            ref="tagSuggestionsListRef"
+            class="parse-review-tag-suggestions"
+            role="listbox"
+          >
+            <li
+              v-for="(item, idx) in overlayTagMatches"
+              :key="item.full_path"
+              role="option"
+              :class="[
+                'parse-review-tag-suggestion-item',
+                { 'is-active': idx === tagOverlayActiveIndex }
+              ]"
+              @click="applyTagAddition(item.full_path)"
+            >
+              <span class="parse-review-tag-suggestion-name">#{{ item.full_path }}</span>
+              <span v-if="item.description" class="parse-review-tag-suggestion-desc">
+                {{ item.description }}
+              </span>
+            </li>
+          </ul>
+          <div v-else-if="tagAssistQuery.trim()" class="parse-review-tag-empty">
+            未找到匹配的标签
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -248,11 +342,14 @@ import {
   getParseResults,
   reparseEntry,
   updateEntryEdit,
+  patchEntryTags,
   confirmWrite,
   reparseAll
 } from '../../api/parse-review'
+import { fetchTagTree } from '../../api/tags'
 import { getTask } from '../../api/reconciliation'
-import type { FormattedEntry, ParseResult, ErrorEntry } from '../../types/parse-review'
+import type { FormattedEntry, ParseResult, ErrorEntry, TagDetail, TagSource } from '../../types/parse-review'
+import type { Tag } from '../../types/tag'
 import type { ScheduledTask } from '../../types/reconciliation'
 import { isReviewExpired } from '../../types/reconciliation'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
@@ -428,7 +525,220 @@ watch(
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onEscapeCloseOverlay)
+  window.removeEventListener('keydown', onEscapeCloseTagOverlay)
 })
+
+type FlatTagAssistItem = { full_path: string; description: string; enable: boolean }
+
+const flatTagsForAssist = ref<FlatTagAssistItem[]>([])
+const tagPopover = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  entryUuid: ''
+})
+const tagAssistQuery = ref('')
+const tagOverlayQueryRef = ref<{ focus: () => void } | null>(null)
+const tagSuggestionsListRef = ref<HTMLUListElement | null>(null)
+const tagOverlayActiveIndex = ref(0)
+
+const tagAssistPanelStyle = computed(() => {
+  const pad = 8
+  const panelW = 420
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+  const left = Math.max(pad, Math.min(tagPopover.value.x, vw - panelW - pad))
+  const top = Math.max(pad, Math.min(tagPopover.value.y + pad, vh - 200))
+  return {
+    position: 'fixed' as const,
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${panelW}px`,
+    zIndex: 3001
+  }
+})
+
+function rebuildFlatTags(nodes: Tag[]) {
+  const out: FlatTagAssistItem[] = []
+  const walk = (items: Tag[]) => {
+    for (const node of items) {
+      if (node.full_path) {
+        out.push({
+          full_path: node.full_path,
+          description: (node.description ?? '').trim(),
+          enable: node.enable !== false
+        })
+      }
+      if (node.children?.length) walk(node.children)
+    }
+  }
+  walk(nodes)
+  flatTagsForAssist.value = out.sort((a, b) => a.full_path.localeCompare(b.full_path))
+}
+
+async function loadTagTreeAssist() {
+  try {
+    const response = await fetchTagTree()
+    const data = Array.isArray(response.data) ? response.data : []
+    rebuildFlatTags(data)
+  } catch {
+    flatTagsForAssist.value = []
+  }
+}
+
+function closeTagAssistOverlay() {
+  tagPopover.value.visible = false
+  tagAssistQuery.value = ''
+}
+
+const onEscapeCloseTagOverlay = (ev: KeyboardEvent) => {
+  if (ev.key === 'Escape' && tagPopover.value.visible) {
+    closeTagAssistOverlay()
+  }
+}
+
+const overlayTagMatches = computed(() => {
+  if (!tagPopover.value.visible) return []
+  const q = tagAssistQuery.value.trim().toLowerCase()
+  if (!q) {
+    return flatTagsForAssist.value.filter((t) => t.enable).slice(0, 80)
+  }
+  return flatTagsForAssist.value
+    .filter((t) => t.enable && t.full_path.toLowerCase().includes(q))
+    .slice(0, 80)
+})
+
+watch(overlayTagMatches, async () => {
+  tagOverlayActiveIndex.value = 0
+  await nextTick()
+  const ul = tagSuggestionsListRef.value
+  const active = ul?.querySelector('.parse-review-tag-suggestion-item.is-active')
+  active?.scrollIntoView({ block: 'nearest' })
+})
+
+watch(tagOverlayActiveIndex, async () => {
+  await nextTick()
+  const ul = tagSuggestionsListRef.value
+  if (!ul) return
+  const active = ul.querySelector('.parse-review-tag-suggestion-item.is-active')
+  active?.scrollIntoView({ block: 'nearest' })
+})
+
+watch(
+  () => tagPopover.value.visible,
+  async (visible) => {
+    if (visible) {
+      window.addEventListener('keydown', onEscapeCloseTagOverlay)
+      tagAssistQuery.value = ''
+      await nextTick()
+      tagOverlayQueryRef.value?.focus?.()
+    } else {
+      window.removeEventListener('keydown', onEscapeCloseTagOverlay)
+      tagAssistQuery.value = ''
+    }
+  }
+)
+
+function openTagAssist(row: FormattedEntry, e: MouseEvent) {
+  tagPopover.value = {
+    visible: true,
+    x: e.clientX,
+    y: e.clientY,
+    entryUuid: row.uuid
+  }
+}
+
+function formatTagSourceLabel(source: TagSource): string {
+  if (source.type === 'source') return '账单原始标签'
+  if (source.type === 'manual') return '手动添加'
+  if (source.type === 'mapping' && source.key) {
+    const typeLabel =
+      source.mapping_type === 'asset'
+        ? '资产映射'
+        : source.mapping_type === 'income'
+          ? '收入映射'
+          : '支出映射'
+    return `${typeLabel}关键字：${source.key}`
+  }
+  return '未知来源'
+}
+
+function getTagSourcesForPath(row: FormattedEntry, path: string): TagSource[] {
+  const normalized = path.toLowerCase()
+  const detail = (row.tag_details ?? []).find((item) => item.path.toLowerCase() === normalized)
+  return detail?.sources ?? [{ type: 'manual' }]
+}
+
+function applyTagFieldsToRow(row: FormattedEntry, payload: {
+  edited_formatted?: string
+  tag_details?: TagDetail[]
+  tag_overrides?: FormattedEntry['tag_overrides']
+}) {
+  if (payload.edited_formatted !== undefined) {
+    row.edited_formatted = payload.edited_formatted.replace(/\n+$/, '')
+  }
+  if (payload.tag_details !== undefined) {
+    row.tag_details = payload.tag_details
+  }
+  if (payload.tag_overrides !== undefined) {
+    row.tag_overrides = payload.tag_overrides
+  }
+}
+
+async function removeTagFromEntry(row: FormattedEntry, tagPath: string) {
+  try {
+    const response = await patchEntryTags(taskId.value, row.uuid, {
+      action: 'remove',
+      tag_path: tagPath
+    })
+    applyTagFieldsToRow(row, response.data)
+    ElMessage.success('标签已移除')
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.error || '移除标签失败')
+  }
+}
+
+async function applyTagAddition(tagPath: string) {
+  const pop = tagPopover.value
+  if (!pop.visible || !pop.entryUuid) return
+  const row = formattedEntries.value.find((item) => item.uuid === pop.entryUuid)
+  if (!row) return
+
+  try {
+    const response = await patchEntryTags(taskId.value, row.uuid, {
+      action: 'add',
+      tag_path: tagPath
+    })
+    applyTagFieldsToRow(row, response.data)
+    closeTagAssistOverlay()
+    ElMessage.success('标签已添加')
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.error || '添加标签失败')
+  }
+}
+
+function onTagOverlayQueryKeydown(e: Event | KeyboardEvent) {
+  if (!(e instanceof KeyboardEvent)) return
+  const list = overlayTagMatches.value
+  if (e.key === 'ArrowDown') {
+    if (!list.length) return
+    e.preventDefault()
+    tagOverlayActiveIndex.value = Math.min(tagOverlayActiveIndex.value + 1, list.length - 1)
+    return
+  }
+  if (e.key === 'ArrowUp') {
+    if (!list.length) return
+    e.preventDefault()
+    tagOverlayActiveIndex.value = Math.max(tagOverlayActiveIndex.value - 1, 0)
+    return
+  }
+  if (e.key === 'Enter') {
+    if (!list.length) return
+    e.preventDefault()
+    const idx = Math.min(Math.max(0, tagOverlayActiveIndex.value), list.length - 1)
+    void applyTagAddition(list[idx].full_path)
+  }
+}
 
 /** 根为五大类，段内允许非空白（含中文等） */
 const ACCOUNT_FULL_RE = /^(?:Assets|Expenses|Income|Liabilities|Equity)(?::[^\s]+)*$/
@@ -444,11 +754,60 @@ type PreviewAccountSegment = {
   absStart: number
   absEnd: number
 }
+type PreviewTagSegment = {
+  kind: 'tag'
+  text: string
+  path: string
+  absStart: number
+  absEnd: number
+}
 type PreviewTextSegment = { kind: 'text'; text: string }
-type PreviewSegment = PreviewAccountSegment | PreviewTextSegment
-type PreviewLine = { segments: PreviewSegment[] }
+type PreviewSegment = PreviewAccountSegment | PreviewTagSegment | PreviewTextSegment
+type PreviewLine = { segments: PreviewSegment[]; isHeader?: boolean }
 
-function parseSingleLineToSegments(line: string, lineBase: number): PreviewSegment[] {
+const TAG_TOKEN_RE = /#\S+/g
+const HEADER_LINE_RE = /^\d{4}-\d{2}-\d{2}/
+
+function parseHeaderLineToSegments(line: string, lineBase: number): PreviewSegment[] {
+  const matches: Array<{ start: number; end: number; path: string; text: string }> = []
+  const re = new RegExp(TAG_TOKEN_RE.source, 'g')
+  let match: RegExpExecArray | null
+  while ((match = re.exec(line)) !== null) {
+    matches.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      path: match[0].slice(1),
+      text: match[0]
+    })
+  }
+  if (!matches.length) {
+    return [{ kind: 'text', text: line }]
+  }
+  const segs: PreviewSegment[] = []
+  let cursor = 0
+  for (const item of matches) {
+    if (item.start > cursor) {
+      segs.push({ kind: 'text', text: line.slice(cursor, item.start) })
+    }
+    segs.push({
+      kind: 'tag',
+      text: item.text,
+      path: item.path,
+      absStart: lineBase + item.start,
+      absEnd: lineBase + item.end
+    })
+    cursor = item.end
+  }
+  if (cursor < line.length) {
+    segs.push({ kind: 'text', text: line.slice(cursor) })
+  }
+  return segs.length ? segs : [{ kind: 'text', text: line }]
+}
+
+function parseSingleLineToSegments(line: string, lineBase: number, isHeaderLine = false): PreviewSegment[] {
+  if (isHeaderLine) {
+    return parseHeaderLineToSegments(line, lineBase)
+  }
   if (!isPostingLine(line)) {
     return [{ kind: 'text', text: line }]
   }
@@ -473,14 +832,18 @@ function parseSingleLineToSegments(line: string, lineBase: number): PreviewSegme
   return segs.length ? segs : [{ kind: 'text', text: line }]
 }
 
-/** 将全文拆成多行，每行若干 text / account 片段（含全文下标） */
+/** 将全文拆成多行，每行若干 text / account / tag 片段（含全文下标） */
 function buildLineSegments(fullText: string): PreviewLine[] {
   const lines = fullText.split('\n')
   const out: PreviewLine[] = []
   let offset = 0
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    out.push({ segments: parseSingleLineToSegments(line, offset) })
+    const isHeader = i === 0 && HEADER_LINE_RE.test(line)
+    out.push({
+      segments: parseSingleLineToSegments(line, offset, isHeader),
+      isHeader
+    })
     offset += line.length
     if (i < lines.length - 1) offset += 1
   }
@@ -619,6 +982,8 @@ function getCharOffsetInPreviewRoot(
 function onEntryPreviewShellClick(row: FormattedEntry, e: MouseEvent) {
   const t = e.target as HTMLElement
   if (t.closest('.entry-preview-account-link')) return
+  if (t.closest('.entry-preview-tag-chip')) return
+  if (t.closest('.entry-preview-tag-add')) return
   const root = e.currentTarget
   const max = row.edited_formatted?.length ?? 0
   let caret = max
@@ -865,6 +1230,7 @@ const {
   mappingRules,
   mappingDialogTitle,
   openForCreate,
+  openForEdit,
   openEditCurrentMapping,
   handleMappingSubmit
 } = useInlineMappingDialog()
@@ -893,7 +1259,9 @@ const applyReparseToEntry = async (entryUuid: string, selectedKey: string) => {
       formatted: updated.formatted,
       edited_formatted: (updated.edited_formatted || '').replace(/\n+$/, ''),
       selected_expense_key: updated.selected_expense_key,
-      expense_candidates_with_score: updated.expense_candidates_with_score
+      expense_candidates_with_score: updated.expense_candidates_with_score,
+      tag_details: updated.tag_details,
+      tag_overrides: updated.tag_overrides
     }
   }
 }
@@ -912,6 +1280,20 @@ const openCreateMappingForRow = (row: FormattedEntry) => {
 
 const openEditCurrentMappingForRow = (row: FormattedEntry) => {
   openEditCurrentMapping(buildParseReviewMappingOptions(row))
+}
+
+const openEditMappingForRowByKey = (row: FormattedEntry, source: TagSource) => {
+  if (source.type !== 'mapping' || !source.key) return
+  if (source.mapping_type === 'asset') {
+    ElMessage.info('资产映射请在映射管理中编辑')
+    return
+  }
+  const mappingType = source.mapping_type === 'income' ? 'income' : 'expense'
+  void openForEdit({
+    ...buildParseReviewMappingOptions(row),
+    inferType: () => mappingType,
+    getSelectedKey: () => source.key
+  })
 }
 
 // 计算剩余时间（基于 review_expires_at 或 created）
@@ -1003,7 +1385,9 @@ const loadResults = async () => {
     // 确保每条记录都有 edited_formatted，并去除末尾的换行符
     formattedEntries.value = result.formatted_data.map(entry => ({
       ...entry,
-      edited_formatted: (entry.edited_formatted || entry.formatted || '').replace(/\n+$/, '')
+      edited_formatted: (entry.edited_formatted || entry.formatted || '').replace(/\n+$/, ''),
+      tag_details: entry.tag_details ?? [],
+      tag_overrides: entry.tag_overrides ?? { removed_paths: [], added_paths: [] }
     }))
   } catch (error: any) {
     ElMessage.error(error.response?.data?.error || '加载解析结果失败')
@@ -1028,7 +1412,9 @@ const handleKeywordSelect = async (uuid: string, selectedKey: string) => {
         formatted: updated.formatted,
         edited_formatted: (updated.edited_formatted || '').replace(/\n+$/, ''),
         selected_expense_key: updated.selected_expense_key,
-        expense_candidates_with_score: updated.expense_candidates_with_score
+        expense_candidates_with_score: updated.expense_candidates_with_score,
+        tag_details: updated.tag_details,
+        tag_overrides: updated.tag_overrides
       }
     }
 
@@ -1240,6 +1626,7 @@ const handleBack = () => {
 onMounted(() => {
   void loadResults()
   void loadAccountTreeAssist()
+  void loadTagTreeAssist()
 })
 </script>
 
@@ -1493,6 +1880,55 @@ $entry-preview-min-height: calc(7 * 1.6em + 10px + 2px);
   color: var(--ep-color-primary, var(--el-color-primary));
 }
 
+.entry-preview-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 2px;
+  padding: 0 2px 0 4px;
+  border-radius: 4px;
+  background: var(--ep-fill-color-light, var(--el-fill-color-light));
+  vertical-align: baseline;
+}
+
+.entry-preview-tag-link {
+  cursor: help;
+  color: var(--ep-color-primary, var(--el-color-primary));
+}
+
+.entry-preview-tag-remove {
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  margin: 0;
+  border: none;
+  background: none;
+  color: var(--ep-text-color-secondary, var(--el-text-color-secondary));
+}
+
+.entry-preview-tag-remove:hover {
+  color: var(--ep-color-danger, var(--el-color-danger));
+}
+
+.entry-preview-tag-add {
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 4px;
+  margin-left: 4px;
+  border: 1px dashed var(--ep-border-color, var(--el-border-color));
+  border-radius: 4px;
+  background: none;
+  color: var(--ep-text-color-secondary, var(--el-text-color-secondary));
+  vertical-align: baseline;
+}
+
+.entry-preview-tag-add:hover {
+  color: var(--ep-color-primary, var(--el-color-primary));
+  border-color: var(--ep-color-primary, var(--el-color-primary));
+}
+
 .entry-preview-plain {
   cursor: text;
 }
@@ -1701,5 +2137,107 @@ html.dark .no-category-tip {
 
 html.dark .parse-review-account-suggestion-item.is-active {
   background-color: var(--ep-fill-color-dark, var(--el-fill-color-dark));
+}
+
+.parse-review-tag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background-color: color-mix(
+    in srgb,
+    var(--ep-overlay-color-lighter, var(--el-overlay-color-lighter, #000)) 12%,
+    transparent
+  );
+}
+
+.parse-review-tag-panel {
+  background-color: var(--ep-bg-color-overlay, var(--ep-bg-color, var(--el-bg-color)));
+  border: 1px solid var(--ep-border-color, var(--el-border-color));
+  border-radius: var(--ep-border-radius-base, var(--el-border-radius-base));
+  padding: 8px;
+  box-shadow: var(--ep-box-shadow, var(--el-box-shadow));
+}
+
+.parse-review-tag-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px 8px;
+  color: var(--ep-text-color-primary, var(--el-text-color-primary));
+}
+
+.parse-review-tag-query {
+  width: 100%;
+}
+
+.parse-review-tag-suggestions {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--ep-border-color-lighter, var(--el-border-color-lighter));
+  border-radius: var(--ep-border-radius-small, var(--el-border-radius-small));
+  background-color: var(--ep-fill-color-blank, var(--el-fill-color-blank));
+}
+
+.parse-review-tag-suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--ep-text-color-regular, var(--el-text-color-regular));
+}
+
+.parse-review-tag-suggestion-name {
+  flex: 1;
+  min-width: 0;
+  font-family: Monaco, Consolas, 'Courier New', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parse-review-tag-suggestion-desc {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ep-text-color-secondary, var(--el-text-color-secondary));
+}
+
+.parse-review-tag-suggestion-item:hover,
+.parse-review-tag-suggestion-item.is-active {
+  background-color: var(--ep-fill-color-light, var(--el-fill-color-light));
+}
+
+.parse-review-tag-empty {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ep-text-color-secondary, var(--el-text-color-secondary));
+  padding: 8px;
+}
+
+.entry-preview-tag-tooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.entry-preview-tag-source-line {
+  font-size: 12px;
+}
+
+.entry-preview-tag-source-link {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  text-decoration: underline;
 }
 </style>

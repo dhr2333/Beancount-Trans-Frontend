@@ -15,6 +15,22 @@ export interface OriginalRow {
   [key: string]: any
 }
 
+export interface TagSource {
+  type: 'mapping' | 'source' | 'manual'
+  key?: string
+  mapping_type?: 'expense' | 'income' | 'asset'
+}
+
+export interface TagDetail {
+  path: string
+  sources: TagSource[]
+}
+
+export interface TagOverrides {
+  removed_paths: string[]
+  added_paths: string[]
+}
+
 /**
  * 格式化条目
  */
@@ -28,6 +44,8 @@ export interface FormattedEntry {
     score: number
   }>
   original_row?: OriginalRow
+  tag_details?: TagDetail[]
+  tag_overrides?: TagOverrides
 }
 
 /**
@@ -73,6 +91,8 @@ export interface ReparseResponse {
     key: string
     score: number
   }>
+  tag_details?: TagDetail[]
+  tag_overrides?: TagOverrides
 }
 
 /**
@@ -89,6 +109,24 @@ export interface UpdateEditResponse {
   uuid: string
   edited_formatted: string
   validation_warning?: string
+}
+
+/**
+ * 更新标签请求
+ */
+export interface UpdateTagsRequest {
+  action: 'add' | 'remove'
+  tag_path: string
+}
+
+/**
+ * 更新标签响应
+ */
+export interface UpdateTagsResponse {
+  uuid: string
+  edited_formatted: string
+  tag_details: TagDetail[]
+  tag_overrides: TagOverrides
 }
 
 /**
