@@ -547,13 +547,13 @@ const openEditCurrentMappingForRow = (row: BillEntry, rowIndex: number) => {
 }
 
 .no-category-tip {
-  color: var(--ep-text-color-placeholder);
+  color: var(--ep-text-color-placeholder, var(--el-text-color-placeholder));
   font-size: 12px;
   display: inline-block;
   line-height: 22px;
   padding: 0 9px;
   border-radius: 4px;
-  background: var(--ep-fill-color-light);
+  background: var(--ep-fill-color-light, var(--el-fill-color-light));
   vertical-align: middle;
 }
 
@@ -578,12 +578,13 @@ const openEditCurrentMappingForRow = (row: BillEntry, rowIndex: number) => {
   margin-left: 8px;
 }
 
-:deep(html.dark) .candidate-tag:hover,
-:deep(html.dark) .selected-tag.is-editable:hover {
+html.dark .candidate-tag:hover,
+html.dark .selected-tag.is-editable:hover {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
-:deep(html.dark) .no-category-tip {
-  background: var(--ep-fill-color-darker);
+html.dark .no-category-tip {
+  background: var(--ep-fill-color-dark, var(--el-fill-color-dark));
+  color: var(--ep-text-color-placeholder, var(--el-text-color-placeholder));
 }
 </style>

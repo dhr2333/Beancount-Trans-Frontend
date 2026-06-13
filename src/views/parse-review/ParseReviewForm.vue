@@ -1536,19 +1536,19 @@ $entry-preview-min-height: calc(7 * 1.6em + 10px + 2px);
 }
 
 .no-category-tip {
-  color: var(--el-text-color-placeholder);
+  color: var(--ep-text-color-placeholder, var(--el-text-color-placeholder));
   font-size: 12px;
   display: inline-block;
   line-height: 22px;
   padding: 0 9px;
   border-radius: 4px;
-  background: var(--el-fill-color-light);
+  background: var(--ep-fill-color-light, var(--el-fill-color-light));
   vertical-align: middle;
 }
 
 // 暗黑模式下：无分类建议提示更柔和、对比度更稳定
-:deep(html.dark) .no-category-tip {
-  background: var(--ep-fill-color-darker, var(--el-fill-color-darker));
+html.dark .no-category-tip {
+  background: var(--ep-fill-color-dark, var(--el-fill-color-dark));
   color: var(--ep-text-color-placeholder, var(--el-text-color-placeholder));
 }
 
