@@ -141,7 +141,18 @@ export interface ErrorEntry {
 /**
  * 确认写入错误响应
  */
-export interface ConfirmWriteErrorResponse {
+export interface ReparseAllResponse {
+  message: string
+  file_id: number
+  celery_task_id?: string
+}
+
+export interface ParseTaskStatusResponse {
+  task_id: string
+  file_id?: number
+  status: string
+  error?: string | null
+}
   error: string
   error_entries?: ErrorEntry[]
 }

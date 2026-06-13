@@ -9,7 +9,9 @@ import type {
   UpdateEditRequest,
   UpdateEditResponse,
   UpdateTagsRequest,
-  UpdateTagsResponse
+  UpdateTagsResponse,
+  ReparseAllResponse,
+  ParseTaskStatusResponse
 } from '../types/parse-review'
 
 /**
@@ -65,8 +67,17 @@ export function confirmWrite(taskId: number): Promise<{ data: { message: string;
 }
 
 /**
- * 重新解析
+ * 重新解析（异步 Celery 任务）
  */
-export function reparseAll(taskId: number): Promise<{ data: { message: string; file_id: number } }> {
+export function reparseAll(taskId: number): Promise<{ data: ReparseAllResponse }> {
   return axios.post(`/translate/parse-review/${taskId}/reparse-all`)
+}
+
+/**
+ * 查询 Celery 解析任务状态
+ */
+export function getParseTaskStatus(celeryTaskId: string): Promise<{ data: ParseTaskStatusResponse }> {
+  return axios.get('/translate/parse-task-status', {
+    params: { task_id: celeryTaskId }
+  })
 }

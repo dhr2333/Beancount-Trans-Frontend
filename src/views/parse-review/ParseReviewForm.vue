@@ -347,7 +347,8 @@ import {
   updateEntryEdit,
   patchEntryTags,
   confirmWrite,
-  reparseAll
+  reparseAll,
+  getParseTaskStatus
 } from '../../api/parse-review'
 import { fetchTagTree } from '../../api/tags'
 import { getTask } from '../../api/reconciliation'
@@ -379,6 +380,14 @@ const parseResult = ref<ParseResult | null>(null)
 
 const errorEntries = ref<Record<string, string>>({})
 const validationWarnings = ref<Record<string, string>>({})
+
+const REPARSE_POLL_INTERVAL_MS = 2000
+const REPARSE_POLL_MAX_ATTEMPTS = 150
+let reparsePollAborted = false
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms))
+}
 
 /** 与后端 /account/tree/ 及 AccountSelector 注入结构一致 */
 type AccountAssistItem = { account: string; description: string }
@@ -527,6 +536,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  reparsePollAborted = true
   window.removeEventListener('keydown', onEscapeCloseOverlay)
   window.removeEventListener('keydown', onEscapeCloseTagOverlay)
 })
@@ -1626,13 +1636,35 @@ const handleConfirmWrite = async () => {
 // 重新解析
 const handleReparseAll = async () => {
   loading.value.reparseAll = true
+  reparsePollAborted = false
   try {
-    await reparseAll(taskId.value)
-    ElMessage.success('重新解析任务已提交，稍后将自动刷新')
-    // 可以延迟刷新
-    setTimeout(() => {
-      loadResults()
-    }, 2000)
+    const response = await reparseAll(taskId.value)
+    const celeryTaskId = response.data.celery_task_id
+    if (!celeryTaskId) {
+      ElMessage.warning('未获取到解析任务 ID，请稍后手动刷新')
+      return
+    }
+
+    ElMessage.info('正在重新解析，完成后将自动刷新')
+
+    for (let attempt = 0; attempt < REPARSE_POLL_MAX_ATTEMPTS; attempt++) {
+      if (reparsePollAborted) return
+      await sleep(REPARSE_POLL_INTERVAL_MS)
+      const statusRes = await getParseTaskStatus(celeryTaskId)
+      const status = statusRes.data.status
+
+      if (status === 'pending_review') {
+        await loadResults()
+        ElMessage.success('重新解析完成')
+        return
+      }
+      if (status === 'failed' || status === 'cancelled' || status === 'needs_password') {
+        ElMessage.error(statusRes.data.error || '重新解析失败')
+        return
+      }
+    }
+
+    ElMessage.warning('解析耗时较长，请稍后手动刷新页面')
   } catch (error: any) {
     ElMessage.error(error.response?.data?.error || '重新解析失败')
   } finally {
