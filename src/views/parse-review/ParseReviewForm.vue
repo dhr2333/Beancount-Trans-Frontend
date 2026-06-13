@@ -156,14 +156,26 @@
                       ({{ candidate.score }})
                     </span>
                   </el-tag>
-                  <el-button size="small" plain @click="openCreateMappingForRow(scope.row)" class="add-mapping-btn">
+                  <el-button
+                    v-if="shouldShowParseReviewCreateMapping(scope.row)"
+                    size="small"
+                    plain
+                    @click="openCreateMappingForRow(scope.row)"
+                    class="add-mapping-btn"
+                  >
                     <el-icon><Plus /></el-icon> 新增映射
                   </el-button>
                 </div>
               </div>
               <div v-else class="candidates">
                 <span class="label muted">无候选分类</span>
-                <el-button size="small" plain @click="openCreateMappingForRow(scope.row)" class="add-mapping-btn">
+                <el-button
+                  v-if="shouldShowParseReviewCreateMapping(scope.row)"
+                  size="small"
+                  plain
+                  @click="openCreateMappingForRow(scope.row)"
+                  class="add-mapping-btn"
+                >
                   <el-icon><Plus /></el-icon> 新增映射
                 </el-button>
               </div>
@@ -352,7 +364,14 @@ import {
 } from '../../api/parse-review'
 import { fetchTagTree } from '../../api/tags'
 import { getTask } from '../../api/reconciliation'
-import type { FormattedEntry, ParseResult, ErrorEntry, TagDetail, TagSource } from '../../types/parse-review'
+import {
+  shouldShowParseReviewCreateMapping,
+  type FormattedEntry,
+  type ParseResult,
+  type ErrorEntry,
+  type TagDetail,
+  type TagSource
+} from '../../types/parse-review'
 import type { Tag } from '../../types/tag'
 import type { ScheduledTask } from '../../types/reconciliation'
 import { isReviewExpired } from '../../types/reconciliation'

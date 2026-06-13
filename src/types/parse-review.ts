@@ -153,6 +153,21 @@ export interface ParseTaskStatusResponse {
   status: string
   error?: string | null
 }
+
+export interface ConfirmWriteErrorResponse {
   error: string
   error_entries?: ErrorEntry[]
+}
+
+/**
+ * 是否显示「新增映射」按钮。
+ * 不计收支且已由内置规则解析（无映射关键字/候选）时，新增支出/收入映射无效，应隐藏。
+ */
+export function shouldShowParseReviewCreateMapping(row: FormattedEntry): boolean {
+  const txType = row.original_row?.transaction_type?.trim()
+  const isNeutralTx = txType === '/' || txType === '不计收支'
+  if (!isNeutralTx) return true
+  if (row.selected_expense_key) return true
+  if (row.expense_candidates_with_score?.length) return true
+  return false
 }
