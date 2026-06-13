@@ -323,6 +323,9 @@
           <div v-else-if="tagAssistQuery.trim()" class="parse-review-tag-empty">
             未找到匹配的标签
           </div>
+          <div v-else class="parse-review-tag-empty">
+            暂无可添加的标签
+          </div>
         </div>
       </div>
     </Teleport>
@@ -597,15 +600,34 @@ const onEscapeCloseTagOverlay = (ev: KeyboardEvent) => {
   }
 }
 
+function getEntryExistingTagPaths(row: FormattedEntry): Set<string> {
+  const paths = new Set<string>()
+  for (const detail of row.tag_details ?? []) {
+    if (detail.path) paths.add(detail.path.toLowerCase())
+  }
+  if (paths.size === 0 && row.edited_formatted) {
+    const firstLine = row.edited_formatted.split('\n')[0] ?? ''
+    const re = /#\S+/g
+    let match: RegExpExecArray | null
+    while ((match = re.exec(firstLine)) !== null) {
+      paths.add(match[0].slice(1).toLowerCase())
+    }
+  }
+  return paths
+}
+
 const overlayTagMatches = computed(() => {
   if (!tagPopover.value.visible) return []
+  const row = formattedEntries.value.find((item) => item.uuid === tagPopover.value.entryUuid)
+  const existingPaths = row ? getEntryExistingTagPaths(row) : new Set<string>()
   const q = tagAssistQuery.value.trim().toLowerCase()
-  if (!q) {
-    return flatTagsForAssist.value.filter((t) => t.enable).slice(0, 80)
-  }
-  return flatTagsForAssist.value
-    .filter((t) => t.enable && t.full_path.toLowerCase().includes(q))
-    .slice(0, 80)
+  const available = flatTagsForAssist.value.filter((t) => {
+    if (!t.enable) return false
+    if (existingPaths.has(t.full_path.toLowerCase())) return false
+    if (!q) return true
+    return t.full_path.toLowerCase().includes(q)
+  })
+  return available.slice(0, 80)
 })
 
 watch(overlayTagMatches, async () => {
