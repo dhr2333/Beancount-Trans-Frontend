@@ -636,10 +636,8 @@ function getEntryExistingTagPaths(row: FormattedEntry): Set<string> {
   }
   if (paths.size === 0 && row.edited_formatted) {
     const firstLine = row.edited_formatted.split('\n')[0] ?? ''
-    const re = /#\S+/g
-    let match: RegExpExecArray | null
-    while ((match = re.exec(firstLine)) !== null) {
-      paths.add(match[0].slice(1).toLowerCase())
+    for (const item of findHeaderTagsOutsideQuotes(firstLine)) {
+      paths.add(item.path.toLowerCase())
     }
   }
   return paths
@@ -816,21 +814,40 @@ type PreviewTextSegment = { kind: 'text'; text: string }
 type PreviewSegment = PreviewAccountSegment | PreviewTagSegment | PreviewTextSegment
 type PreviewLine = { segments: PreviewSegment[]; isHeader?: boolean }
 
-const TAG_TOKEN_RE = /#\S+/g
 const HEADER_LINE_RE = /^\d{4}-\d{2}-\d{2}/
 
-function parseHeaderLineToSegments(line: string, lineBase: number): PreviewSegment[] {
-  const matches: Array<{ start: number; end: number; path: string; text: string }> = []
-  const re = new RegExp(TAG_TOKEN_RE.source, 'g')
-  let match: RegExpExecArray | null
-  while ((match = re.exec(line)) !== null) {
-    matches.push({
-      start: match.index,
-      end: match.index + match[0].length,
-      path: match[0].slice(1),
-      text: match[0]
-    })
+function findHeaderTagsOutsideQuotes(line: string): Array<{ start: number; end: number; path: string; text: string }> {
+  const tags: Array<{ start: number; end: number; path: string; text: string }> = []
+  let inQuote = false
+  let i = 0
+  while (i < line.length) {
+    const ch = line[i]
+    if (ch === '"') {
+      inQuote = !inQuote
+      i += 1
+      continue
+    }
+    if (!inQuote && ch === '#') {
+      const rest = line.slice(i)
+      const match = /^#\S+/.exec(rest)
+      if (match) {
+        tags.push({
+          start: i,
+          end: i + match[0].length,
+          path: match[0].slice(1),
+          text: match[0]
+        })
+        i += match[0].length
+        continue
+      }
+    }
+    i += 1
   }
+  return tags
+}
+
+function parseHeaderLineToSegments(line: string, lineBase: number): PreviewSegment[] {
+  const matches = findHeaderTagsOutsideQuotes(line)
   if (!matches.length) {
     return [{ kind: 'text', text: line }]
   }
