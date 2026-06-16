@@ -4,6 +4,24 @@ import axios from '../utils/request'
 
 export type MappingType = 'expense' | 'income'
 
+const MAPPING_KEY_MAX_LENGTH = 16
+
+/** 从账单原始行的对方/商品信息生成新增映射的默认关键字 */
+export function defaultMappingKeyFromOriginalRow(originalRow?: {
+  counterparty?: string
+  commodity?: string
+}): string {
+  const counterparty = originalRow?.counterparty?.trim()
+  if (counterparty && counterparty !== '/') {
+    return counterparty.substring(0, MAPPING_KEY_MAX_LENGTH)
+  }
+  const commodity = originalRow?.commodity?.trim()
+  if (commodity) {
+    return commodity.substring(0, MAPPING_KEY_MAX_LENGTH)
+  }
+  return ''
+}
+
 interface MappingListItem {
   id: number
   key: string
@@ -11,6 +29,7 @@ interface MappingListItem {
   payer?: string | null
   expend?: { id: number } | number | null
   income?: { id: number } | number | null
+  tags?: Array<{ id: number }>
 }
 
 export interface OpenMappingOptions<T> {
@@ -34,6 +53,10 @@ function partyFromMapping(item: MappingListItem, type: MappingType): string {
   return item.payer ?? ''
 }
 
+function tagIdsFromMapping(item: MappingListItem): number[] {
+  return item.tags?.map((tag) => tag.id) ?? []
+}
+
 async function fetchMappingByKey(type: MappingType, key: string): Promise<MappingListItem | null> {
   const endpoint = type === 'expense' ? 'expense/' : 'income/'
   const response = await axios.get<MappingListItem[]>(endpoint)
@@ -47,25 +70,29 @@ export function useInlineMappingDialog() {
     visible: false,
     loading: false,
     mode: 'create' as 'create' | 'edit',
-    mappingId: null as number | null,
-    keyDisabled: false
+    mappingId: null as number | null
   })
 
   const mappingForm = ref({
     type: 'expense' as MappingType,
     key: '',
     accountId: null as number | null,
-    party: ''
+    party: '',
+    tag_ids: [] as number[]
   })
 
   const mappingRules: FormRules = {
-    key: [{ required: true, message: '请输入关键字', trigger: 'blur' }],
-    accountId: [{ required: true, message: '请选择映射账户', trigger: 'change' }]
+    key: [
+      { required: true, message: '请输入关键字', trigger: 'blur' },
+      { max: 16, message: '长度应控制在16个字符以内', trigger: 'blur' }
+    ]
   }
 
-  const mappingDialogTitle = computed(() =>
-    mappingDialog.value.mode === 'edit' ? '编辑映射' : '新增映射'
-  )
+  const mappingDialogTitle = computed(() => {
+    const typeLabel = mappingForm.value.type === 'expense' ? '支出' : '收入'
+    const action = mappingDialog.value.mode === 'edit' ? '编辑' : '新增'
+    return `${action}${typeLabel}映射`
+  })
 
   let reparseAfterSave: ((key: string) => Promise<void>) | null = null
 
@@ -85,14 +112,14 @@ export function useInlineMappingDialog() {
       type: defaults.type,
       key: defaults.key,
       accountId: null,
-      party: defaults.party
+      party: defaults.party,
+      tag_ids: []
     }
     mappingDialog.value = {
       visible: true,
       loading: false,
       mode: 'create',
-      mappingId: null,
-      keyDisabled: false
+      mappingId: null
     }
     reparseAfterSave = options.onReparse
   }
@@ -115,14 +142,14 @@ export function useInlineMappingDialog() {
           type,
           key: mapping.key,
           accountId: accountIdFromMapping(mapping, type),
-          party: partyFromMapping(mapping, type)
+          party: partyFromMapping(mapping, type),
+          tag_ids: tagIdsFromMapping(mapping)
         }
         mappingDialog.value = {
           visible: true,
           loading: false,
           mode: 'edit',
-          mappingId: mapping.id,
-          keyDisabled: true
+          mappingId: mapping.id
         }
       } else {
         ElMessage.info('未找到映射，将创建新映射')
@@ -130,14 +157,14 @@ export function useInlineMappingDialog() {
           type,
           key,
           accountId: null,
-          party: ''
+          party: '',
+          tag_ids: []
         }
         mappingDialog.value = {
           visible: true,
           loading: false,
           mode: 'create',
-          mappingId: null,
-          keyDisabled: true
+          mappingId: null
         }
       }
     } catch {
@@ -164,7 +191,7 @@ export function useInlineMappingDialog() {
     if (!reparseAfterSave) return
 
     mappingDialog.value.loading = true
-    const { type, key, accountId, party } = mappingForm.value
+    const { type, key, accountId, party, tag_ids } = mappingForm.value
     const selectedKey = key.trim()
 
     try {
@@ -174,13 +201,15 @@ export function useInlineMappingDialog() {
             key: selectedKey,
             expend_id: accountId,
             payee: party,
-            currency: 'CNY'
+            currency: 'CNY',
+            tag_ids
           })
         } else {
           await axios.put(`income/${mappingDialog.value.mappingId}/`, {
             key: selectedKey,
             income_id: accountId,
-            payer: party
+            payer: party,
+            tag_ids
           })
         }
         ElMessage.success('映射更新成功')
@@ -190,13 +219,15 @@ export function useInlineMappingDialog() {
             key: selectedKey,
             expend_id: accountId,
             payee: party,
-            currency: 'CNY'
+            currency: 'CNY',
+            tag_ids
           })
         } else {
           await axios.post('/income/', {
             key: selectedKey,
             income_id: accountId,
-            payer: party
+            payer: party,
+            tag_ids
           })
         }
         ElMessage.success('映射创建成功')

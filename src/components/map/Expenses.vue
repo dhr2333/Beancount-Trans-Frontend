@@ -80,7 +80,8 @@
       <el-table-column label="标签" min-width="180" width="auto">
         <template #default="{ row }">
           <div v-if="row.tags && row.tags.length > 0" class="tags-cell">
-            <el-tag v-for="tag in row.tags" :key="tag.id" size="small" style="margin-right: 4px; margin-bottom: 4px;">
+            <el-tag v-for="tag in row.tags" :key="tag.id" size="small"
+              :type="tag.enable !== false ? undefined : 'info'" style="margin-right: 4px; margin-bottom: 4px;">
               {{ tag.full_path }}
             </el-tag>
           </div>
@@ -159,7 +160,6 @@
 
       <el-form-item>
         <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
-        <el-button @click="resetForm(ruleFormRef)">重置</el-button>
       </el-form-item>
     </el-form>
   </el-dialog>
@@ -188,7 +188,8 @@
       </el-form-item>
 
       <el-form-item label="标签" prop="tag_ids">
-        <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签（可多选）" />
+        <TagSelector v-model="ruleForm.tag_ids" :known-tags="editKnownTags" multiple :show-preview="false"
+          placeholder="请选择标签（可多选）" />
       </el-form-item>
 
       <el-form-item>
@@ -272,23 +273,29 @@
   <!-- 批量修改账户对话框 -->
   <el-dialog v-model="batchUpdateAccountDialog" title="批量修改支出映射账户" width="600px" :close-on-click-modal="false">
     <div class="batch-update-content">
-      <!-- 提示信息 -->
-      <el-alert :title="`您即将修改 ${selectedItems.length} 个支出映射的账户设置`" type="info" :closable="false" show-icon
+      <el-alert :title="`您即将修改 ${selectedItems.length} 个支出映射的映射账户`" type="info" :closable="false" show-icon
         style="margin-bottom: 20px;">
-        <template #default>
-          <p>请选择要修改的字段，留空的字段将保持不变。</p>
-        </template>
       </el-alert>
 
-      <!-- 表单 -->
+      <div class="delete-items-list">
+        <div v-for="(item, index) in selectedItems" :key="item.id" class="delete-item">
+          <div class="item-info">
+            <div class="item-main">
+              <el-tag type="primary" size="small">{{ item.key }}</el-tag>
+              <span v-if="item.payee" class="item-payee">{{ item.payee }}</span>
+            </div>
+            <div class="item-account">
+              {{ typeof item.expend === 'object' ? item.expend?.account : item.expend }}
+            </div>
+          </div>
+          <div class="item-index">{{ index + 1 }}</div>
+        </div>
+      </div>
+
       <el-form ref="batchUpdateFormRef" :model="batchUpdateForm" label-width="100px" status-icon>
         <el-form-item label="映射账户">
-          <AccountSelector v-model="batchUpdateForm.expend" placeholder="请选择或搜索账户（留空保持不变）"
+          <AccountSelector v-model="batchUpdateForm.expend" placeholder="请选择目标映射账户"
             @change="handleBatchAccountChange" />
-        </el-form-item>
-
-        <el-form-item label="货币代码">
-          <el-input v-model="batchUpdateForm.currency" placeholder="如 CNY、USD（留空保持不变）" clearable />
         </el-form-item>
       </el-form>
 
@@ -319,7 +326,7 @@
           取消
         </el-button>
         <el-button type="primary" @click="confirmBatchUpdateAccount" :loading="batchUpdateLoading"
-          :disabled="batchUpdateLoading || (!batchUpdateForm.expend && !batchUpdateForm.currency)">
+          :disabled="batchUpdateLoading || !batchUpdateForm.expend">
           {{ batchUpdateLoading ? '更新中...' : '确认更新' }}
         </el-button>
       </div>
@@ -350,7 +357,6 @@ import { getAccountTypeColor } from '~/utils/accountTypeColor'
 
 // const apiUrl = import.meta.env.VITE_API_URL;
 const dialogError = ref(false)
-const lastEditedData = ref<Partial<Expense> | null>(null)
 // console.log(import.meta.env);
 
 interface Expense {
@@ -462,34 +468,20 @@ const handleSearch = () => {
 
 // 新增
 const dialogAdd = ref(false)
+const editKnownTags = ref<Expense['tags']>([])
 
 const handleAdd = () => {
-  if (lastEditedData.value) {
-    // 使用上一次编辑的值
-    const expendId = typeof lastEditedData.value.expend === 'object'
-      ? lastEditedData.value.expend?.id
-      : lastEditedData.value.expend
-
-    ruleForm.value = {
-      key: lastEditedData.value.key || '',
-      payee: lastEditedData.value.payee ?? null,
-      expend: typeof expendId === 'number' ? expendId : null,
-      currency: lastEditedData.value.currency || null,
-      tag_ids: lastEditedData.value.tags?.map(tag => tag.id) ?? []
-    };
-  } else {
-    // 没有编辑记录则重置
-    ruleForm.value = {
-      key: '',
-      payee: null,
-      expend: null,
-      currency: null,
-      tag_ids: []
-    };
-    if (ruleFormRef.value) {
-      ruleFormRef.value.resetFields();
-    }
+  editKnownTags.value = []
+  ruleForm.value = {
+    key: '',
+    payee: null,
+    expend: null,
+    currency: null,
+    tag_ids: []
   };
+  if (ruleFormRef.value) {
+    ruleFormRef.value.resetFields();
+  }
   dialogAdd.value = true;
 }
 
@@ -519,12 +511,6 @@ const rules = ref<FormRules>({
     { required: false, message: '请选择货币', trigger: 'change' },
   ],
 })
-
-// 弹窗重置
-const resetForm = (formEl: FormInstance | undefined) => {
-  if (!formEl) return
-  formEl.resetFields()
-}
 
 // 新增确认
 const submitForm = async (formEl: FormInstance | undefined) => {
@@ -689,14 +675,12 @@ const handleImport = () => {
 const dialogEdit = ref(false)
 
 const handleEdit = (index: number, row: Expense) => {
-  const { id, enable, ...rest } = row;
-  lastEditedData.value = rest;
-
   ruleForm.value.key = row.key
   ruleForm.value.payee = row.payee !== null ? row.payee : null // 为了解决编辑时payee为null时的问题;
   ruleForm.value.expend = typeof row.expend === 'object' ? row.expend?.id : (typeof row.expend === 'number' ? row.expend : null)
   ruleForm.value.currency = row.currency || null
   ruleForm.value.tag_ids = row.tags?.map(tag => tag.id) || []
+  editKnownTags.value = row.tags || []
   // ruleForm.value.enable = row.enable
   // ruleForm.value.tag = row.tag
   // ruleForm.value.classification = row.classification
@@ -875,8 +859,7 @@ const batchUpdateProgress = ref(0)
 const batchUpdateErrors = ref<string[]>([])
 const batchUpdateFormRef = ref<FormInstance>()
 const batchUpdateForm = ref({
-  expend: null as number | null,
-  currency: null as string | null
+  expend: null as number | null
 })
 
 // 批量删除
@@ -953,8 +936,7 @@ const handleBatchUpdateAccount = () => {
   batchUpdateProgress.value = 0
   // 重置表单
   batchUpdateForm.value = {
-    expend: null,
-    currency: null
+    expend: null
   }
 }
 
@@ -980,8 +962,7 @@ const confirmBatchUpdateAccount = async () => {
     // 准备批量更新数据
     const updateData = {
       expense_ids: selectedItems.value.map(item => item.id),
-      expend_id: batchUpdateForm.value.expend,
-      currency: batchUpdateForm.value.currency
+      expend_id: batchUpdateForm.value.expend
     }
 
     console.log('批量更新数据:', updateData)
@@ -1029,8 +1010,7 @@ const cancelBatchUpdateAccount = () => {
   batchUpdateErrors.value = []
   batchUpdateProgress.value = 0
   batchUpdateForm.value = {
-    expend: null,
-    currency: null
+    expend: null
   }
 }
 

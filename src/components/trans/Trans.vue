@@ -110,16 +110,19 @@ or
       </el-table-column>
     </el-table>
   </div>
-  <el-dialog v-model="mappingDialog.visible" :title="mappingDialogTitle" width="500px">
+  <el-dialog v-model="mappingDialog.visible" :title="mappingDialogTitle" width="600px">
     <el-form ref="mappingFormRef" :model="mappingForm" :rules="mappingRules" label-width="100px">
       <el-form-item label="关键字" prop="key">
-        <el-input v-model="mappingForm.key" placeholder="请输入关键字" :disabled="mappingDialog.keyDisabled" />
+        <el-input v-model="mappingForm.key" placeholder="请输入关键字" />
       </el-form-item>
       <el-form-item label="映射账户" prop="accountId">
         <AccountSelector v-model="mappingForm.accountId" placeholder="请选择或搜索账户" />
       </el-form-item>
       <el-form-item :label="mappingForm.type === 'expense' ? '对方' : '付款方'" prop="party">
         <el-input v-model="mappingForm.party" :placeholder="mappingForm.type === 'expense' ? '如腾讯、星巴克' : '选填：付款方信息'" />
+      </el-form-item>
+      <el-form-item label="标签" prop="tag_ids">
+        <TagSelector v-model="mappingForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签" />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -139,7 +142,8 @@ import axios from '../../utils/request';
 import { hasAuthTokens } from '../../utils/auth';
 import type { UploadFile, UploadFiles } from 'element-plus'
 import AccountSelector from '../common/AccountSelector.vue';
-import { useInlineMappingDialog } from '../../composables/useInlineMappingDialog';
+import TagSelector from '../common/TagSelector.vue';
+import { useInlineMappingDialog, defaultMappingKeyFromOriginalRow } from '../../composables/useInlineMappingDialog';
 
 
 const input = ref()
@@ -186,6 +190,8 @@ interface BillEntry {
   id: string;
   formatted: string;
   ai_choose: string;
+  counterparty?: string;
+  commodity?: string;
   ai_candidates?: Array<{
     key: string;
     score?: number;
@@ -369,7 +375,9 @@ const handleAiChoose = async (rowIndex: number, key: string) => {
       responseList.value[rowIndex] = {
         ...responseList.value[rowIndex], // 保留原有属性
         formatted: updatedData.formatted, // 更新格式化内容
-        ai_choose: updatedData.ai_choose || key
+        ai_choose: updatedData.ai_choose || key,
+        counterparty: updatedData.counterparty ?? responseList.value[rowIndex].counterparty,
+        commodity: updatedData.commodity ?? responseList.value[rowIndex].commodity
       };
 
       // 更新整个结果文本框
@@ -391,7 +399,10 @@ const inferTransMappingType = (row: BillEntry) => {
 
 const getTransCreateDefaults = (row: BillEntry) => {
   const type = inferTransMappingType(row)
-  const key = row.ai_choose || row.ai_candidates?.[0]?.key || ''
+  const key = defaultMappingKeyFromOriginalRow({
+    counterparty: row.counterparty,
+    commodity: row.commodity
+  })
   return { type, key, party: '' }
 }
 
@@ -408,6 +419,8 @@ const applyTransReparse = async (rowIndex: number, entryId: string, selectedKey:
     ...responseList.value[rowIndex],
     formatted: updatedData.formatted,
     ai_choose: updatedData.ai_choose || selectedKey,
+    counterparty: updatedData.counterparty ?? responseList.value[rowIndex].counterparty,
+    commodity: updatedData.commodity ?? responseList.value[rowIndex].commodity,
     ai_candidates: Array.isArray(updatedData.ai_candidates)
       ? updatedData.ai_candidates
       : responseList.value[rowIndex].ai_candidates
@@ -534,13 +547,13 @@ const openEditCurrentMappingForRow = (row: BillEntry, rowIndex: number) => {
 }
 
 .no-category-tip {
-  color: var(--ep-text-color-placeholder);
+  color: var(--ep-text-color-placeholder, var(--el-text-color-placeholder));
   font-size: 12px;
   display: inline-block;
   line-height: 22px;
   padding: 0 9px;
   border-radius: 4px;
-  background: var(--ep-fill-color-light);
+  background: var(--ep-fill-color-light, var(--el-fill-color-light));
   vertical-align: middle;
 }
 
@@ -565,12 +578,13 @@ const openEditCurrentMappingForRow = (row: BillEntry, rowIndex: number) => {
   margin-left: 8px;
 }
 
-:deep(html.dark) .candidate-tag:hover,
-:deep(html.dark) .selected-tag.is-editable:hover {
+html.dark .candidate-tag:hover,
+html.dark .selected-tag.is-editable:hover {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
-:deep(html.dark) .no-category-tip {
-  background: var(--ep-fill-color-darker);
+html.dark .no-category-tip {
+  background: var(--ep-fill-color-dark, var(--el-fill-color-dark));
+  color: var(--ep-text-color-placeholder, var(--el-text-color-placeholder));
 }
 </style>

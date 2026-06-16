@@ -86,6 +86,7 @@
                 <template #default="{ row }">
                     <div v-if="row.tags && row.tags.length > 0" class="tags-cell">
                         <el-tag v-for="tag in row.tags" :key="tag.id" size="small"
+                            :type="tag.enable !== false ? undefined : 'info'"
                             style="margin-right: 4px; margin-bottom: 4px;">
                             {{ tag.full_path }}
                         </el-tag>
@@ -124,6 +125,7 @@
                     <div class="batch-buttons">
                         <el-button size="small" @click="handleBatchEnable">批量启用</el-button>
                         <el-button size="small" @click="handleBatchDisable">批量禁用</el-button>
+                        <el-button size="small" type="primary" @click="handleBatchUpdateAccount">批量修改账户</el-button>
                         <el-button size="small" type="danger" @click="handleBatchDelete">批量删除</el-button>
                     </div>
                 </template>
@@ -160,7 +162,6 @@
 
             <el-form-item>
                 <el-button type="primary" @click="submitForm(ruleFormRef)">新增</el-button>
-                <el-button @click="resetForm(ruleFormRef)">重置</el-button>
             </el-form-item>
         </el-form>
     </el-dialog>
@@ -190,7 +191,8 @@
             </el-form-item> -->
 
             <el-form-item label="关联标签" prop="tag_ids">
-                <TagSelector v-model="ruleForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签（可多选）" />
+                <TagSelector v-model="ruleForm.tag_ids" :known-tags="editKnownTags" multiple :show-preview="false"
+                    placeholder="请选择标签（可多选）" />
             </el-form-item>
 
             <el-form-item>
@@ -272,6 +274,67 @@
         </template>
     </el-dialog>
 
+    <!-- 批量修改账户对话框 -->
+    <el-dialog v-model="batchUpdateAccountDialog" title="批量修改收入映射账户" width="600px" :close-on-click-modal="false">
+        <div class="batch-update-content">
+            <el-alert :title="`您即将修改 ${selectedItems.length} 个收入映射的映射账户`" type="info" :closable="false" show-icon
+                style="margin-bottom: 20px;">
+            </el-alert>
+
+            <div class="delete-items-list">
+                <div v-for="(item, index) in selectedItems" :key="item.id" class="delete-item">
+                    <div class="item-info">
+                        <div class="item-main">
+                            <el-tag type="primary" size="small">{{ item.key }}</el-tag>
+                            <span v-if="item.payer" class="item-payer">{{ item.payer }}</span>
+                        </div>
+                        <div class="item-account">
+                            {{ typeof item.income === 'object' ? item.income?.account : item.income }}
+                        </div>
+                    </div>
+                    <div class="item-index">{{ index + 1 }}</div>
+                </div>
+            </div>
+
+            <el-form ref="batchUpdateFormRef" :model="batchUpdateForm" label-width="100px" status-icon>
+                <el-form-item label="映射账户">
+                    <AccountSelector v-model="batchUpdateForm.income" placeholder="请选择目标映射账户"
+                        @change="handleBatchAccountChange" />
+                </el-form-item>
+            </el-form>
+
+            <div v-if="batchUpdateLoading" class="update-progress">
+                <el-progress :percentage="batchUpdateProgress"
+                    :status="batchUpdateProgress === 100 ? 'success' : undefined" :stroke-width="8" />
+                <p class="progress-text">正在更新映射... {{ batchUpdateProgress }}%</p>
+            </div>
+
+            <div v-if="batchUpdateErrors.length > 0" class="update-errors">
+                <el-alert title="部分更新失败" type="error" :closable="false" show-icon>
+                    <template #default>
+                        <ul class="error-list">
+                            <li v-for="error in batchUpdateErrors" :key="error" class="error-item">
+                                {{ error }}
+                            </li>
+                        </ul>
+                    </template>
+                </el-alert>
+            </div>
+        </div>
+
+        <template #footer>
+            <div class="dialog-footer">
+                <el-button @click="cancelBatchUpdateAccount" :disabled="batchUpdateLoading">
+                    取消
+                </el-button>
+                <el-button type="primary" @click="confirmBatchUpdateAccount" :loading="batchUpdateLoading"
+                    :disabled="batchUpdateLoading || !batchUpdateForm.income">
+                    {{ batchUpdateLoading ? '更新中...' : '确认更新' }}
+                </el-button>
+            </div>
+        </template>
+    </el-dialog>
+
     <!-- <el-dialog v-model="dialogError" title="操作失败" width="30%">
         <el-icon>
             <WarningFilled />
@@ -298,7 +361,6 @@ import { getAccountTypeColor } from '~/utils/accountTypeColor'
 
 const dialogError = ref(false)
 const loading = ref(false)
-const lastEditedData = ref<Partial<Income> | null>(null)
 
 // interface Currency {
 //     id: number
@@ -409,30 +471,19 @@ const handleSearch = () => {
 
 // 新增
 const dialogAdd = ref(false)
+const editKnownTags = ref<Income['tags']>([])
 
 const handleAdd = () => {
-    if (lastEditedData.value) {
-        // 使用上一次编辑的值
-        ruleForm.value = {
-            key: lastEditedData.value.key || '',
-            payer: lastEditedData.value.payer ?? null,
-            income: lastEditedData.value.income_id || null,
-            tag_ids: lastEditedData.value.tags?.map(tag => tag.id) ?? []
-            // currency_id: lastEditedData.value.currency_ids?.[0] || null
-        };
-    } else {
-        // 没有编辑记录则重置
-        ruleForm.value = {
-            key: '',
-            payer: null,
-            income: null,
-            tag_ids: []
-            // currency_id: null
-        };
-        if (ruleFormRef.value) {
-            ruleFormRef.value.resetFields();
-        }
+    editKnownTags.value = []
+    ruleForm.value = {
+        key: '',
+        payer: null,
+        income: null,
+        tag_ids: []
     };
+    if (ruleFormRef.value) {
+        ruleFormRef.value.resetFields();
+    }
     dialogAdd.value = true;
 }
 
@@ -463,13 +514,6 @@ const rules = ref<FormRules>({
     // ],
 })
 
-// 弹窗重置
-const resetForm = (formEl: FormInstance | undefined) => {
-    if (!formEl) return
-    formEl.resetFields()
-}
-
-
 // 新增确认
 const submitForm = async (formEl: FormInstance | undefined) => {
     if (!formEl) return
@@ -497,7 +541,6 @@ const submitForm = async (formEl: FormInstance | undefined) => {
                         ElMessage.success('新增成功')
                         dialogAdd.value = false
                         fetchData() // 新增刷新
-                        resetForm(formEl) // 重置表单
                         // console.log(response.data);
                     })
                     .catch(error => {
@@ -626,13 +669,11 @@ const handleImport = () => {
 const dialogEdit = ref(false)
 
 const handleEdit = (index: number, row: Income) => {
-    const { id, enable, ...rest } = row;
-    lastEditedData.value = rest;
-
     ruleForm.value.key = row.key
     ruleForm.value.payer = row.payer !== null ? row.payer : null
     ruleForm.value.income = typeof row.income === 'object' && row.income ? row.income.id : (typeof row.income === 'number' ? row.income : null)
     ruleForm.value.tag_ids = row.tags?.map(tag => tag.id) || []
+    editKnownTags.value = row.tags || []
     dialogEdit.value = true
     selectedId.value = row.id
     // console.log(index, row)
@@ -798,6 +839,16 @@ const batchDeleteLoading = ref(false)
 const batchDeleteProgress = ref(0)
 const batchDeleteErrors = ref<string[]>([])
 
+// 批量修改账户相关状态
+const batchUpdateAccountDialog = ref(false)
+const batchUpdateLoading = ref(false)
+const batchUpdateProgress = ref(0)
+const batchUpdateErrors = ref<string[]>([])
+const batchUpdateFormRef = ref<FormInstance>()
+const batchUpdateForm = ref({
+    income: null as number | null
+})
+
 // 批量删除
 const handleBatchDelete = () => {
     if (selectedItems.value.length === 0) return
@@ -862,6 +913,67 @@ const cancelBatchDelete = () => {
     batchDeleteDialog.value = false
     batchDeleteErrors.value = []
     batchDeleteProgress.value = 0
+}
+
+const handleBatchUpdateAccount = () => {
+    if (selectedItems.value.length === 0) return
+    batchUpdateAccountDialog.value = true
+    batchUpdateErrors.value = []
+    batchUpdateProgress.value = 0
+    batchUpdateForm.value = { income: null }
+}
+
+const handleBatchAccountChange = () => {}
+
+const confirmBatchUpdateAccount = async () => {
+    if (selectedItems.value.length === 0 || !batchUpdateForm.value.income) return
+
+    batchUpdateLoading.value = true
+    batchUpdateProgress.value = 0
+    batchUpdateErrors.value = []
+
+    const totalItems = selectedItems.value.length
+    const errors: string[] = []
+
+    try {
+        const response = await axios.post('income/batch_update_account/', {
+            income_ids: selectedItems.value.map(item => item.id),
+            income_id: batchUpdateForm.value.income
+        })
+
+        const successCount = response.data?.updated_count ?? 0
+        batchUpdateProgress.value = 100
+
+        if (successCount === totalItems) {
+            ElMessage.success(`成功更新 ${successCount} 个收入映射`)
+            batchUpdateAccountDialog.value = false
+            await fetchData()
+            selectedItems.value = []
+        } else {
+            ElMessage.warning(`成功更新 ${successCount} 个映射，${totalItems - successCount} 个失败`)
+            batchUpdateErrors.value = [`${totalItems - successCount} 个映射更新失败`]
+        }
+    } catch (error: any) {
+        console.error('批量更新账户失败:', error)
+        if (error.response?.data?.error) {
+            errors.push(error.response.data.error)
+        } else if (error.response?.data?.detail) {
+            errors.push(error.response.data.detail)
+        } else {
+            errors.push('批量更新过程中发生未知错误')
+        }
+        batchUpdateErrors.value = errors
+        ElMessage.error('批量更新失败')
+    } finally {
+        batchUpdateLoading.value = false
+    }
+}
+
+const cancelBatchUpdateAccount = () => {
+    batchUpdateAccountDialog.value = false
+    batchUpdateErrors.value = []
+    batchUpdateProgress.value = 0
+    batchUpdateForm.value = { income: null }
 }
 
 // 高级排序方法：处理数字、英文和中文混合内容
@@ -1012,8 +1124,18 @@ const sortByAccount = (a: Income, b: Income): number => {
 }
 
 /* 批量删除对话框样式 */
-.batch-delete-content {
+.batch-delete-content,
+.batch-update-content {
     padding: 10px 0;
+}
+
+.update-progress {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.update-errors {
+    margin-top: 20px;
 }
 
 .delete-items-list {
