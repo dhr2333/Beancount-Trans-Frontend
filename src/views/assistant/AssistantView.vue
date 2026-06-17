@@ -67,7 +67,25 @@
         <div class="message-bubble">
           <div class="message-role">{{ msg.role === 'user' ? '你' : '助手' }}</div>
           <div v-if="msg.role === 'user'" class="message-content message-content--user">{{ msg.content }}</div>
-          <MarkdownContent v-else :content="msg.content" class="message-content message-content--assistant" />
+          <template v-else>
+            <div
+              v-if="msg.streaming"
+              class="message-content message-content--assistant message-content--streaming"
+            >
+              <template v-if="!msg.content">
+                <span class="status-hint">{{ statusHint(msg.status) }}</span>
+              </template>
+              <template v-else>
+                <span class="streaming-text">{{ msg.content }}</span>
+                <span class="streaming-cursor">▍</span>
+              </template>
+            </div>
+            <MarkdownContent
+              v-else
+              :content="msg.content"
+              class="message-content message-content--assistant"
+            />
+          </template>
           <el-collapse v-if="msg.role === 'assistant' && msg.queries?.length" class="query-collapse">
             <el-collapse-item title="查看查询详情" name="queries">
               <div v-for="(q, qi) in msg.queries" :key="qi" class="query-block">
@@ -76,13 +94,6 @@
               </div>
             </el-collapse-item>
           </el-collapse>
-        </div>
-      </div>
-
-      <div v-if="loading" class="message-row assistant">
-        <div class="message-bubble loading-bubble">
-          <el-icon class="is-loading"><Loading /></el-icon>
-          <span>正在查询账本...</span>
         </div>
       </div>
     </div>
@@ -98,8 +109,14 @@
         @keydown.enter.exact.prevent="handleSend"
       />
       <el-button
+        v-if="loading"
+        @click="stop"
+      >
+        停止
+      </el-button>
+      <el-button
+        v-else
         type="primary"
-        :loading="loading"
         :disabled="!canChat || !inputText.trim()"
         @click="handleSend"
       >
@@ -111,9 +128,10 @@
 
 <script lang="ts" setup>
 import { nextTick, onMounted, ref, watch } from 'vue'
-import { ChatDotRound, Loading } from '@element-plus/icons-vue'
+import { ChatDotRound } from '@element-plus/icons-vue'
 import MarkdownContent from '../../components/assistant/MarkdownContent.vue'
 import { useAssistantChat } from '../../composables/useAssistantChat'
+import type { AssistantPhase } from '../../types/assistant'
 
 const {
   messages,
@@ -125,8 +143,15 @@ const {
   exampleQuestions,
   fetchStatus,
   send,
+  stop,
   clearMessages,
 } = useAssistantChat()
+
+function statusHint(phase?: AssistantPhase): string {
+  if (phase === 'querying') return '正在查询账本...'
+  if (phase === 'writing') return ''
+  return '正在思考...'
+}
 
 const inputText = ref('')
 const chatContainerRef = ref<HTMLElement | null>(null)
@@ -287,13 +312,29 @@ onMounted(() => {
   &--user {
     white-space: pre-wrap;
   }
+
+  &--streaming {
+    white-space: pre-wrap;
+  }
 }
 
-.loading-bubble {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.status-hint {
   color: var(--ep-text-color-secondary);
+}
+
+.streaming-text {
+  white-space: pre-wrap;
+}
+
+.streaming-cursor {
+  animation: blink 1s step-end infinite;
+  color: var(--ep-color-primary);
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
 }
 
 .query-collapse {
