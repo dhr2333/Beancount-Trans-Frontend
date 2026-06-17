@@ -5,6 +5,9 @@
       <el-menu-item index="platform-ledger" @click="openFavaInstance">
         Fava 专业报表
       </el-menu-item>
+      <router-link to="/assistant" class="no-underline">
+        <el-menu-item index="/assistant">AI 账本助手</el-menu-item>
+      </router-link>
       <!-- <el-menu-item index="official-ledger"
         @click="openExternal('https://fava.pythonanywhere.com/example-beancount-file/income_statement/')">
         案例账本

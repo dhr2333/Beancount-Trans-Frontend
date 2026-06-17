@@ -19,6 +19,8 @@ import ReconciliationList from "./views/reconciliation/ReconciliationList.vue"
 import ReconciliationForm from "./views/reconciliation/ReconciliationForm.vue"
 // 解析审核功能
 import ParseReviewForm from "./views/parse-review/ParseReviewForm.vue"
+// AI 账本助手
+import AssistantView from "./views/assistant/AssistantView.vue"
 
 // 配置路由
 const router = createRouter({
@@ -45,6 +47,8 @@ const router = createRouter({
     { path: '/reconciliation/:id', name: "reconciliationForm", component: ReconciliationForm },
     // 解析审核功能
     { path: '/parse-review/:taskId', name: "parseReviewForm", component: ParseReviewForm },
+    // AI 账本助手
+    { path: '/assistant', name: "assistant", component: AssistantView },
     { path: '/login', name: "login", component: Login },
     { path: '/phone-binding', name: "phoneBinding", component: PhoneBinding },
     { path: '/settings', name: "settings", component: Settings },

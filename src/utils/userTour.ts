@@ -147,8 +147,9 @@ const driverObj = driver({
     {
       element: '#tour-ledger-menu',
       popover: {
-        title: '📊 查看财务报表',
-        description: '恭喜完成新手引导！点击"财务报表" → "Fava 专业报表"，查看您的可视化财务报表。',
+        title: '📊 查看账本',
+        description:
+          '引导完成！「财务报表」→「Fava 专业报表」看图表，或「AI 账本助手」用自然语言查账。',
         side: 'bottom',
         align: 'start',
         disableButtons: ['previous'], // 禁用 Previous 按钮，使用与步骤一 Previous 相同的效果

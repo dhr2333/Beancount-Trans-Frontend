@@ -11,6 +11,21 @@ const apiUrl = import.meta.env.DEV
     ? (import.meta.env.VITE_API_URL || '/api')
     : '/api';
 
+export function getApiBaseUrl(): string {
+    return apiUrl;
+}
+
+export function getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json;charset=UTF-8',
+    };
+    const token = localStorage.getItem('access');
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+    return headers;
+}
+
 // 刷新令牌的函数
 const refreshToken = async () => {
     const refresh = localStorage.getItem('refresh');
@@ -110,5 +125,40 @@ instance.interceptors.response.use(
         return Promise.reject(error);
     }
 );
+
+export async function fetchWithAuth(
+    path: string,
+    init: RequestInit = {},
+    retry = true,
+): Promise<Response> {
+    const url = path.startsWith('http') ? path : `${apiUrl}${path}`;
+    const headers = new Headers(init.headers);
+    const token = localStorage.getItem('access');
+    if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    const response = await fetch(url, {
+        ...init,
+        headers,
+        credentials: init.credentials ?? 'include',
+    });
+
+    if (response.status === 401 && retry) {
+        try {
+            const newToken = await refreshToken();
+            headers.set('Authorization', `Bearer ${newToken}`);
+            return fetch(url, {
+                ...init,
+                headers,
+                credentials: init.credentials ?? 'include',
+            });
+        } catch {
+            throw response;
+        }
+    }
+
+    return response;
+}
 
 export default instance;
