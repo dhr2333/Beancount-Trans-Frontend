@@ -66,7 +66,8 @@
       <div v-for="(msg, index) in messages" :key="index" class="message-row" :class="msg.role">
         <div class="message-bubble">
           <div class="message-role">{{ msg.role === 'user' ? '你' : '助手' }}</div>
-          <div class="message-content">{{ msg.content }}</div>
+          <div v-if="msg.role === 'user'" class="message-content message-content--user">{{ msg.content }}</div>
+          <MarkdownContent v-else :content="msg.content" class="message-content message-content--assistant" />
           <el-collapse v-if="msg.role === 'assistant' && msg.queries?.length" class="query-collapse">
             <el-collapse-item title="查看查询详情" name="queries">
               <div v-for="(q, qi) in msg.queries" :key="qi" class="query-block">
@@ -111,6 +112,7 @@
 <script lang="ts" setup>
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { ChatDotRound, Loading } from '@element-plus/icons-vue'
+import MarkdownContent from '../../components/assistant/MarkdownContent.vue'
 import { useAssistantChat } from '../../composables/useAssistantChat'
 
 const {
@@ -278,10 +280,13 @@ onMounted(() => {
 }
 
 .message-content {
-  white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.6;
   color: var(--ep-text-color-primary);
+
+  &--user {
+    white-space: pre-wrap;
+  }
 }
 
 .loading-bubble {

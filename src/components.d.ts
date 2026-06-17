@@ -73,6 +73,7 @@ declare module '@vue/runtime-core' {
     Logos: typeof import('./components/Logos.vue')['default']
     MappingManagement: typeof import('./components/map/MappingManagement.vue')['default']
     MappingTemplates: typeof import('./components/template/MappingTemplates.vue')['default']
+    MarkdownContent: typeof import('./components/assistant/MarkdownContent.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     TagManagement: typeof import('./components/config/TagManagement.vue')['default']
