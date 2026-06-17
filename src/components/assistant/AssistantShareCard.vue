@@ -42,7 +42,7 @@ const showTurnNumber = computed(() => props.turns.length > 1)
 
     <div class="share-card__footer">
       <p class="share-card__notice">
-        隐私提示：本图可能包含个人账本信息，请勿随意分享给不熟悉的人。
+        隐私提示：本图可能包含个人账本信息，请勿随意分享给陌生人。
       </p>
       <p class="share-card__notice">
         以上内容由 AI 生成，仅供参考，请注意甄别。

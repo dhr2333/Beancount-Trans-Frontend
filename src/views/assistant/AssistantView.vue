@@ -72,12 +72,14 @@
           'share-selectable': shareSelectMode && canShareAssistantMessage(msg),
           'is-selected': shareSelectMode && selectedIndices.has(index),
         }"
+        @click="handleShareRowClick(index, msg)"
       >
         <el-checkbox
           v-if="shareSelectMode && canShareAssistantMessage(msg)"
           class="share-checkbox"
           :model-value="selectedIndices.has(index)"
           :disabled="sharing"
+          @click.stop
           @change="(val: CheckboxValueType) => toggleShareSelection(index, val === true)"
         />
         <div class="message-bubble">
@@ -104,6 +106,7 @@
             <div
               v-if="msg.role === 'assistant' && !msg.streaming && msg.content"
               class="feedback-bar"
+              @click.stop
             >
               <el-button
                 size="small"
@@ -148,7 +151,11 @@
               </el-button>
             </div>
           </template>
-          <el-collapse v-if="msg.role === 'assistant' && msg.queries?.length" class="query-collapse">
+          <el-collapse
+            v-if="msg.role === 'assistant' && msg.queries?.length"
+            class="query-collapse"
+            @click.stop
+          >
             <el-collapse-item title="查看查询详情" name="queries">
               <div v-for="(q, qi) in msg.queries" :key="qi" class="query-block">
                 <pre class="query-bql">{{ q.bql }}</pre>
@@ -223,7 +230,7 @@ import {
   validateShareTurnCount,
 } from '../../utils/assistantShare'
 import { captureElementAsPng, sharePngBlob } from '../../utils/shareImage'
-import type { AssistantPhase, AssistantShareTurn } from '../../types/assistant'
+import type { AssistantPhase, AssistantShareTurn, ChatMessage } from '../../types/assistant'
 
 const {
   messages,
@@ -294,6 +301,13 @@ function toggleShareSelection(index: number, checked: boolean) {
     next.delete(index)
   }
   selectedIndices.value = next
+}
+
+function handleShareRowClick(index: number, msg: ChatMessage) {
+  if (!shareSelectMode.value || !canShareAssistantMessage(msg) || sharing.value) {
+    return
+  }
+  toggleShareSelection(index, !selectedIndices.value.has(index))
 }
 
 async function renderAndShare(turns: AssistantShareTurn[]) {
@@ -514,6 +528,7 @@ onMounted(() => {
   &.share-selectable {
     align-items: flex-start;
     gap: 8px;
+    cursor: pointer;
 
     &.is-selected .message-bubble {
       border-color: var(--ep-color-primary);
