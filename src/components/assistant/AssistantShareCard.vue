@@ -20,7 +20,7 @@ const showTurnNumber = computed(() => props.turns.length > 1)
 
 <template>
   <div class="assistant-share-card">
-    <div class="share-card__header">AI 账本助手</div>
+    <div class="share-card__header">Beancount-Trans</div>
 
     <template v-for="(turn, index) in turns" :key="index">
       <div v-if="index > 0" class="share-card__divider" />
@@ -41,8 +41,13 @@ const showTurnNumber = computed(() => props.turns.length > 1)
     </template>
 
     <div class="share-card__footer">
-      <span>来自 Beancount-Trans</span>
-      <span>{{ shareDate }}</span>
+      <p class="share-card__notice">
+        隐私提示：本图可能包含个人账本信息，请勿随意分享给不熟悉的人。
+      </p>
+      <p class="share-card__notice">
+        以上内容由 AI 生成，仅供参考，请注意甄别。
+      </p>
+      <p class="share-card__date">{{ shareDate }}</p>
     </div>
   </div>
 </template>
@@ -172,13 +177,22 @@ const showTurnNumber = computed(() => props.turns.length > 1)
 }
 
 .share-card__footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   margin-top: 20px;
   padding-top: 12px;
   border-top: 1px solid #ebeef5;
+}
+
+.share-card__notice {
+  margin: 0 0 6px;
   font-size: 12px;
+  line-height: 1.5;
   color: #909399;
+}
+
+.share-card__date {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #c0c4cc;
+  text-align: right;
 }
 </style>
