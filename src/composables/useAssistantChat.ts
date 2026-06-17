@@ -84,6 +84,13 @@ export function useAssistantChat() {
       case 'status':
         assistant.status = event.data.phase
         break
+      case 'reasoning_delta':
+        assistant.reasoning = (assistant.reasoning || '') + event.data.content
+        assistant.thinking = (assistant.thinking || '') + event.data.content
+        break
+      case 'thinking_delta':
+        assistant.thinking = (assistant.thinking || '') + event.data.content
+        break
       case 'tool_end':
         if (event.data.bql && event.data.result_preview) {
           appendQuery({
@@ -95,12 +102,16 @@ export function useAssistantChat() {
       case 'delta':
         assistant.content += event.data.content
         assistant.status = 'writing'
+        assistant.thinkingExpanded = false
         break
       case 'done':
         assistant.content = event.data.reply
         assistant.queries = event.data.queries
+        assistant.thinking = event.data.thinking || assistant.thinking || ''
+        assistant.reasoning = event.data.reasoning || assistant.reasoning || ''
         assistant.streaming = false
         assistant.status = undefined
+        assistant.thinkingExpanded = false
         break
       case 'error':
         assistant.content = event.data.detail
@@ -154,6 +165,9 @@ export function useAssistantChat() {
       id: createMessageId(),
       role: 'assistant',
       content: '',
+      thinking: '',
+      reasoning: '',
+      thinkingExpanded: true,
       streaming: true,
       status: 'thinking',
       queries: [],

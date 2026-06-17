@@ -86,8 +86,15 @@
           <div class="message-role">{{ msg.role === 'user' ? '你' : '助手' }}</div>
           <div v-if="msg.role === 'user'" class="message-content message-content--user">{{ msg.content }}</div>
           <template v-else>
+            <AssistantThinkingBlock
+              v-if="msg.thinking?.trim()"
+              v-model:expanded="msg.thinkingExpanded"
+              :thinking="msg.thinking"
+              :streaming="!!msg.streaming && !msg.content"
+              @click.stop
+            />
             <div
-              v-if="msg.streaming"
+              v-if="msg.streaming && (msg.content || !msg.thinking?.trim())"
               class="message-content message-content--assistant message-content--streaming"
             >
               <template v-if="!msg.content">
@@ -220,6 +227,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { CheckboxValueType } from 'element-plus'
 import { ChatDotRound, CircleCheck, CircleClose, DocumentCopy, Share } from '@element-plus/icons-vue'
 import AssistantShareCard from '../../components/assistant/AssistantShareCard.vue'
+import AssistantThinkingBlock from '../../components/assistant/AssistantThinkingBlock.vue'
 import MarkdownContent from '../../components/assistant/MarkdownContent.vue'
 import { useAssistantChat } from '../../composables/useAssistantChat'
 import { copyText } from '../../utils/clipboard'

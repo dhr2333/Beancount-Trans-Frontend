@@ -8,6 +8,9 @@ export interface ChatMessage {
   id?: string
   role: ChatRole
   content: string
+  thinking?: string
+  reasoning?: string
+  thinkingExpanded?: boolean
   queries?: QueryRecord[]
   streaming?: boolean
   status?: AssistantPhase
@@ -29,6 +32,8 @@ export interface AssistantChatResponse {
   reply: string
   queries: QueryRecord[]
   api_key_source: 'user' | 'platform' | 'none'
+  thinking?: string
+  reasoning?: string
 }
 
 export interface AssistantStatus {
@@ -40,6 +45,8 @@ export interface AssistantStatus {
 
 export type AssistantStreamEvent =
   | { event: 'status'; data: { phase: AssistantPhase } }
+  | { event: 'reasoning_delta'; data: { content: string } }
+  | { event: 'thinking_delta'; data: { content: string } }
   | { event: 'tool_start'; data: { name: string; query?: string } }
   | { event: 'tool_end'; data: { name: string; bql?: string; result_preview?: string } }
   | { event: 'delta'; data: { content: string } }
