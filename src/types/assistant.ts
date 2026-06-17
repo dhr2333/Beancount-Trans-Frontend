@@ -60,3 +60,8 @@ export interface AssistantFeedbackResponse {
   rating: AssistantFeedbackRating | null
   comment?: string
 }
+
+export interface AssistantShareTurn {
+  userMessage: string
+  assistantContent: string
+}

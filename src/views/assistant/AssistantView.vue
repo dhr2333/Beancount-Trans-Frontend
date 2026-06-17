@@ -1,5 +1,5 @@
 <template>
-  <div class="assistant-page">
+  <div class="assistant-page" :class="{ 'assistant-page--share-select': shareSelectMode }">
     <div class="assistant-header">
       <div class="header-left">
         <h2 class="page-title">AI 账本助手</h2>
@@ -9,7 +9,7 @@
         <el-tag v-if="statusLoading" type="info">检查中...</el-tag>
         <el-tag v-else-if="status?.api_key_configured" type="success">{{ keySourceLabel }}</el-tag>
         <el-tag v-else type="warning">未配置 Key</el-tag>
-        <el-button text @click="clearMessages" :disabled="messages.length === 0">清空对话</el-button>
+        <el-button text @click="handleClearMessages" :disabled="messages.length === 0">清空对话</el-button>
       </div>
     </div>
 
@@ -63,7 +63,23 @@
         </div>
       </div>
 
-      <div v-for="(msg, index) in messages" :key="index" class="message-row" :class="msg.role">
+      <div
+        v-for="(msg, index) in messages"
+        :key="index"
+        class="message-row"
+        :class="{
+          [msg.role]: true,
+          'share-selectable': shareSelectMode && canShareAssistantMessage(msg),
+          'is-selected': shareSelectMode && selectedIndices.has(index),
+        }"
+      >
+        <el-checkbox
+          v-if="shareSelectMode && canShareAssistantMessage(msg)"
+          class="share-checkbox"
+          :model-value="selectedIndices.has(index)"
+          :disabled="sharing"
+          @change="(val: CheckboxValueType) => toggleShareSelection(index, val === true)"
+        />
         <div class="message-bubble">
           <div class="message-role">{{ msg.role === 'user' ? '你' : '助手' }}</div>
           <div v-if="msg.role === 'user'" class="message-content message-content--user">{{ msg.content }}</div>
@@ -98,11 +114,11 @@
                 复制
               </el-button>
               <el-button
+                v-if="!shareSelectMode"
                 size="small"
                 text
-                :loading="sharingIndex === index"
-                :disabled="sharingIndex !== null"
-                @click="handleShareImage(index)"
+                :disabled="sharing"
+                @click="handleShareClick(index)"
               >
                 <el-icon><Share /></el-icon>
                 分享
@@ -113,7 +129,7 @@
                 text
                 :type="msg.feedback === 'like' ? 'primary' : 'default'"
                 :loading="msg.feedbackSubmitting"
-                :disabled="msg.feedbackSubmitting || sharingIndex !== null"
+                :disabled="msg.feedbackSubmitting || sharing"
                 @click="handleLike(index)"
               >
                 <el-icon><CircleCheck /></el-icon>
@@ -124,7 +140,7 @@
                 text
                 :type="msg.feedback === 'dislike' ? 'danger' : 'default'"
                 :loading="msg.feedbackSubmitting"
-                :disabled="msg.feedbackSubmitting || sharingIndex !== null"
+                :disabled="msg.feedbackSubmitting || sharing"
                 @click="handleDislike(index)"
               >
                 <el-icon><CircleClose /></el-icon>
@@ -144,7 +160,7 @@
       </div>
     </div>
 
-    <div class="input-area">
+    <div v-if="!shareSelectMode" class="input-area">
       <el-input
         v-model="inputText"
         type="textarea"
@@ -170,12 +186,22 @@
       </el-button>
     </div>
 
+    <div v-if="shareSelectMode" class="share-select-bar">
+      <span class="share-select-count">已选 {{ selectedIndices.size }} 条对话</span>
+      <el-button :disabled="sharing" @click="exitShareSelectMode">取消</el-button>
+      <el-button
+        type="primary"
+        :loading="sharing"
+        :disabled="selectedIndices.size === 0"
+        @click="handleGenerateShareImage"
+      >
+        生成分享图
+      </el-button>
+    </div>
+
     <Teleport to="body">
       <div v-if="sharePreview" ref="shareCardHostRef" class="share-card-host">
-        <AssistantShareCard
-          :user-message="sharePreview.userMessage"
-          :assistant-content="sharePreview.assistantContent"
-        />
+        <AssistantShareCard :turns="sharePreview.turns" />
       </div>
     </Teleport>
   </div>
@@ -184,13 +210,20 @@
 <script lang="ts" setup>
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { CheckboxValueType } from 'element-plus'
 import { ChatDotRound, CircleCheck, CircleClose, DocumentCopy, Share } from '@element-plus/icons-vue'
 import AssistantShareCard from '../../components/assistant/AssistantShareCard.vue'
 import MarkdownContent from '../../components/assistant/MarkdownContent.vue'
 import { useAssistantChat } from '../../composables/useAssistantChat'
 import { copyText } from '../../utils/clipboard'
+import {
+  buildShareTurns,
+  canShareAssistantMessage,
+  MAX_SHARE_TURNS,
+  validateShareTurnCount,
+} from '../../utils/assistantShare'
 import { captureElementAsPng, sharePngBlob } from '../../utils/shareImage'
-import type { AssistantPhase } from '../../types/assistant'
+import type { AssistantPhase, AssistantShareTurn } from '../../types/assistant'
 
 const {
   messages,
@@ -213,16 +246,6 @@ function statusHint(phase?: AssistantPhase): string {
   return '正在思考...'
 }
 
-function findUserMessageBefore(index: number): string {
-  for (let i = index - 1; i >= 0; i -= 1) {
-    const message = messages.value[i]
-    if (message.role === 'user') {
-      return message.content
-    }
-  }
-  return ''
-}
-
 async function handleCopyMarkdown(index: number) {
   const message = messages.value[index]
   if (!message?.content) {
@@ -236,21 +259,50 @@ async function handleCopyMarkdown(index: number) {
   }
 }
 
-const sharingIndex = ref<number | null>(null)
-const sharePreview = ref<{ userMessage: string; assistantContent: string } | null>(null)
+const shareSelectMode = ref(false)
+const selectedIndices = ref<Set<number>>(new Set())
+const sharing = ref(false)
+const sharePreview = ref<{ turns: AssistantShareTurn[] } | null>(null)
 const shareCardHostRef = ref<HTMLElement | null>(null)
 
-async function handleShareImage(index: number) {
-  const message = messages.value[index]
-  if (!message?.content || sharingIndex.value !== null) {
+function exitShareSelectMode() {
+  shareSelectMode.value = false
+  selectedIndices.value = new Set()
+}
+
+function handleShareClick(index: number) {
+  if (sharing.value || !canShareAssistantMessage(messages.value[index])) {
+    return
+  }
+  shareSelectMode.value = true
+  selectedIndices.value = new Set([index])
+}
+
+function toggleShareSelection(index: number, checked: boolean) {
+  if (sharing.value) {
     return
   }
 
-  sharingIndex.value = index
-  sharePreview.value = {
-    userMessage: findUserMessageBefore(index),
-    assistantContent: message.content,
+  const next = new Set(selectedIndices.value)
+  if (checked) {
+    if (next.size >= MAX_SHARE_TURNS) {
+      ElMessage.warning(`最多选择 ${MAX_SHARE_TURNS} 条对话`)
+      return
+    }
+    next.add(index)
+  } else {
+    next.delete(index)
   }
+  selectedIndices.value = next
+}
+
+async function renderAndShare(turns: AssistantShareTurn[]) {
+  if (!validateShareTurnCount(turns.length)) {
+    return
+  }
+
+  sharing.value = true
+  sharePreview.value = { turns }
 
   try {
     await nextTick()
@@ -260,17 +312,29 @@ async function handleShareImage(index: number) {
     }
     const blob = await captureElementAsPng(card)
     const timestamp = new Date().toISOString().slice(0, 10)
-    await sharePngBlob(blob, `assistant-${timestamp}.png`)
+    await sharePngBlob(blob, `assistant-${turns.length}turns-${timestamp}.png`)
     ElMessage.success('分享图片已生成')
+    exitShareSelectMode()
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       return
     }
     ElMessage.error(error instanceof Error ? error.message : '生成分享图片失败')
   } finally {
-    sharingIndex.value = null
+    sharing.value = false
     sharePreview.value = null
   }
+}
+
+async function handleGenerateShareImage() {
+  const indices = [...selectedIndices.value]
+  const turns = buildShareTurns(messages.value, indices)
+  await renderAndShare(turns)
+}
+
+function handleClearMessages() {
+  exitShareSelectMode()
+  clearMessages()
 }
 
 async function handleLike(index: number) {
@@ -347,6 +411,10 @@ onMounted(() => {
   flex-direction: column;
   height: calc(100vh - 120px);
   text-align: left;
+
+  &--share-select {
+    padding-bottom: 88px;
+  }
 }
 
 .assistant-header {
@@ -442,6 +510,21 @@ onMounted(() => {
       border-color: var(--ep-border-color);
     }
   }
+
+  &.share-selectable {
+    align-items: flex-start;
+    gap: 8px;
+
+    &.is-selected .message-bubble {
+      border-color: var(--ep-color-primary);
+      box-shadow: 0 0 0 1px var(--ep-color-primary-light-7);
+    }
+  }
+}
+
+.share-checkbox {
+  margin-top: 10px;
+  flex-shrink: 0;
 }
 
 .message-bubble {
@@ -505,6 +588,29 @@ onMounted(() => {
   height: 16px;
   margin: 0 4px;
   background: var(--ep-border-color-lighter);
+}
+
+.share-select-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--ep-bg-color);
+  border: 1px solid var(--ep-border-color-light);
+  border-radius: 12px;
+  box-shadow: var(--ep-box-shadow-light);
+}
+
+.share-select-count {
+  font-size: 14px;
+  color: var(--ep-text-color-regular);
+  margin-right: 4px;
+  white-space: nowrap;
 }
 
 .share-card-host {

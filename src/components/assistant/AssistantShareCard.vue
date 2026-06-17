@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { AssistantShareTurn } from '../../types/assistant'
 import MarkdownContent from './MarkdownContent.vue'
 
 const props = defineProps<{
-  userMessage: string
-  assistantContent: string
+  turns: AssistantShareTurn[]
 }>()
 
 const shareDate = computed(() => {
@@ -14,21 +14,31 @@ const shareDate = computed(() => {
     day: 'numeric',
   })
 })
+
+const showTurnNumber = computed(() => props.turns.length > 1)
 </script>
 
 <template>
   <div class="assistant-share-card">
     <div class="share-card__header">AI 账本助手</div>
 
-    <div class="share-card__section">
-      <div class="share-card__label">你的问题</div>
-      <div class="share-card__user-text">{{ userMessage }}</div>
-    </div>
+    <template v-for="(turn, index) in turns" :key="index">
+      <div v-if="index > 0" class="share-card__divider" />
 
-    <div class="share-card__section">
-      <div class="share-card__label">助手回答</div>
-      <MarkdownContent :content="assistantContent" class="share-card__markdown" />
-    </div>
+      <div class="share-card__turn">
+        <div v-if="showTurnNumber" class="share-card__turn-title">对话 {{ index + 1 }}</div>
+
+        <div class="share-card__section">
+          <div class="share-card__label">你的问题</div>
+          <div class="share-card__user-text">{{ turn.userMessage }}</div>
+        </div>
+
+        <div class="share-card__section">
+          <div class="share-card__label">助手回答</div>
+          <MarkdownContent :content="turn.assistantContent" class="share-card__markdown" />
+        </div>
+      </div>
+    </template>
 
     <div class="share-card__footer">
       <span>来自 Beancount-Trans</span>
@@ -57,6 +67,18 @@ const shareDate = computed(() => {
   padding-left: 12px;
   border-bottom: 1px solid #ebeef5;
   border-left: 4px solid #409eff;
+}
+
+.share-card__divider {
+  margin: 20px 0;
+  border-top: 1px dashed #dcdfe6;
+}
+
+.share-card__turn-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+  margin-bottom: 12px;
 }
 
 .share-card__section {
