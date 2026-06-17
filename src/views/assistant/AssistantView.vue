@@ -92,9 +92,28 @@
               <el-button
                 size="small"
                 text
+                @click="handleCopyMarkdown(index)"
+              >
+                <el-icon><DocumentCopy /></el-icon>
+                复制
+              </el-button>
+              <el-button
+                size="small"
+                text
+                :loading="sharingIndex === index"
+                :disabled="sharingIndex !== null"
+                @click="handleShareImage(index)"
+              >
+                <el-icon><Share /></el-icon>
+                分享
+              </el-button>
+              <span class="feedback-divider" />
+              <el-button
+                size="small"
+                text
                 :type="msg.feedback === 'like' ? 'primary' : 'default'"
                 :loading="msg.feedbackSubmitting"
-                :disabled="msg.feedbackSubmitting"
+                :disabled="msg.feedbackSubmitting || sharingIndex !== null"
                 @click="handleLike(index)"
               >
                 <el-icon><CircleCheck /></el-icon>
@@ -105,7 +124,7 @@
                 text
                 :type="msg.feedback === 'dislike' ? 'danger' : 'default'"
                 :loading="msg.feedbackSubmitting"
-                :disabled="msg.feedbackSubmitting"
+                :disabled="msg.feedbackSubmitting || sharingIndex !== null"
                 @click="handleDislike(index)"
               >
                 <el-icon><CircleClose /></el-icon>
@@ -150,15 +169,27 @@
         发送
       </el-button>
     </div>
+
+    <Teleport to="body">
+      <div v-if="sharePreview" ref="shareCardHostRef" class="share-card-host">
+        <AssistantShareCard
+          :user-message="sharePreview.userMessage"
+          :assistant-content="sharePreview.assistantContent"
+        />
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { nextTick, onMounted, ref, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { ChatDotRound, CircleCheck, CircleClose } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ChatDotRound, CircleCheck, CircleClose, DocumentCopy, Share } from '@element-plus/icons-vue'
+import AssistantShareCard from '../../components/assistant/AssistantShareCard.vue'
 import MarkdownContent from '../../components/assistant/MarkdownContent.vue'
 import { useAssistantChat } from '../../composables/useAssistantChat'
+import { copyText } from '../../utils/clipboard'
+import { captureElementAsPng, sharePngBlob } from '../../utils/shareImage'
 import type { AssistantPhase } from '../../types/assistant'
 
 const {
@@ -180,6 +211,66 @@ function statusHint(phase?: AssistantPhase): string {
   if (phase === 'querying') return '正在查询账本...'
   if (phase === 'writing') return ''
   return '正在思考...'
+}
+
+function findUserMessageBefore(index: number): string {
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const message = messages.value[i]
+    if (message.role === 'user') {
+      return message.content
+    }
+  }
+  return ''
+}
+
+async function handleCopyMarkdown(index: number) {
+  const message = messages.value[index]
+  if (!message?.content) {
+    return
+  }
+  try {
+    await copyText(message.content)
+    ElMessage.success('已复制 Markdown')
+  } catch {
+    ElMessage.error('复制失败')
+  }
+}
+
+const sharingIndex = ref<number | null>(null)
+const sharePreview = ref<{ userMessage: string; assistantContent: string } | null>(null)
+const shareCardHostRef = ref<HTMLElement | null>(null)
+
+async function handleShareImage(index: number) {
+  const message = messages.value[index]
+  if (!message?.content || sharingIndex.value !== null) {
+    return
+  }
+
+  sharingIndex.value = index
+  sharePreview.value = {
+    userMessage: findUserMessageBefore(index),
+    assistantContent: message.content,
+  }
+
+  try {
+    await nextTick()
+    const card = shareCardHostRef.value?.firstElementChild as HTMLElement | null
+    if (!card) {
+      throw new Error('分享卡片渲染失败')
+    }
+    const blob = await captureElementAsPng(card)
+    const timestamp = new Date().toISOString().slice(0, 10)
+    await sharePngBlob(blob, `assistant-${timestamp}.png`)
+    ElMessage.success('分享图片已生成')
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return
+    }
+    ElMessage.error(error instanceof Error ? error.message : '生成分享图片失败')
+  } finally {
+    sharingIndex.value = null
+    sharePreview.value = null
+  }
 }
 
 async function handleLike(index: number) {
@@ -401,10 +492,27 @@ onMounted(() => {
 
 .feedback-bar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
   margin-top: 8px;
   padding-top: 4px;
   border-top: 1px solid var(--ep-border-color-lighter);
+}
+
+.feedback-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--ep-border-color-lighter);
+}
+
+.share-card-host {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  z-index: -1;
+  pointer-events: none;
 }
 
 .query-collapse {
