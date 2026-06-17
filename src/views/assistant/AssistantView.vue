@@ -13,14 +13,8 @@
       </div>
     </div>
 
-    <el-alert
-      v-if="!statusLoading && status && !status.api_key_configured"
-      type="warning"
-      :closable="false"
-      show-icon
-      class="setup-alert"
-      title="尚未配置 DeepSeek API Key"
-    >
+    <el-alert v-if="!statusLoading && status && !status.api_key_configured" type="warning" :closable="false" show-icon
+      class="setup-alert" title="尚未配置 DeepSeek API Key">
       <template #default>
         请在
         <router-link to="/format" class="alert-link">输出配置</router-link>
@@ -28,14 +22,8 @@
       </template>
     </el-alert>
 
-    <el-alert
-      v-if="!statusLoading && status && !status.ledger_exists"
-      type="info"
-      :closable="false"
-      show-icon
-      class="setup-alert"
-      title="账本尚未就绪"
-    >
+    <el-alert v-if="!statusLoading && status && !status.ledger_exists" type="info" :closable="false" show-icon
+      class="setup-alert" title="账本尚未就绪">
       <template #default>
         请先在
         <router-link to="/file" class="alert-link">文件管理</router-link>
@@ -50,53 +38,29 @@
         </el-icon>
         <p class="welcome-text">你好，我可以帮你查询支出、收入、余额等账本信息。</p>
         <div class="example-chips">
-          <el-button
-            v-for="q in exampleQuestions"
-            :key="q"
-            size="small"
-            round
-            :disabled="!canChat || loading"
-            @click="handleExample(q)"
-          >
+          <el-button v-for="q in exampleQuestions" :key="q" size="small" round :disabled="!canChat || loading"
+            @click="handleExample(q)">
             {{ q }}
           </el-button>
         </div>
       </div>
 
-      <div
-        v-for="(msg, index) in messages"
-        :key="index"
-        class="message-row"
-        :class="{
-          [msg.role]: true,
-          'share-selectable': shareSelectMode && canShareAssistantMessage(msg),
-          'is-selected': shareSelectMode && selectedIndices.has(index),
-        }"
-        @click="handleShareRowClick(index, msg)"
-      >
-        <el-checkbox
-          v-if="shareSelectMode && canShareAssistantMessage(msg)"
-          class="share-checkbox"
-          :model-value="selectedIndices.has(index)"
-          :disabled="sharing"
-          @click.stop
-          @change="(val: CheckboxValueType) => toggleShareSelection(index, val === true)"
-        />
+      <div v-for="(msg, index) in messages" :key="index" class="message-row" :class="{
+        [msg.role]: true,
+        'share-selectable': shareSelectMode && canShareAssistantMessage(msg),
+        'is-selected': shareSelectMode && selectedIndices.has(index),
+      }" @click="handleShareRowClick(index, msg)">
+        <el-checkbox v-if="shareSelectMode && canShareAssistantMessage(msg)" class="share-checkbox"
+          :model-value="selectedIndices.has(index)" :disabled="sharing" @click.stop
+          @change="(val: CheckboxValueType) => toggleShareSelection(index, val === true)" />
         <div class="message-bubble">
           <div class="message-role">{{ msg.role === 'user' ? '你' : '助手' }}</div>
           <div v-if="msg.role === 'user'" class="message-content message-content--user">{{ msg.content }}</div>
           <template v-else>
-            <AssistantThinkingBlock
-              v-if="msg.thinking?.trim()"
-              v-model:expanded="msg.thinkingExpanded"
-              :thinking="msg.thinking"
-              :streaming="!!msg.streaming && !msg.content"
-              @click.stop
-            />
-            <div
-              v-if="msg.streaming && (msg.content || !msg.thinking?.trim())"
-              class="message-content message-content--assistant message-content--streaming"
-            >
+            <AssistantThinkingBlock v-if="msg.thinking?.trim()" v-model:expanded="msg.thinkingExpanded"
+              :thinking="msg.thinking" :streaming="!!msg.streaming && !msg.content" @click.stop />
+            <div v-if="msg.streaming && (msg.content || !msg.thinking?.trim())"
+              class="message-content message-content--assistant message-content--streaming">
               <template v-if="!msg.content">
                 <span class="status-hint">{{ statusHint(msg.status) }}</span>
               </template>
@@ -105,64 +69,40 @@
                 <span class="streaming-cursor">▍</span>
               </template>
             </div>
-            <MarkdownContent
-              v-else
-              :content="msg.content"
-              class="message-content message-content--assistant"
-            />
-            <div
-              v-if="msg.role === 'assistant' && !msg.streaming && msg.content"
-              class="feedback-bar"
-              @click.stop
-            >
-              <el-button
-                size="small"
-                text
-                @click="handleCopyMarkdown(index)"
-              >
-                <el-icon><DocumentCopy /></el-icon>
+            <MarkdownContent v-else :content="msg.content" class="message-content message-content--assistant" />
+            <div v-if="msg.role === 'assistant' && !msg.streaming && msg.content" class="feedback-bar" @click.stop>
+              <el-button size="small" text @click="handleCopyMarkdown(index)">
+                <el-icon>
+                  <DocumentCopy />
+                </el-icon>
                 复制
               </el-button>
-              <el-button
-                v-if="!shareSelectMode"
-                size="small"
-                text
-                :disabled="sharing"
-                @click="handleShareClick(index)"
-              >
-                <el-icon><Share /></el-icon>
+              <el-button v-if="!shareSelectMode" size="small" text :disabled="sharing" @click="handleShareClick(index)">
+                <el-icon>
+                  <Share />
+                </el-icon>
                 分享
               </el-button>
               <span class="feedback-divider" />
-              <el-button
-                size="small"
-                text
-                :type="msg.feedback === 'like' ? 'primary' : 'default'"
-                :loading="msg.feedbackSubmitting"
-                :disabled="msg.feedbackSubmitting || sharing"
-                @click="handleLike(index)"
-              >
-                <el-icon><CircleCheck /></el-icon>
+              <el-button size="small" text :type="msg.feedback === 'like' ? 'primary' : 'default'"
+                :loading="msg.feedbackSubmitting" :disabled="msg.feedbackSubmitting || sharing"
+                @click="handleLike(index)">
+                <el-icon>
+                  <CircleCheck />
+                </el-icon>
                 喜欢
               </el-button>
-              <el-button
-                size="small"
-                text
-                :type="msg.feedback === 'dislike' ? 'danger' : 'default'"
-                :loading="msg.feedbackSubmitting"
-                :disabled="msg.feedbackSubmitting || sharing"
-                @click="handleDislike(index)"
-              >
-                <el-icon><CircleClose /></el-icon>
+              <el-button size="small" text :type="msg.feedback === 'dislike' ? 'danger' : 'default'"
+                :loading="msg.feedbackSubmitting" :disabled="msg.feedbackSubmitting || sharing"
+                @click="handleDislike(index)">
+                <el-icon>
+                  <CircleClose />
+                </el-icon>
                 不喜欢
               </el-button>
             </div>
           </template>
-          <el-collapse
-            v-if="msg.role === 'assistant' && msg.queries?.length"
-            class="query-collapse"
-            @click.stop
-          >
+          <el-collapse v-if="msg.role === 'assistant' && msg.queries?.length" class="query-collapse" @click.stop>
             <el-collapse-item title="查看查询详情" name="queries">
               <div v-for="(q, qi) in msg.queries" :key="qi" class="query-block">
                 <pre class="query-bql">{{ q.bql }}</pre>
@@ -175,27 +115,12 @@
     </div>
 
     <div v-if="!shareSelectMode" class="input-area">
-      <el-input
-        v-model="inputText"
-        type="textarea"
-        :rows="2"
-        placeholder="输入问题，例如：本月餐饮支出多少？"
-        :disabled="!canChat || loading"
-        resize="none"
-        @keydown.enter.exact.prevent="handleSend"
-      />
-      <el-button
-        v-if="loading"
-        @click="stop"
-      >
+      <el-input v-model="inputText" type="textarea" :rows="2" placeholder="输入问题，例如：本月餐饮支出多少？"
+        :disabled="!canChat || loading" resize="none" @keydown.enter.exact.prevent="handleSend" />
+      <el-button v-if="loading" @click="stop">
         停止
       </el-button>
-      <el-button
-        v-else
-        type="primary"
-        :disabled="!canChat || !inputText.trim()"
-        @click="handleSend"
-      >
+      <el-button v-else type="primary" :disabled="!canChat || !inputText.trim()" @click="handleSend">
         发送
       </el-button>
     </div>
@@ -203,12 +128,8 @@
     <div v-if="shareSelectMode" class="share-select-bar">
       <span class="share-select-count">已选 {{ selectedIndices.size }} 条对话</span>
       <el-button :disabled="sharing" @click="exitShareSelectMode">取消</el-button>
-      <el-button
-        type="primary"
-        :loading="sharing"
-        :disabled="selectedIndices.size === 0"
-        @click="handleGenerateShareImage"
-      >
+      <el-button type="primary" :loading="sharing" :disabled="selectedIndices.size === 0"
+        @click="handleGenerateShareImage">
         生成分享图
       </el-button>
     </div>

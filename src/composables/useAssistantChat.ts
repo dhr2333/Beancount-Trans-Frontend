@@ -87,9 +87,15 @@ export function useAssistantChat() {
       case 'reasoning_delta':
         assistant.reasoning = (assistant.reasoning || '') + event.data.content
         assistant.thinking = (assistant.thinking || '') + event.data.content
+        assistant.thinkingExpanded = true
         break
       case 'thinking_delta':
         assistant.thinking = (assistant.thinking || '') + event.data.content
+        assistant.thinkingExpanded = true
+        break
+      case 'thinking_set':
+        assistant.thinking = event.data.content
+        assistant.reasoning = event.data.reasoning ?? ''
         break
       case 'tool_end':
         if (event.data.bql && event.data.result_preview) {
