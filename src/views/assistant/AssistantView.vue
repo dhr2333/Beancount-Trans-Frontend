@@ -249,7 +249,7 @@ const {
 
 function statusHint(phase?: AssistantPhase): string {
   if (phase === 'querying') return '正在查询账本...'
-  if (phase === 'writing') return ''
+  if (phase === 'writing') return '正在撰写回答...'
   return '正在思考...'
 }
 
