@@ -85,6 +85,33 @@
               :content="msg.content"
               class="message-content message-content--assistant"
             />
+            <div
+              v-if="msg.role === 'assistant' && !msg.streaming && msg.content"
+              class="feedback-bar"
+            >
+              <el-button
+                size="small"
+                text
+                :type="msg.feedback === 'like' ? 'primary' : 'default'"
+                :loading="msg.feedbackSubmitting"
+                :disabled="msg.feedbackSubmitting"
+                @click="handleLike(index)"
+              >
+                <el-icon><CircleCheck /></el-icon>
+                喜欢
+              </el-button>
+              <el-button
+                size="small"
+                text
+                :type="msg.feedback === 'dislike' ? 'danger' : 'default'"
+                :loading="msg.feedbackSubmitting"
+                :disabled="msg.feedbackSubmitting"
+                @click="handleDislike(index)"
+              >
+                <el-icon><CircleClose /></el-icon>
+                不喜欢
+              </el-button>
+            </div>
           </template>
           <el-collapse v-if="msg.role === 'assistant' && msg.queries?.length" class="query-collapse">
             <el-collapse-item title="查看查询详情" name="queries">
@@ -128,7 +155,8 @@
 
 <script lang="ts" setup>
 import { nextTick, onMounted, ref, watch } from 'vue'
-import { ChatDotRound } from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
+import { ChatDotRound, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import MarkdownContent from '../../components/assistant/MarkdownContent.vue'
 import { useAssistantChat } from '../../composables/useAssistantChat'
 import type { AssistantPhase } from '../../types/assistant'
@@ -144,6 +172,7 @@ const {
   fetchStatus,
   send,
   stop,
+  submitFeedback,
   clearMessages,
 } = useAssistantChat()
 
@@ -151,6 +180,39 @@ function statusHint(phase?: AssistantPhase): string {
   if (phase === 'querying') return '正在查询账本...'
   if (phase === 'writing') return ''
   return '正在思考...'
+}
+
+async function handleLike(index: number) {
+  await submitFeedback(index, 'like')
+}
+
+async function handleDislike(index: number) {
+  const message = messages.value[index]
+  if (!message || message.role !== 'assistant') {
+    return
+  }
+
+  if (message.feedback === 'dislike') {
+    await submitFeedback(index, 'dislike')
+    return
+  }
+
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '可以告诉我们哪里不满意（可选）',
+      '反馈原因',
+      {
+        confirmButtonText: '提交',
+        cancelButtonText: '取消',
+        inputType: 'textarea',
+        inputPlaceholder: '例如：数据不准确、回答不完整...',
+        inputValidator: (value: string) => !value || value.length <= 500 || '原因不超过 500 字',
+      },
+    )
+    await submitFeedback(index, 'dislike', value?.trim() || '')
+  } catch {
+    // 用户取消弹窗
+  }
 }
 
 const inputText = ref('')
@@ -335,6 +397,14 @@ onMounted(() => {
   50% {
     opacity: 0;
   }
+}
+
+.feedback-bar {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--ep-border-color-lighter);
 }
 
 .query-collapse {

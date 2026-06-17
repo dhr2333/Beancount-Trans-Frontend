@@ -2,12 +2,17 @@ export type ChatRole = 'user' | 'assistant'
 
 export type AssistantPhase = 'thinking' | 'querying' | 'writing'
 
+export type AssistantFeedbackRating = 'like' | 'dislike'
+
 export interface ChatMessage {
+  id?: string
   role: ChatRole
   content: string
   queries?: QueryRecord[]
   streaming?: boolean
   status?: AssistantPhase
+  feedback?: AssistantFeedbackRating | null
+  feedbackSubmitting?: boolean
 }
 
 export interface QueryRecord {
@@ -40,3 +45,18 @@ export type AssistantStreamEvent =
   | { event: 'delta'; data: { content: string } }
   | { event: 'done'; data: AssistantChatResponse }
   | { event: 'error'; data: { detail: string } }
+
+export interface AssistantFeedbackRequest {
+  message_id: string
+  rating: AssistantFeedbackRating | null
+  user_message: string
+  assistant_reply: string
+  queries?: QueryRecord[]
+  comment?: string
+}
+
+export interface AssistantFeedbackResponse {
+  message_id: string
+  rating: AssistantFeedbackRating | null
+  comment?: string
+}

@@ -3,6 +3,8 @@ import { fetchWithAuth } from '../utils/request'
 import type {
   AssistantChatRequest,
   AssistantChatResponse,
+  AssistantFeedbackRequest,
+  AssistantFeedbackResponse,
   AssistantStatus,
   AssistantStreamEvent,
 } from '../types/assistant'
@@ -15,6 +17,12 @@ export function sendAssistantChat(
   request: AssistantChatRequest
 ): Promise<{ data: AssistantChatResponse }> {
   return axios.post('/assistant/chat/', request)
+}
+
+export function submitAssistantFeedback(
+  request: AssistantFeedbackRequest
+): Promise<{ data: AssistantFeedbackResponse }> {
+  return axios.post('/assistant/feedback/', request)
 }
 
 function parseSseFrame(frame: string): AssistantStreamEvent | null {

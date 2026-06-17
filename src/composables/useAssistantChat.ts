@@ -1,6 +1,8 @@
 import { ref, computed } from 'vue'
-import { getAssistantStatus, streamAssistantChat } from '../api/assistant'
+import { ElMessage } from 'element-plus'
+import { getAssistantStatus, streamAssistantChat, submitAssistantFeedback } from '../api/assistant'
 import type {
+  AssistantFeedbackRating,
   AssistantStatus,
   AssistantStreamEvent,
   ChatMessage,
@@ -13,6 +15,10 @@ const EXAMPLE_QUESTIONS = [
   '最近有哪些大额消费？',
   '上个月餐饮花了多少？',
 ]
+
+function createMessageId(): string {
+  return crypto.randomUUID()
+}
 
 export function useAssistantChat() {
   const messages = ref<ChatMessage[]>([])
@@ -40,6 +46,16 @@ export function useAssistantChat() {
       return last
     }
     return undefined
+  }
+
+  function findUserMessageBefore(index: number): string {
+    for (let i = index - 1; i >= 0; i -= 1) {
+      const message = messages.value[i]
+      if (message.role === 'user') {
+        return message.content
+      }
+    }
+    return ''
   }
 
   function appendQuery(record: QueryRecord) {
@@ -129,13 +145,19 @@ export function useAssistantChat() {
     const text = content.trim()
     if (!text || loading.value) return
 
-    messages.value.push({ role: 'user', content: text })
     messages.value.push({
+      id: createMessageId(),
+      role: 'user',
+      content: text,
+    })
+    messages.value.push({
+      id: createMessageId(),
       role: 'assistant',
       content: '',
       streaming: true,
       status: 'thinking',
       queries: [],
+      feedback: null,
     })
     loading.value = true
     error.value = null
@@ -183,6 +205,38 @@ export function useAssistantChat() {
     }
   }
 
+  async function submitFeedback(
+    messageIndex: number,
+    rating: AssistantFeedbackRating,
+    comment = '',
+  ) {
+    const message = messages.value[messageIndex]
+    if (!message || message.role !== 'assistant' || message.streaming || !message.id) {
+      return
+    }
+
+    const nextRating = message.feedback === rating ? null : rating
+    message.feedbackSubmitting = true
+
+    try {
+      const { data } = await submitAssistantFeedback({
+        message_id: message.id,
+        rating: nextRating,
+        user_message: findUserMessageBefore(messageIndex),
+        assistant_reply: message.content,
+        queries: message.queries || [],
+        comment: nextRating === 'dislike' ? comment : '',
+      })
+      message.feedback = data.rating
+      ElMessage.success(nextRating ? '感谢你的反馈' : '已取消评价')
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } }
+      ElMessage.error(err.response?.data?.detail || '提交反馈失败')
+    } finally {
+      message.feedbackSubmitting = false
+    }
+  }
+
   function clearMessages() {
     stop()
     messages.value = []
@@ -201,6 +255,7 @@ export function useAssistantChat() {
     fetchStatus,
     send,
     stop,
+    submitFeedback,
     clearMessages,
   }
 }
