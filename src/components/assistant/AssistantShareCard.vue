@@ -43,17 +43,20 @@ const shareDate = computed(() => {
   padding: 24px;
   background: #ffffff;
   color: #303133;
+  color-scheme: light;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   box-sizing: border-box;
 }
 
 .share-card__header {
   font-size: 18px;
-  font-weight: 600;
-  color: #409eff;
+  font-weight: 700;
+  color: #303133;
   margin-bottom: 20px;
   padding-bottom: 12px;
+  padding-left: 12px;
   border-bottom: 1px solid #ebeef5;
+  border-left: 4px solid #409eff;
 }
 
 .share-card__section {
@@ -85,8 +88,31 @@ const shareDate = computed(() => {
     color: #303133;
   }
 
+  :deep(h1),
+  :deep(h2),
+  :deep(h3),
+  :deep(h4),
+  :deep(h5),
+  :deep(h6) {
+    color: #303133;
+  }
+
+  :deep(p),
+  :deep(li) {
+    color: #303133;
+  }
+
   :deep(strong) {
     color: #303133;
+  }
+
+  :deep(blockquote) {
+    color: #606266;
+    border-left-color: #dcdfe6;
+  }
+
+  :deep(hr) {
+    border-top-color: #ebeef5;
   }
 
   :deep(code) {
@@ -97,6 +123,10 @@ const shareDate = computed(() => {
   :deep(pre) {
     background: #f5f7fa;
     overflow-x: auto;
+
+    code {
+      color: #606266;
+    }
   }
 
   :deep(th) {
@@ -107,6 +137,7 @@ const shareDate = computed(() => {
   :deep(td),
   :deep(th) {
     border-color: #ebeef5;
+    color: #303133;
   }
 
   :deep(tr:nth-child(even) td) {
