@@ -46,7 +46,6 @@ export interface AssistantStatus {
 export type AssistantStreamEvent =
   | { event: 'status'; data: { phase: AssistantPhase } }
   | { event: 'reasoning_delta'; data: { content: string; source?: 'api' | 'planning' } }
-  | { event: 'thinking_delta'; data: { content: string } }
   | { event: 'thinking_set'; data: { content: string; reasoning?: string } }
   | { event: 'tool_start'; data: { name: string; query?: string } }
   | { event: 'tool_end'; data: { name: string; bql?: string; result_preview?: string } }
