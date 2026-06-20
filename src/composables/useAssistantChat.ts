@@ -10,10 +10,10 @@ import type {
 } from '../types/assistant'
 
 const EXAMPLE_QUESTIONS = [
-  '本月总支出是多少？',
-  '各资产账户余额是多少？',
+  '提供一份消费洞察',
+  '有什么令人意外的消费发现？',
+  '帮我写一份月度总结',
   '最近有哪些大额消费？',
-  '上个月餐饮花了多少？',
 ]
 
 function createMessageId(): string {
