@@ -1,3 +1,9 @@
+## [5.11.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.10.0...5.11.0) (2026-06-20)
+
+### Features
+
+* 添加深度思考功能以增强助手聊天体验 ([b0885cd](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/b0885cdacdfbf41ac047e58f93c7a51af9ffcfe6))
+
 ## [5.10.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.10...5.10.0) (2026-06-20)
 
 ### Features
