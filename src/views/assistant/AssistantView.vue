@@ -117,12 +117,26 @@
     <div v-if="!shareSelectMode" class="input-area">
       <el-input v-model="inputText" type="textarea" :rows="2" placeholder="输入问题，例如：本月餐饮支出多少？"
         :disabled="!canChat || loading" resize="none" @keydown.enter.exact.prevent="handleSend" />
-      <el-button v-if="loading" @click="stop">
-        停止
-      </el-button>
-      <el-button v-else type="primary" :disabled="!canChat || !inputText.trim()" @click="handleSend">
-        发送
-      </el-button>
+      <div class="input-actions">
+        <el-tooltip
+          content="启用 DeepSeek Reasoner，展示更完整的推理过程，响应更慢、消耗更多 Token"
+          placement="top"
+        >
+          <el-switch
+            v-model="deepThink"
+            inline-prompt
+            active-text="深度思考"
+            inactive-text="深度思考"
+            :disabled="!canChat || loading"
+          />
+        </el-tooltip>
+        <el-button v-if="loading" @click="stop">
+          停止
+        </el-button>
+        <el-button v-else type="primary" :disabled="!canChat || !inputText.trim()" @click="handleSend">
+          发送
+        </el-button>
+      </div>
     </div>
 
     <div v-if="shareSelectMode" class="share-select-bar">
@@ -164,6 +178,7 @@ import type { AssistantPhase, AssistantShareTurn, ChatMessage } from '../../type
 const {
   messages,
   loading,
+  deepThink,
   status,
   statusLoading,
   canChat,
@@ -609,13 +624,20 @@ onMounted(() => {
 
 .input-area {
   display: flex;
-  gap: 12px;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 12px;
   flex-shrink: 0;
 
   .ep-textarea {
-    flex: 1;
+    width: 100%;
   }
+}
+
+.input-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
 }
 </style>

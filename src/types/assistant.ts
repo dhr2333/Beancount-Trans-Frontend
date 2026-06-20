@@ -26,6 +26,7 @@ export interface QueryRecord {
 export interface AssistantChatRequest {
   messages: Array<{ role: ChatRole; content: string }>
   show_bql?: boolean
+  deep_think?: boolean
 }
 
 export interface AssistantChatResponse {
@@ -34,6 +35,7 @@ export interface AssistantChatResponse {
   api_key_source: 'user' | 'platform' | 'none'
   thinking?: string
   reasoning?: string
+  model?: string
 }
 
 export interface AssistantStatus {

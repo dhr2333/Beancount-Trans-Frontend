@@ -23,6 +23,7 @@ function createMessageId(): string {
 export function useAssistantChat() {
   const messages = ref<ChatMessage[]>([])
   const loading = ref(false)
+  const deepThink = ref(false)
   const status = ref<AssistantStatus | null>(null)
   const statusLoading = ref(false)
   const error = ref<string | null>(null)
@@ -187,6 +188,7 @@ export function useAssistantChat() {
           .filter((m) => !m.streaming)
           .map((m) => ({ role: m.role, content: m.content })),
         show_bql: false,
+        deep_think: deepThink.value,
       }
 
       await streamAssistantChat(
@@ -262,6 +264,7 @@ export function useAssistantChat() {
   return {
     messages,
     loading,
+    deepThink,
     status,
     statusLoading,
     error,
