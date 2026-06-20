@@ -1,3 +1,9 @@
+## [5.10.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.10...5.10.0) (2026-06-20)
+
+### Features
+
+* 更新示例问题以增强助手聊天功能 ([281520a](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/281520a614f2d774bc33e0ff5925bf3b96cf8b1f))
+
 ## [5.9.10](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.9.9...5.9.10) (2026-06-04)
 
 ### Bug Fixes
