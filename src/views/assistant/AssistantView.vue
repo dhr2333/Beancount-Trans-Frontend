@@ -118,18 +118,13 @@
       <el-input v-model="inputText" type="textarea" :rows="2" placeholder="输入问题，例如：本月餐饮支出多少？"
         :disabled="!canChat || loading" resize="none" @keydown.enter.exact.prevent="handleSend" />
       <div class="input-actions">
-        <el-tooltip
-          content="启用 DeepSeek Reasoner，展示更完整的推理过程，响应更慢、消耗更多 Token"
-          placement="top"
-        >
-          <el-switch
-            v-model="deepThink"
-            inline-prompt
-            active-text="深度思考"
-            inactive-text="深度思考"
-            :disabled="!canChat || loading"
-          />
-        </el-tooltip>
+        <el-switch
+          v-model="deepThink"
+          inline-prompt
+          active-text="深度思考"
+          inactive-text="深度思考"
+          :disabled="!canChat || loading"
+        />
         <el-button v-if="loading" @click="stop">
           停止
         </el-button>
