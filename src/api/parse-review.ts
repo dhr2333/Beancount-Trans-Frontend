@@ -40,7 +40,7 @@ export function updateEntryEdit(
   request: UpdateEditRequest
 ): Promise<{ data: UpdateEditResponse }> {
   return axios.put(
-    `/translate/parse-review/${taskId}/entries/${entryUuid}/edit`,
+    `/translate/parse-review/${taskId}/entries/${encodeURIComponent(entryUuid)}/edit`,
     request
   )
 }
@@ -54,7 +54,7 @@ export function patchEntryTags(
   request: UpdateTagsRequest
 ): Promise<{ data: UpdateTagsResponse }> {
   return axios.patch(
-    `/translate/parse-review/${taskId}/entries/${entryUuid}/tags`,
+    `/translate/parse-review/${taskId}/entries/${encodeURIComponent(entryUuid)}/tags`,
     request
   )
 }

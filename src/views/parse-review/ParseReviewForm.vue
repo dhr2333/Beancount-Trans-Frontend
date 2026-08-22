@@ -29,7 +29,7 @@
     <!-- 加载状态 -->
     <div v-loading="loading.results" class="content-container" :class="{ 'is-review-expired': reviewExpired }">
       <!-- 解析结果表格 -->
-      <el-table v-if="formattedEntries.length > 0" :data="formattedEntries" style="width: 100%" border
+      <el-table v-if="formattedEntries.length > 0" :data="formattedEntries" row-key="uuid" style="width: 100%" border
         highlight-current-row>
         <el-table-column label="Beancount 条目预览" min-width="400">
           <template #default="scope">
