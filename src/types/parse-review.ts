@@ -46,6 +46,8 @@ export interface FormattedEntry {
   original_row?: OriginalRow
   tag_details?: TagDetail[]
   tag_overrides?: TagOverrides
+  installment_role?: 'purchase' | 'installment' | null
+  installment_period?: number | null
 }
 
 /**
@@ -164,10 +166,15 @@ export interface ConfirmWriteErrorResponse {
  * 不计收支且已由内置规则解析（无映射关键字/候选）时，新增支出/收入映射无效，应隐藏。
  */
 export function shouldShowParseReviewCreateMapping(row: FormattedEntry): boolean {
+  if (row.installment_role === 'installment') return false
   const txType = row.original_row?.transaction_type?.trim()
   const isNeutralTx = txType === '/' || txType === '不计收支'
   if (!isNeutralTx) return true
   if (row.selected_expense_key) return true
   if (row.expense_candidates_with_score?.length) return true
   return false
+}
+
+export function isInstallmentRepaymentEntry(row: FormattedEntry): boolean {
+  return row.installment_role === 'installment'
 }

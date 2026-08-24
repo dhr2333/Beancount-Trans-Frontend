@@ -29,7 +29,7 @@
     <!-- 加载状态 -->
     <div v-loading="loading.results" class="content-container" :class="{ 'is-review-expired': reviewExpired }">
       <!-- 解析结果表格 -->
-      <el-table v-if="formattedEntries.length > 0" :data="formattedEntries" style="width: 100%" border
+      <el-table v-if="formattedEntries.length > 0" :data="formattedEntries" row-key="uuid" style="width: 100%" border
         highlight-current-row>
         <el-table-column label="Beancount 条目预览" min-width="400">
           <template #default="scope">
@@ -112,7 +112,7 @@
                 :ref="(el) => setEntryInputRef(scope.row.uuid, el)"
                 v-model="scope.row.edited_formatted"
                 type="textarea"
-                :autosize="{ minRows: 7, maxRows: 40 }"
+                :autosize="getEntryAutosize(scope.row.edited_formatted)"
                 class="entry-preview"
                 placeholder="编辑 Beancount 条目；失焦后返回预览。过账行中账户在预览模式下点击可更换"
                 @blur="onEntryTextareaBlur(scope.row)"
@@ -130,7 +130,13 @@
         </el-table-column>
         <el-table-column label="AI分类反馈" min-width="400">
           <template #default="scope">
-            <div class="ai-classification-container">
+            <div v-if="isInstallmentRepaymentEntry(scope.row)" class="ai-classification-container">
+              <div class="current-selection">
+                <span class="label">分期还款：</span>
+                <span class="no-category-tip">不参与分类反馈</span>
+              </div>
+            </div>
+            <div v-else class="ai-classification-container">
               <div class="current-selection">
                 <span class="label">当前分类：</span>
                 <el-tag
@@ -366,6 +372,7 @@ import { fetchTagTree } from '../../api/tags'
 import { getTask } from '../../api/reconciliation'
 import {
   shouldShowParseReviewCreateMapping,
+  isInstallmentRepaymentEntry,
   type FormattedEntry,
   type ParseResult,
   type ErrorEntry,
@@ -1519,6 +1526,12 @@ const handleEntryEdit = async (uuid: string, editedFormatted: string) => {
   }
 }
 
+/** 编辑框高度随条目行数变化，避免短条目被固定撑到 7 行。 */
+function getEntryAutosize(text: string) {
+  const lineCount = Math.max(1, (text || '').split('\n').length)
+  return { minRows: lineCount, maxRows: Math.max(40, lineCount) }
+}
+
 // 获取条目预览的类名
 const getEntryClasses = (uuid: string, editedFormatted: string) => {
   const isError = !!errorEntries.value[uuid]
@@ -1766,7 +1779,6 @@ onMounted(() => {
 .entry-preview-wrapper {
   position: relative;
   flex-shrink: 0;
-  min-height: calc(7 * 1.6em + 10px + 2px);
   font-size: 12px;
   line-height: 1.6;
   
@@ -1832,12 +1844,12 @@ onMounted(() => {
   }
 }
 
-// 预览块与编辑 textarea 共用同一套「占位尺寸」。
-// border-box 下 min-height 须包含 7 行内容高度（line-height 1.6 → 7×1.6em）+ 上下 padding(10px) + 上下 border(2px)，否则少于 7 行时外框会偏矮。
+// 预览块与编辑 textarea 共用同一套内边距；高度随条目行数自适应。
+// 空条目仍保留 1 行占位（line-height 1.6 + 上下 padding 10px + 上下 border 2px），保证可点选。
 $entry-preview-inner-padding: 5px 11px;
 $entry-preview-inner-radius: var(--el-border-radius-base);
 $entry-preview-inner-border: 1px solid;
-$entry-preview-min-height: calc(7 * 1.6em + 10px + 2px);
+$entry-preview-min-height: calc(1 * 1.6em + 10px + 2px);
 
 .entry-preview {
   width: 100%;
