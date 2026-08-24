@@ -130,7 +130,13 @@
         </el-table-column>
         <el-table-column label="AI分类反馈" min-width="400">
           <template #default="scope">
-            <div class="ai-classification-container">
+            <div v-if="isInstallmentRepaymentEntry(scope.row)" class="ai-classification-container">
+              <div class="current-selection">
+                <span class="label">分期还款：</span>
+                <span class="no-category-tip">不参与分类反馈</span>
+              </div>
+            </div>
+            <div v-else class="ai-classification-container">
               <div class="current-selection">
                 <span class="label">当前分类：</span>
                 <el-tag
@@ -366,6 +372,7 @@ import { fetchTagTree } from '../../api/tags'
 import { getTask } from '../../api/reconciliation'
 import {
   shouldShowParseReviewCreateMapping,
+  isInstallmentRepaymentEntry,
   type FormattedEntry,
   type ParseResult,
   type ErrorEntry,
