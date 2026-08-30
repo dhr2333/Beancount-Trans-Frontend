@@ -14,6 +14,7 @@ declare module '@vue/runtime-core' {
     AccountTemplates: typeof import('./components/template/AccountTemplates.vue')['default']
     AnonymousPrompt: typeof import('./components/common/AnonymousPrompt.vue')['default']
     Assets: typeof import('./components/map/Assets.vue')['default']
+    AssistantSessionSidebar: typeof import('./components/assistant/AssistantSessionSidebar.vue')['default']
     AssistantShareCard: typeof import('./components/assistant/AssistantShareCard.vue')['default']
     AssistantThinkingBlock: typeof import('./components/assistant/AssistantThinkingBlock.vue')['default']
     BaseHeader: typeof import('./components/layouts/BaseHeader.vue')['default']

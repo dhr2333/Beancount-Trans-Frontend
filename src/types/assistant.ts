@@ -24,7 +24,9 @@ export interface QueryRecord {
 }
 
 export interface AssistantChatRequest {
-  messages: Array<{ role: ChatRole; content: string }>
+  messages?: Array<{ role: ChatRole; content: string }>
+  session_id?: string
+  content?: string
   show_bql?: boolean
   deep_think?: boolean
 }
@@ -35,6 +37,9 @@ export interface AssistantChatResponse {
   thinking?: string
   reasoning?: string
   model?: string
+  session_id?: string
+  user_message_id?: string
+  assistant_message_id?: string
 }
 
 export interface AssistantStatus {
@@ -46,7 +51,32 @@ export interface AssistantStatus {
   reference_date?: string
 }
 
+export interface AssistantSessionSummary {
+  id: string
+  title: string
+  created: string
+  modified: string
+}
+
+export interface AssistantSessionDetail extends AssistantSessionSummary {
+  title_locked: boolean
+  messages: StoredChatMessage[]
+}
+
+export interface StoredChatMessage {
+  id: string
+  role: ChatRole
+  content: string
+  thinking: string
+  reasoning: string
+  queries: QueryRecord[]
+  position: number
+  feedback: AssistantFeedbackRating | null
+  created: string
+}
+
 export type AssistantStreamEvent =
+  | { event: 'session'; data: { id: string; title: string; user_message_id: string } }
   | { event: 'status'; data: { phase: AssistantPhase } }
   | { event: 'reasoning_delta'; data: { content: string; source?: 'api' | 'planning' } }
   | { event: 'thinking_set'; data: { content: string; reasoning?: string } }

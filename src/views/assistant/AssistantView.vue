@@ -1,17 +1,30 @@
 <template>
-  <div class="assistant-page" :class="{ 'assistant-page--share-select': shareSelectMode }">
-    <div class="assistant-header">
-      <div class="header-left">
-        <h2 class="page-title">AI 账本助手</h2>
-        <p class="page-subtitle">用自然语言查询账本数据与汇总</p>
+  <div class="assistant-layout">
+    <AssistantSessionSidebar
+      :sessions="sessions"
+      :sessions-loading="sessionsLoading"
+      v-model:search-query="searchQuery"
+      :active-session-id="sessionId"
+      @new-chat="handleNewChat"
+      @select="handleSelectSession"
+      @rename="handleRenameSession"
+      @delete="handleDeleteSession"
+      @search="fetchSessions"
+    />
+
+    <div class="assistant-page" :class="{ 'assistant-page--share-select': shareSelectMode }">
+      <div class="assistant-header">
+        <div class="header-left">
+          <h2 class="page-title">AI 账本助手</h2>
+          <p class="page-subtitle">用自然语言查询账本数据与汇总</p>
+        </div>
+        <div class="header-right">
+          <el-tag v-if="statusLoading" type="info">检查中...</el-tag>
+          <el-tag v-else-if="status?.api_key_configured" type="success">已配置</el-tag>
+          <el-tag v-else type="warning">未配置</el-tag>
+          <el-button text @click="handleNewChat">新对话</el-button>
+        </div>
       </div>
-      <div class="header-right">
-        <el-tag v-if="statusLoading" type="info">检查中...</el-tag>
-        <el-tag v-else-if="status?.api_key_configured" type="success">已配置</el-tag>
-        <el-tag v-else type="warning">未配置</el-tag>
-        <el-button text @click="handleClearMessages" :disabled="messages.length === 0">清空对话</el-button>
-      </div>
-    </div>
 
     <el-alert v-if="!statusLoading && status && !status.api_key_configured" type="warning" :closable="false" show-icon
       class="setup-alert" title="尚未配置账本助手">
@@ -31,7 +44,7 @@
       </template>
     </el-alert>
 
-    <div class="chat-container" ref="chatContainerRef">
+    <div class="chat-container" ref="chatContainerRef" v-loading="sessionLoading">
       <div v-if="messages.length === 0" class="welcome-panel">
         <el-icon :size="48" color="var(--ep-color-primary)">
           <ChatDotRound />
@@ -154,18 +167,22 @@
         <AssistantShareCard :turns="sharePreview.turns" />
       </div>
     </Teleport>
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { CheckboxValueType } from 'element-plus'
 import { ChatDotRound, CircleCheck, CircleClose, DocumentCopy, Share } from '@element-plus/icons-vue'
+import AssistantSessionSidebar from '../../components/assistant/AssistantSessionSidebar.vue'
 import AssistantShareCard from '../../components/assistant/AssistantShareCard.vue'
 import AssistantThinkingBlock from '../../components/assistant/AssistantThinkingBlock.vue'
 import MarkdownContent from '../../components/assistant/MarkdownContent.vue'
 import { useAssistantChat } from '../../composables/useAssistantChat'
+import { useAssistantSessions } from '../../composables/useAssistantSessions'
 import { copyText } from '../../utils/clipboard'
 import {
   buildShareTurns,
@@ -174,11 +191,29 @@ import {
   validateShareTurnCount,
 } from '../../utils/assistantShare'
 import { captureElementAsPng, sharePngBlob } from '../../utils/shareImage'
-import type { AssistantPhase, AssistantShareTurn, ChatMessage } from '../../types/assistant'
+import type { AssistantPhase, AssistantSessionSummary, AssistantShareTurn, ChatMessage } from '../../types/assistant'
+
+const route = useRoute()
+const router = useRouter()
+
+const sessionId = computed(() => {
+  const value = route.params.sessionId
+  return typeof value === 'string' && value ? value : undefined
+})
+
+const {
+  sessions,
+  sessionsLoading,
+  searchQuery,
+  fetchSessions,
+  renameSession,
+  removeSession,
+} = useAssistantSessions()
 
 const {
   messages,
   loading,
+  sessionLoading,
   deepThink,
   status,
   statusLoading,
@@ -189,8 +224,12 @@ const {
   send,
   stop,
   submitFeedback,
-  clearMessages,
-} = useAssistantChat()
+  startNewChat,
+} = useAssistantChat({
+  sessionId,
+  router,
+  onSessionsChanged: fetchSessions,
+})
 
 function statusHint(phase?: AssistantPhase): string {
   if (phase === 'querying') return '正在查询账本...'
@@ -291,9 +330,50 @@ async function handleGenerateShareImage() {
   await renderAndShare(turns)
 }
 
-function handleClearMessages() {
+function handleNewChat() {
   exitShareSelectMode()
-  clearMessages()
+  startNewChat()
+}
+
+function handleSelectSession(id: string) {
+  if (id === sessionId.value) {
+    return
+  }
+  exitShareSelectMode()
+  router.push(`/assistant/${id}`)
+}
+
+async function handleRenameSession(session: AssistantSessionSummary) {
+  try {
+    const { value } = await ElMessageBox.prompt('输入新的会话标题', '重命名', {
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValue: session.title,
+      inputValidator: (value: string) => !!value?.trim() || '标题不能为空',
+    })
+    if (!value?.trim()) {
+      return
+    }
+    await renameSession(session.id, value.trim())
+  } catch {
+    // 用户取消
+  }
+}
+
+async function handleDeleteSession(id: string) {
+  try {
+    await ElMessageBox.confirm('确定删除该会话吗？此操作不可恢复。', '删除会话', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    await removeSession(id)
+    if (sessionId.value === id) {
+      router.push('/assistant')
+    }
+  } catch {
+    // 用户取消
+  }
 }
 
 async function handleLike(index: number) {
@@ -364,18 +444,25 @@ watch(deepThink, (enabled) => {
 
 onMounted(() => {
   fetchStatus()
+  fetchSessions()
 })
 </script>
 
 <style scoped lang="scss">
+.assistant-layout {
+  display: flex;
+  height: calc(100vh - 120px);
+  margin: 0 -16px;
+  text-align: left;
+}
+
 .assistant-page {
-  max-width: 900px;
-  margin: 0 auto;
+  flex: 1;
+  min-width: 0;
   padding: 0 16px 24px;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 120px);
-  text-align: left;
+  height: 100%;
 
   &--share-select {
     padding-bottom: 88px;

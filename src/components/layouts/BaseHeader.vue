@@ -1,5 +1,5 @@
 <template>
-  <el-menu class="el-menu-demo" mode="horizontal" :ellipsis="false" @select="handleSelect">
+  <el-menu class="el-menu-demo" mode="horizontal" :ellipsis="false" :default-active="activeMenuIndex" @select="handleSelect">
     <el-sub-menu index="account" id="tour-ledger-menu">
       <template #title>财务报表</template>
       <el-menu-item index="platform-ledger" @click="openFavaInstance">
@@ -78,7 +78,8 @@
 
 <script lang="ts" setup>
 // 1. 导入 Vue 相关
-import { ref, onMounted, watchEffect, onUnmounted } from "vue";
+import { ref, computed, onMounted, watchEffect, onUnmounted } from "vue";
+import { useRoute } from 'vue-router'
 
 // 2. 导入第三方库
 import { ElMessage, ElLoading } from 'element-plus';
@@ -88,6 +89,14 @@ import { Moon, Sunny } from "@element-plus/icons-vue";
 import axios from '../../utils/request'
 import router from "~/routers";
 import { isDark } from "~/composables";
+
+const route = useRoute()
+const activeMenuIndex = computed(() => {
+  if (route.path.startsWith('/assistant')) {
+    return '/assistant'
+  }
+  return route.path
+})
 
 // 4. 常量
 const FAVA_STOP_PATH = '/fava/stop/'

@@ -48,7 +48,7 @@ const router = createRouter({
     // 解析审核功能
     { path: '/parse-review/:taskId', name: "parseReviewForm", component: ParseReviewForm },
     // AI 账本助手
-    { path: '/assistant', name: "assistant", component: AssistantView },
+    { path: '/assistant/:sessionId?', name: 'assistant', component: AssistantView },
     { path: '/login', name: "login", component: Login },
     { path: '/phone-binding', name: "phoneBinding", component: PhoneBinding },
     { path: '/settings', name: "settings", component: Settings },
