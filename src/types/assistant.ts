@@ -32,7 +32,6 @@ export interface AssistantChatRequest {
 export interface AssistantChatResponse {
   reply: string
   queries: QueryRecord[]
-  api_key_source: 'user' | 'platform' | 'none'
   thinking?: string
   reasoning?: string
   model?: string
@@ -40,9 +39,11 @@ export interface AssistantChatResponse {
 
 export interface AssistantStatus {
   api_key_configured: boolean
-  api_key_source: 'user' | 'platform' | 'none'
+  assistant_model: string
+  deep_think_supported: boolean
   ledger_exists: boolean
   ledger_path: string
+  reference_date?: string
 }
 
 export type AssistantStreamEvent =

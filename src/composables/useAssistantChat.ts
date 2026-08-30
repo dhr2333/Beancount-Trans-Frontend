@@ -34,12 +34,7 @@ export function useAssistantChat() {
     return status.value.api_key_configured && status.value.ledger_exists
   })
 
-  const keySourceLabel = computed(() => {
-    if (!status.value?.api_key_configured) return '未配置'
-    if (status.value.api_key_source === 'user') return '用户 Key'
-    if (status.value.api_key_source === 'platform') return '平台 Key'
-    return '未配置'
-  })
+  const deepThinkSupported = computed(() => status.value?.deep_think_supported ?? false)
 
   function getAssistantMessage(): ChatMessage | undefined {
     const last = messages.value[messages.value.length - 1]
@@ -269,7 +264,7 @@ export function useAssistantChat() {
     statusLoading,
     error,
     canChat,
-    keySourceLabel,
+    deepThinkSupported,
     exampleQuestions: EXAMPLE_QUESTIONS,
     fetchStatus,
     send,

@@ -7,18 +7,18 @@
       </div>
       <div class="header-right">
         <el-tag v-if="statusLoading" type="info">检查中...</el-tag>
-        <el-tag v-else-if="status?.api_key_configured" type="success">{{ keySourceLabel }}</el-tag>
-        <el-tag v-else type="warning">未配置 Key</el-tag>
+        <el-tag v-else-if="status?.api_key_configured" type="success">已配置</el-tag>
+        <el-tag v-else type="warning">未配置</el-tag>
         <el-button text @click="handleClearMessages" :disabled="messages.length === 0">清空对话</el-button>
       </div>
     </div>
 
     <el-alert v-if="!statusLoading && status && !status.api_key_configured" type="warning" :closable="false" show-icon
-      class="setup-alert" title="尚未配置 DeepSeek API Key">
+      class="setup-alert" title="尚未配置账本助手">
       <template #default>
         请在
         <router-link to="/format" class="alert-link">输出配置</router-link>
-        中填写 DeepSeek API Key，或联系管理员配置平台 Key。
+        的「账本助手」中填写接口地址、模型与密钥。
       </template>
     </el-alert>
 
@@ -118,13 +118,19 @@
       <el-input v-model="inputText" type="textarea" :rows="2" placeholder="输入问题，例如：本月餐饮支出多少？"
         :disabled="!canChat || loading" resize="none" @keydown.enter.exact.prevent="handleSend" />
       <div class="input-actions">
-        <el-switch
-          v-model="deepThink"
-          inline-prompt
-          active-text="深度思考"
-          inactive-text="深度思考"
+        <el-tooltip
+          content="开启后模型会先推理再回答，更慢但更准"
+          placement="top"
           :disabled="!canChat || loading"
-        />
+        >
+          <el-switch
+            v-model="deepThink"
+            inline-prompt
+            active-text="DeepThink"
+            inactive-text="DeepThink"
+            :disabled="!canChat || loading"
+          />
+        </el-tooltip>
         <el-button v-if="loading" @click="stop">
           停止
         </el-button>
@@ -177,7 +183,7 @@ const {
   status,
   statusLoading,
   canChat,
-  keySourceLabel,
+  deepThinkSupported,
   exampleQuestions,
   fetchStatus,
   send,
@@ -349,6 +355,12 @@ async function scrollToBottom() {
 watch(messages, () => {
   scrollToBottom()
 }, { deep: true })
+
+watch(deepThink, (enabled) => {
+  if (enabled && status.value && !status.value.deep_think_supported) {
+    ElMessage.info('当前模型不支持 DeepThink，将使用简要分析')
+  }
+})
 
 onMounted(() => {
   fetchStatus()
