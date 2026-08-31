@@ -160,8 +160,8 @@
                 </div>
             </el-collapse-item>
 
-            <!-- 账本助手 -->
-            <el-collapse-item title="账本助手" name="assistant" class="config-item">
+            <!-- Copilot -->
+            <el-collapse-item title="Copilot" name="assistant" class="config-item">
                 <div class="config-group">
                     <el-form-item label="Provider 预设">
                         <el-select v-model="assistantPreset" class="model-selector" @change="applyAssistantPreset">
@@ -185,7 +185,7 @@
                     </el-form-item>
 
                     <el-alert type="info" :closable="false" class="engine-description-alert">
-                        账本助手与上方解析引擎独立配置。DeepSeek 支持 DeepThink（thinking 参数）；Ollama 等自定义接口仅使用简要分析。
+                        Copilot 与上方解析引擎独立配置，只读查询账本，不会改账。DeepSeek 支持 DeepThink（thinking 参数）；Ollama 等自定义接口仅使用简要分析。
                     </el-alert>
                 </div>
             </el-collapse-item>

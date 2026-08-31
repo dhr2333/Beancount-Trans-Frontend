@@ -1,52 +1,71 @@
 <template>
-  <aside class="assistant-sidebar">
-    <div class="sidebar-header">
-      <el-button type="primary" class="new-chat-btn" @click="emit('new-chat')">
-        新对话
+  <aside
+    class="assistant-sidebar"
+    :class="{ 'assistant-sidebar--collapsed': collapsed }"
+  >
+    <div v-if="collapsed" class="sidebar-rail">
+      <el-button class="rail-btn" text @click="emit('expand')">
+        <el-icon :size="18"><Expand /></el-icon>
       </el-button>
-      <el-input
-        ref="searchInputRef"
-        v-model="searchModel"
-        placeholder="搜索会话"
-        clearable
-        size="small"
-        @input="handleSearchInput"
-      />
+      <el-button class="rail-btn" text @click="emit('new-chat')">
+        <el-icon :size="18"><EditPen /></el-icon>
+      </el-button>
     </div>
 
-    <div v-loading="sessionsLoading" class="session-list">
-      <div v-if="sessions.length === 0 && !sessionsLoading" class="empty-sessions">
-        暂无历史会话
-      </div>
-      <div
-        v-for="session in sessions"
-        :key="session.id"
-        class="session-item"
-        :class="{
-          active: session.id === activeSessionId,
-          'is-menu-open': openMenuId === session.id,
-        }"
-        @click="emit('select', session.id)"
-      >
-        <div class="session-title" :title="session.title">{{ session.title || '新对话' }}</div>
-        <el-dropdown
-          trigger="click"
-          @command="(command) => handleCommand(command, session)"
-          @visible-change="(visible) => onMenuVisible(session.id, visible)"
-          @click.stop
-        >
-          <el-button class="session-more" text size="small" title="更多" @click.stop>
-            <el-icon><More /></el-icon>
+    <div v-else class="assistant-sidebar-inner">
+      <div class="sidebar-header">
+        <div class="sidebar-header-row">
+          <el-button class="collapse-btn" text @click="emit('collapse')">
+            <el-icon :size="18"><Fold /></el-icon>
           </el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="rename">重命名</el-dropdown-item>
-              <el-dropdown-item command="delete" divided>
-                <span class="session-delete">删除</span>
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+          <el-button type="primary" class="new-chat-btn" @click="emit('new-chat')">
+            新对话
+          </el-button>
+        </div>
+        <el-input
+          ref="searchInputRef"
+          v-model="searchModel"
+          placeholder="搜索会话"
+          clearable
+          size="small"
+          @input="handleSearchInput"
+        />
+      </div>
+
+      <div v-loading="sessionsLoading" class="session-list">
+        <div v-if="sessions.length === 0 && !sessionsLoading" class="empty-sessions">
+          暂无历史会话
+        </div>
+        <div
+          v-for="session in sessions"
+          :key="session.id"
+          class="session-item"
+          :class="{
+            active: session.id === activeSessionId,
+            'is-menu-open': openMenuId === session.id,
+          }"
+          @click="emit('select', session.id)"
+        >
+          <div class="session-title" :title="session.title">{{ session.title || '新对话' }}</div>
+          <el-dropdown
+            trigger="click"
+            @command="(command) => handleCommand(command, session)"
+            @visible-change="(visible) => onMenuVisible(session.id, visible)"
+            @click.stop
+          >
+            <el-button class="session-more" text size="small" @click.stop>
+              <el-icon><More /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="rename">重命名</el-dropdown-item>
+                <el-dropdown-item command="delete" divided>
+                  <span class="session-delete">删除</span>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </div>
     </div>
   </aside>
@@ -54,7 +73,7 @@
 
 <script lang="ts" setup>
 import { computed, ref } from 'vue'
-import { More } from '@element-plus/icons-vue'
+import { EditPen, Expand, Fold, More } from '@element-plus/icons-vue'
 import type { AssistantSessionSummary } from '../../types/assistant'
 
 const props = defineProps<{
@@ -62,6 +81,7 @@ const props = defineProps<{
   sessionsLoading: boolean
   searchQuery: string
   activeSessionId?: string
+  collapsed?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -71,6 +91,8 @@ const emit = defineEmits<{
   delete: [sessionId: string]
   'update:searchQuery': [value: string]
   search: []
+  collapse: []
+  expand: []
 }>()
 
 const searchModel = computed({
@@ -117,11 +139,42 @@ defineExpose({ focusSearch })
   width: 260px;
   flex-shrink: 0;
   align-self: stretch;
+  min-height: 0;
+  overflow: hidden;
   border-right: 1px solid var(--ep-border-color-light);
+  background: var(--ep-bg-color);
+  transition: width 0.2s ease;
+
+  &--collapsed {
+    width: 52px;
+  }
+}
+
+.sidebar-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0;
+}
+
+.rail-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
+
+  &:hover {
+    background: var(--ep-fill-color-light);
+  }
+}
+
+.assistant-sidebar-inner {
+  width: 260px;
+  height: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--ep-bg-color);
 }
 
 .sidebar-header {
@@ -132,8 +185,21 @@ defineExpose({ focusSearch })
   border-bottom: 1px solid var(--ep-border-color-lighter);
 }
 
+.sidebar-header-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.collapse-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
 .new-chat-btn {
-  width: 100%;
+  flex: 1;
 }
 
 .session-list {

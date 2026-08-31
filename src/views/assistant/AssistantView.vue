@@ -6,20 +6,23 @@
       :sessions-loading="sessionsLoading"
       v-model:search-query="searchQuery"
       :active-session-id="sessionId"
+      :collapsed="!sidebarOpen"
       @new-chat="handleNewChat"
       @select="handleSelectSession"
       @rename="handleRenameSession"
       @delete="handleDeleteSession"
       @search="fetchSessions"
+      @collapse="sidebarOpen = false"
+      @expand="sidebarOpen = true"
     />
 
     <div class="assistant-page" :class="{ 'assistant-page--share-select': shareSelectMode }">
     <el-alert v-if="!statusLoading && status && !status.api_key_configured" type="warning" :closable="false" show-icon
-      class="setup-alert" title="尚未配置账本助手">
+      class="setup-alert" title="尚未配置 Copilot">
       <template #default>
         请在
         <router-link to="/format" class="alert-link">输出配置</router-link>
-        的「账本助手」中填写接口地址、模型与密钥。
+        的「Copilot」中填写接口地址、模型与密钥。
       </template>
     </el-alert>
 
@@ -28,7 +31,7 @@
       <template #default>
         请先在
         <router-link to="/file" class="alert-link">文件管理</router-link>
-        上传并解析账单，生成账本后再使用助手。
+        上传并解析账单，生成账本后再使用 Copilot。
       </template>
     </el-alert>
 
@@ -55,7 +58,7 @@
           :model-value="selectedIndices.has(index)" :disabled="sharing" @click.stop
           @change="(val: CheckboxValueType) => toggleShareSelection(index, val === true)" />
         <div class="message-bubble">
-          <div class="message-role">{{ msg.role === 'user' ? '你' : '助手' }}</div>
+          <div class="message-role">{{ msg.role === 'user' ? '你' : 'Copilot' }}</div>
           <div v-if="msg.role === 'user'" class="message-content message-content--user">{{ msg.content }}</div>
           <template v-else>
             <AssistantThinkingBlock v-if="msg.thinking?.trim()" v-model:expanded="msg.thinkingExpanded"
@@ -130,17 +133,13 @@
         <div class="composer-footer">
           <span class="composer-meta">{{ modelLabel }}</span>
           <div class="input-actions">
-            <el-tooltip :content="deepThinkTooltip" placement="top">
-              <span class="deepthink-switch">
-                <el-switch
-                  v-model="deepThink"
-                  inline-prompt
-                  active-text="DeepThink"
-                  inactive-text="DeepThink"
-                  :disabled="!canChat || loading || !deepThinkSupported"
-                />
-              </span>
-            </el-tooltip>
+            <el-switch
+              v-model="deepThink"
+              inline-prompt
+              active-text="DeepThink"
+              inactive-text="DeepThink"
+              :disabled="!canChat || loading || !deepThinkSupported"
+            />
             <el-button v-if="loading" @click="stop">
               停止
             </el-button>
@@ -230,22 +229,19 @@ const {
   onSessionsChanged: fetchSessions,
 })
 
+const SIDEBAR_OPEN_KEY = 'assistant-sidebar-open'
+const sidebarOpen = ref(localStorage.getItem(SIDEBAR_OPEN_KEY) !== '0')
+
+watch(sidebarOpen, (open) => {
+  localStorage.setItem(SIDEBAR_OPEN_KEY, open ? '1' : '0')
+})
+
 const sessionSidebarRef = ref<{ focusSearch: () => void } | null>(null)
 const composerInputRef = ref<InputInstance>()
 const inputText = ref('')
 const chatContainerRef = ref<HTMLElement | null>(null)
 
 const modelLabel = computed(() => status.value?.assistant_model?.trim() || '')
-
-const deepThinkTooltip = computed(() => {
-  if (!canChat.value) {
-    return '配置助手并生成账本后可用'
-  }
-  if (!deepThinkSupported.value) {
-    return '当前模型不支持 DeepThink'
-  }
-  return '开启后模型会先推理再回答，更慢但更准'
-})
 
 function statusHint(phase?: AssistantPhase): string {
   if (phase === 'querying') return '正在查询账本...'
@@ -274,7 +270,10 @@ function handleShortcut(event: KeyboardEvent) {
   }
   if (meta && event.key.toLowerCase() === 'k') {
     event.preventDefault()
-    sessionSidebarRef.value?.focusSearch()
+    sidebarOpen.value = true
+    nextTick(() => {
+      sessionSidebarRef.value?.focusSearch()
+    })
     return
   }
   if (event.key === '/' && !meta && !event.altKey && !isTypingTarget(event.target)) {
@@ -505,6 +504,7 @@ onUnmounted(() => {
 }
 
 .assistant-page {
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -519,6 +519,11 @@ onUnmounted(() => {
 .setup-alert {
   margin: 12px 16px 0;
   flex-shrink: 0;
+}
+
+.welcome-text {
+  margin: 16px 0 24px;
+  color: var(--ep-text-color-regular);
 }
 
 .alert-link {
@@ -547,11 +552,6 @@ onUnmounted(() => {
   min-height: 100%;
   padding: 48px 16px;
   text-align: center;
-}
-
-.welcome-text {
-  margin: 16px 0 24px;
-  color: var(--ep-text-color-regular);
 }
 
 .example-chips {
@@ -664,11 +664,11 @@ onUnmounted(() => {
 }
 
 .share-select-bar {
-  position: fixed;
+  position: absolute;
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 2000;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -773,11 +773,6 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.deepthink-switch {
-  display: inline-flex;
-  align-items: center;
 }
 
 .input-actions {

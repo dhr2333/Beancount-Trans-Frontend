@@ -1,19 +1,13 @@
 <template>
-  <el-menu class="el-menu-demo" mode="horizontal" :ellipsis="false" :default-active="activeMenuIndex" @select="handleSelect">
-    <el-sub-menu index="account" id="tour-ledger-menu">
-      <template #title>财务报表</template>
-      <el-menu-item index="platform-ledger" @click="openFavaInstance">
-        Fava 专业报表
-      </el-menu-item>
-      <!-- <el-menu-item index="official-ledger"
-        @click="openExternal('https://fava.pythonanywhere.com/example-beancount-file/income_statement/')">
-        案例账本
-      </el-menu-item> -->
-    </el-sub-menu>
-
+  <el-menu class="el-menu-demo" mode="horizontal" :ellipsis="false" :default-active="activeMenuIndex" :key="`${activeMenuIndex}-${menuRenderKey}`" @select="handleSelect">
     <router-link to="/assistant" class="no-underline">
-      <el-menu-item index="/assistant">AI 账本助手</el-menu-item>
+      <el-menu-item index="/assistant" id="tour-ledger-menu">
+        Copilot
+      </el-menu-item>
     </router-link>
+    <el-menu-item index="platform-ledger" @click="openFavaInstance">
+      Fava
+    </el-menu-item>
 
     <router-link to="/trans" class="no-underline">
       <el-menu-item index="/trans">账单解析</el-menu-item>
@@ -98,6 +92,7 @@ const activeMenuIndex = computed(() => {
   }
   return route.path
 })
+const menuRenderKey = ref(0)
 
 // 4. 常量
 const FAVA_STOP_PATH = '/fava/stop/'
@@ -225,6 +220,7 @@ const openFavaInstance = async () => {
     }
   } finally {
     loading.close();
+    menuRenderKey.value += 1;
   }
 };
 
