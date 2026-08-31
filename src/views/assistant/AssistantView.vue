@@ -41,6 +41,7 @@
           <ChatDotRound />
         </el-icon>
         <p class="welcome-text">你好，我可以帮你查询支出、收入、余额等账本信息。</p>
+        <p class="welcome-readonly">Copilot 只读查询账本，不会改账。</p>
         <div class="example-chips">
           <el-button v-for="q in exampleQuestions" :key="q" size="small" round :disabled="!canChat || loading"
             @click="handleExample(q)">
@@ -522,8 +523,14 @@ onUnmounted(() => {
 }
 
 .welcome-text {
-  margin: 16px 0 24px;
+  margin: 16px 0 8px;
   color: var(--ep-text-color-regular);
+}
+
+.welcome-readonly {
+  margin: 0 0 24px;
+  font-size: 13px;
+  color: var(--ep-text-color-secondary);
 }
 
 .alert-link {
