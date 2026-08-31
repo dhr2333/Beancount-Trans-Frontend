@@ -151,22 +151,43 @@ defineExpose({ focusSearch })
 
   &--collapsed {
     width: 52px;
+    display: flex;
+    flex-direction: column;
   }
 }
 
 .sidebar-rail {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 0;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 4px 12px 12px;
+  box-sizing: border-box;
 }
 
 .rail-btn {
   width: 36px;
   height: 36px;
+  margin: 0;
   padding: 0;
   border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  :deep(span) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+  }
+
+  :deep(.ep-icon) {
+    margin: 0;
+  }
 
   &:hover {
     background: var(--ep-fill-color-light);
@@ -192,18 +213,37 @@ defineExpose({ focusSearch })
 .sidebar-header-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
 }
 
 .collapse-btn {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
+  margin: 0;
   padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  :deep(span) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+  }
+
+  :deep(.ep-icon) {
+    margin: 0;
+  }
 }
 
 .new-chat-btn {
   flex: 1;
+  height: 36px;
+  margin: 0;
+  padding: 0 12px;
 }
 
 .session-list {
