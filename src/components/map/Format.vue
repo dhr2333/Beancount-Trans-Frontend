@@ -135,7 +135,6 @@
                             <el-select v-model="aiModel" placeholder="选择AI处理引擎" class="model-selector">
                                 <el-option label="单规则匹配" value="None" />
                                 <el-option label="BERT - 本地模型 (平衡模式)" value="BERT" />
-                                <el-option label="spaCy - 本地模型 (极速模式)" value="spaCy" />
                                 <el-option label="DeepSeek - 云端大模型 (高精度模式)" value="DeepSeek" />
                             </el-select>
 
@@ -318,8 +317,6 @@ const engineDescription = computed(() => {
             return '选择第一个'
         case 'BERT':
             return '基于Transformer架构，适合复杂语义理解，准确度较高（F1 0.87），推理速度 32ms/token'
-        case 'spaCy':
-            return '工业级NLP库，优化词向量匹配，推理速度 <5ms/token，适合实时处理'
         case 'DeepSeek':
             return '千亿参数LLM（需API密钥），复杂场景准确度提升35%，延迟 800-1200ms/请求'
         default:
@@ -335,7 +332,7 @@ const convertToFrontend = (config: Config) => {
         commissionTemplate: config.commission_template || '',
         reconciliationFallbackAccount: config.reconciliation_fallback_account || 'Equity:Adjustments',
         currency: config.currency || 'CNY',
-        aiModel: config.ai_model || 'BERT',
+        aiModel: config.ai_model === 'spaCy' ? 'BERT' : (config.ai_model || 'BERT'),
         deepseek_apikey: config.deepseek_apikey || '',
         assistantBaseUrl: config.assistant_base_url || '',
         assistantApiKey: config.assistant_api_key || '',
