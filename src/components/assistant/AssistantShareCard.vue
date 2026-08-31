@@ -34,7 +34,7 @@ const showTurnNumber = computed(() => props.turns.length > 1)
         </div>
 
         <div class="share-card__section">
-          <div class="share-card__label">助手回答</div>
+          <div class="share-card__label">Copilot</div>
           <MarkdownContent :content="turn.assistantContent" class="share-card__markdown" />
         </div>
       </div>

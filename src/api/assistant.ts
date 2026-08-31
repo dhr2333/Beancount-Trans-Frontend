@@ -5,12 +5,35 @@ import type {
   AssistantChatResponse,
   AssistantFeedbackRequest,
   AssistantFeedbackResponse,
+  AssistantSessionDetail,
+  AssistantSessionSummary,
   AssistantStatus,
   AssistantStreamEvent,
 } from '../types/assistant'
 
 export function getAssistantStatus(): Promise<{ data: AssistantStatus }> {
   return axios.get('/assistant/status/')
+}
+
+export function listAssistantSessions(search = ''): Promise<{ data: AssistantSessionSummary[] }> {
+  return axios.get('/assistant/sessions/', {
+    params: search ? { search } : undefined,
+  })
+}
+
+export function getAssistantSession(sessionId: string): Promise<{ data: AssistantSessionDetail }> {
+  return axios.get(`/assistant/sessions/${sessionId}/`)
+}
+
+export function updateAssistantSessionTitle(
+  sessionId: string,
+  title: string,
+): Promise<{ data: AssistantSessionDetail }> {
+  return axios.patch(`/assistant/sessions/${sessionId}/`, { title })
+}
+
+export function deleteAssistantSession(sessionId: string): Promise<void> {
+  return axios.delete(`/assistant/sessions/${sessionId}/`)
 }
 
 export function sendAssistantChat(

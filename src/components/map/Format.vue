@@ -129,8 +129,8 @@
                         </div>
                     </el-form-item>
 
-                    <el-divider>AI模型选择</el-divider>
-                    <el-form-item label="AI引擎" prop="aiModel">
+                    <el-divider>解析引擎（仅用于账单分类）</el-divider>
+                    <el-form-item label="解析引擎" prop="aiModel">
                         <div class="ai-engine-container">
                             <el-select v-model="aiModel" placeholder="选择AI处理引擎" class="model-selector">
                                 <el-option label="单规则匹配" value="None" />
@@ -157,6 +157,36 @@
                                 show-password clearable />
                         </el-form-item>
                     </template>
+                </div>
+            </el-collapse-item>
+
+            <!-- Copilot -->
+            <el-collapse-item title="Copilot" name="assistant" class="config-item">
+                <div class="config-group">
+                    <el-form-item label="Provider 预设">
+                        <el-select v-model="assistantPreset" class="model-selector" @change="applyAssistantPreset">
+                            <el-option label="DeepSeek" value="deepseek" />
+                            <el-option label="Ollama（本地）" value="ollama" />
+                            <el-option label="自定义" value="custom" />
+                        </el-select>
+                    </el-form-item>
+
+                    <el-form-item label="接口地址">
+                        <el-input v-model="assistantBaseUrl" placeholder="例如 https://api.deepseek.com" clearable />
+                    </el-form-item>
+
+                    <el-form-item label="API 密钥">
+                        <el-input v-model="assistantApiKey" type="password" placeholder="Ollama 等本地服务可留空"
+                            show-password clearable />
+                    </el-form-item>
+
+                    <el-form-item label="模型名称">
+                        <el-input v-model="assistantModel" placeholder="例如 deepseek-v4-flash" clearable />
+                    </el-form-item>
+
+                    <el-alert type="info" :closable="false" class="engine-description-alert">
+                        Copilot 与上方解析引擎独立配置，只读查询账本，不会改账。DeepSeek 支持 DeepThink（thinking 参数）；Ollama 等自定义接口仅使用简要分析。
+                    </el-alert>
                 </div>
             </el-collapse-item>
         </el-collapse>
@@ -230,12 +260,32 @@ interface Config {
     currency?: string
     ai_model?: string
     deepseek_apikey?: string
+    assistant_base_url?: string
+    assistant_api_key?: string
+    assistant_model?: string
     enable_realtime?: boolean
     parsing_mode_preference?: string
 }
 
+type AssistantPreset = 'deepseek' | 'ollama' | 'custom'
+
+const ASSISTANT_PRESETS: Record<AssistantPreset, { baseUrl: string; model: string }> = {
+    deepseek: {
+        baseUrl: 'https://api.deepseek.com',
+        model: 'deepseek-v4-flash',
+    },
+    ollama: {
+        baseUrl: 'http://127.0.0.1:11434/v1',
+        model: '',
+    },
+    custom: {
+        baseUrl: '',
+        model: '',
+    },
+}
+
 // 响应式配置状态
-const activePanels = ref(['basic', 'template', 'parsing'])
+const activePanels = ref(['basic', 'template', 'parsing', 'assistant'])
 const formatSettings = ref<string[]>([])
 const accountTree = ref<AccountOption[]>([])
 const incomeTemplate = ref('')
@@ -247,6 +297,10 @@ const reconciliationFallbackAccountId = ref<number | null>(null)
 const currency = ref('')
 const aiModel = ref('BERT') // 默认使用 BERT
 const deepseek_apikey = ref('')
+const assistantPreset = ref<AssistantPreset>('deepseek')
+const assistantBaseUrl = ref('')
+const assistantApiKey = ref('')
+const assistantModel = ref('')
 const flagSymbol = ref('*')
 const parsingModePreference = ref('review') // 默认审核模式
 
@@ -283,6 +337,9 @@ const convertToFrontend = (config: Config) => {
         currency: config.currency || 'CNY',
         aiModel: config.ai_model || 'BERT',
         deepseek_apikey: config.deepseek_apikey || '',
+        assistantBaseUrl: config.assistant_base_url || '',
+        assistantApiKey: config.assistant_api_key || '',
+        assistantModel: config.assistant_model || '',
         parsingModePreference: config.parsing_mode_preference || 'review',
 
         formatSettings: [
@@ -348,6 +405,34 @@ const handleReconciliationFallbackChange = (account: AccountOption | null) => {
     reconciliationFallbackAccount.value = account?.account ?? ''
 }
 
+function detectAssistantPreset(baseUrl: string, model: string): AssistantPreset {
+    const normalizedUrl = baseUrl.trim()
+    const normalizedModel = model.trim()
+    if (normalizedUrl === ASSISTANT_PRESETS.deepseek.baseUrl
+        && (!normalizedModel || normalizedModel === ASSISTANT_PRESETS.deepseek.model)) {
+        return 'deepseek'
+    }
+    if (normalizedUrl.startsWith('http://127.0.0.1:11434')
+        || normalizedUrl.startsWith('http://localhost:11434')) {
+        return 'ollama'
+    }
+    if (!normalizedUrl && !normalizedModel) {
+        return 'deepseek'
+    }
+    return 'custom'
+}
+
+function applyAssistantPreset(preset: AssistantPreset) {
+    const presetConfig = ASSISTANT_PRESETS[preset]
+    if (preset === 'custom') {
+        return
+    }
+    assistantBaseUrl.value = presetConfig.baseUrl
+    if (presetConfig.model) {
+        assistantModel.value = presetConfig.model
+    }
+}
+
 // 加载用户配置
 const loadConfig = async () => {
     try {
@@ -358,6 +443,13 @@ const loadConfig = async () => {
         const frontendConfig = convertToFrontend(data)
         aiModel.value = frontendConfig.aiModel
         deepseek_apikey.value = frontendConfig.deepseek_apikey
+        assistantBaseUrl.value = frontendConfig.assistantBaseUrl
+        assistantApiKey.value = frontendConfig.assistantApiKey
+        assistantModel.value = frontendConfig.assistantModel
+        assistantPreset.value = detectAssistantPreset(
+            frontendConfig.assistantBaseUrl,
+            frontendConfig.assistantModel,
+        )
         formatSettings.value = frontendConfig.formatSettings
         incomeTemplate.value = frontendConfig.incomeTemplate
         commissionTemplate.value = frontendConfig.commissionTemplate
@@ -414,10 +506,12 @@ const currentConfig = computed(() => {
         reconciliation_fallback_account: reconciliationFallbackAccount.value,
         currency: currency.value,
         ai_model: aiModel.value,
-        parsing_mode_preference: parsingModePreference.value
+        parsing_mode_preference: parsingModePreference.value,
+        assistant_base_url: assistantBaseUrl.value.trim(),
+        assistant_api_key: assistantApiKey.value.trim(),
+        assistant_model: assistantModel.value.trim(),
     }
 
-    // 只有选择 DeepSeek 时才提交 API 密钥
     if (aiModel.value === 'DeepSeek') {
         config.deepseek_apikey = deepseek_apikey.value
     }
@@ -469,6 +563,9 @@ const resetToDefault = async () => {
             currency: 'CNY',
             ai_model: 'BERT',
             parsing_mode_preference: 'review',
+            assistant_base_url: '',
+            assistant_api_key: '',
+            assistant_model: '',
         })
         await loadConfig() // 重新加载最新配置
         ElMessage.success('已恢复默认配置')

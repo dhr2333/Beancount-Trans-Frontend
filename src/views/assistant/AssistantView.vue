@@ -1,24 +1,28 @@
 <template>
-  <div class="assistant-page" :class="{ 'assistant-page--share-select': shareSelectMode }">
-    <div class="assistant-header">
-      <div class="header-left">
-        <h2 class="page-title">AI 账本助手</h2>
-        <p class="page-subtitle">用自然语言查询账本数据与汇总</p>
-      </div>
-      <div class="header-right">
-        <el-tag v-if="statusLoading" type="info">检查中...</el-tag>
-        <el-tag v-else-if="status?.api_key_configured" type="success">{{ keySourceLabel }}</el-tag>
-        <el-tag v-else type="warning">未配置 Key</el-tag>
-        <el-button text @click="handleClearMessages" :disabled="messages.length === 0">清空对话</el-button>
-      </div>
-    </div>
+  <div class="assistant-layout">
+    <AssistantSessionSidebar
+      ref="sessionSidebarRef"
+      :sessions="sessions"
+      :sessions-loading="sessionsLoading"
+      v-model:search-query="searchQuery"
+      :active-session-id="sessionId"
+      :collapsed="!sidebarOpen"
+      @new-chat="handleNewChat"
+      @select="handleSelectSession"
+      @rename="handleRenameSession"
+      @delete="handleDeleteSession"
+      @search="fetchSessions"
+      @collapse="sidebarOpen = false"
+      @expand="sidebarOpen = true"
+    />
 
+    <div class="assistant-page" :class="{ 'assistant-page--share-select': shareSelectMode }">
     <el-alert v-if="!statusLoading && status && !status.api_key_configured" type="warning" :closable="false" show-icon
-      class="setup-alert" title="尚未配置 DeepSeek API Key">
+      class="setup-alert" title="尚未配置 Copilot">
       <template #default>
         请在
         <router-link to="/format" class="alert-link">输出配置</router-link>
-        中填写 DeepSeek API Key，或联系管理员配置平台 Key。
+        的「Copilot」中填写接口地址、模型与密钥。
       </template>
     </el-alert>
 
@@ -27,16 +31,22 @@
       <template #default>
         请先在
         <router-link to="/file" class="alert-link">文件管理</router-link>
-        上传并解析账单，生成账本后再使用助手。
+        上传并解析账单，生成账本后再使用 Copilot。
       </template>
     </el-alert>
 
-    <div class="chat-container" ref="chatContainerRef">
+    <div
+      class="chat-container"
+      ref="chatContainerRef"
+      :class="{ 'chat-container--welcome': messages.length === 0 }"
+      v-loading="sessionLoading"
+    >
       <div v-if="messages.length === 0" class="welcome-panel">
         <el-icon :size="48" color="var(--ep-color-primary)">
           <ChatDotRound />
         </el-icon>
         <p class="welcome-text">你好，我可以帮你查询支出、收入、余额等账本信息。</p>
+        <p class="welcome-readonly">Copilot 只读查询账本，不会改账。</p>
         <div class="example-chips">
           <el-button v-for="q in exampleQuestions" :key="q" size="small" round :disabled="!canChat || loading"
             @click="handleExample(q)">
@@ -54,7 +64,7 @@
           :model-value="selectedIndices.has(index)" :disabled="sharing" @click.stop
           @change="(val: CheckboxValueType) => toggleShareSelection(index, val === true)" />
         <div class="message-bubble">
-          <div class="message-role">{{ msg.role === 'user' ? '你' : '助手' }}</div>
+          <div class="message-role">{{ msg.role === 'user' ? '你' : 'Copilot' }}</div>
           <div v-if="msg.role === 'user'" class="message-content message-content--user">{{ msg.content }}</div>
           <template v-else>
             <AssistantThinkingBlock v-if="msg.thinking?.trim()" v-model:expanded="msg.thinkingExpanded"
@@ -115,22 +125,35 @@
     </div>
 
     <div v-if="!shareSelectMode" class="input-area">
-      <el-input v-model="inputText" type="textarea" :rows="2" placeholder="输入问题，例如：本月餐饮支出多少？"
-        :disabled="!canChat || loading" resize="none" @keydown.enter.exact.prevent="handleSend" />
-      <div class="input-actions">
-        <el-switch
-          v-model="deepThink"
-          inline-prompt
-          active-text="深度思考"
-          inactive-text="深度思考"
+      <div class="composer">
+        <el-input
+          ref="composerInputRef"
+          v-model="inputText"
+          type="textarea"
+          :autosize="{ minRows: 1, maxRows: 8 }"
+          placeholder="给 Beancount-Trans Copilot 发送消息"
           :disabled="!canChat || loading"
+          resize="none"
+          @keydown.enter.exact.prevent="handleSend"
         />
-        <el-button v-if="loading" @click="stop">
-          停止
-        </el-button>
-        <el-button v-else type="primary" :disabled="!canChat || !inputText.trim()" @click="handleSend">
-          发送
-        </el-button>
+        <div class="composer-footer">
+          <span class="composer-meta">{{ modelLabel }}</span>
+          <div class="input-actions">
+            <el-switch
+              v-model="deepThink"
+              inline-prompt
+              active-text="DeepThink"
+              inactive-text="DeepThink"
+              :disabled="!canChat || loading || !deepThinkSupported"
+            />
+            <el-button v-if="loading" @click="stop">
+              停止
+            </el-button>
+            <el-button v-else type="primary" :disabled="!canChat || !inputText.trim()" @click="handleSend">
+              发送
+            </el-button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -148,18 +171,22 @@
         <AssistantShareCard :turns="sharePreview.turns" />
       </div>
     </Teleport>
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { CheckboxValueType } from 'element-plus'
+import type { CheckboxValueType, InputInstance } from 'element-plus'
 import { ChatDotRound, CircleCheck, CircleClose, DocumentCopy, Share } from '@element-plus/icons-vue'
+import AssistantSessionSidebar from '../../components/assistant/AssistantSessionSidebar.vue'
 import AssistantShareCard from '../../components/assistant/AssistantShareCard.vue'
 import AssistantThinkingBlock from '../../components/assistant/AssistantThinkingBlock.vue'
 import MarkdownContent from '../../components/assistant/MarkdownContent.vue'
 import { useAssistantChat } from '../../composables/useAssistantChat'
+import { useAssistantSessions } from '../../composables/useAssistantSessions'
 import { copyText } from '../../utils/clipboard'
 import {
   buildShareTurns,
@@ -168,28 +195,97 @@ import {
   validateShareTurnCount,
 } from '../../utils/assistantShare'
 import { captureElementAsPng, sharePngBlob } from '../../utils/shareImage'
-import type { AssistantPhase, AssistantShareTurn, ChatMessage } from '../../types/assistant'
+import type { AssistantPhase, AssistantSessionSummary, AssistantShareTurn, ChatMessage } from '../../types/assistant'
+
+const route = useRoute()
+const router = useRouter()
+
+const sessionId = computed(() => {
+  const value = route.params.sessionId
+  return typeof value === 'string' && value ? value : undefined
+})
+
+const {
+  sessions,
+  sessionsLoading,
+  searchQuery,
+  fetchSessions,
+  renameSession,
+  removeSession,
+} = useAssistantSessions()
 
 const {
   messages,
   loading,
+  sessionLoading,
   deepThink,
   status,
   statusLoading,
   canChat,
-  keySourceLabel,
+  deepThinkSupported,
   exampleQuestions,
   fetchStatus,
   send,
   stop,
   submitFeedback,
-  clearMessages,
-} = useAssistantChat()
+  startNewChat,
+} = useAssistantChat({
+  sessionId,
+  router,
+  onSessionsChanged: fetchSessions,
+})
+
+const SIDEBAR_OPEN_KEY = 'assistant-sidebar-open'
+const sidebarOpen = ref(localStorage.getItem(SIDEBAR_OPEN_KEY) !== '0')
+
+watch(sidebarOpen, (open) => {
+  localStorage.setItem(SIDEBAR_OPEN_KEY, open ? '1' : '0')
+})
+
+const sessionSidebarRef = ref<{ focusSearch: () => void } | null>(null)
+const composerInputRef = ref<InputInstance>()
+const inputText = ref('')
+const chatContainerRef = ref<HTMLElement | null>(null)
+
+const modelLabel = computed(() => status.value?.assistant_model?.trim() || '')
 
 function statusHint(phase?: AssistantPhase): string {
   if (phase === 'querying') return '正在查询账本...'
   if (phase === 'writing') return '正在撰写回答...'
   return '正在思考...'
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+  const tag = target.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
+}
+
+function focusComposer() {
+  composerInputRef.value?.focus()
+}
+
+function handleShortcut(event: KeyboardEvent) {
+  const meta = event.ctrlKey || event.metaKey
+  if (meta && event.key.toLowerCase() === 'n') {
+    event.preventDefault()
+    handleNewChat()
+    return
+  }
+  if (meta && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
+    sidebarOpen.value = true
+    nextTick(() => {
+      sessionSidebarRef.value?.focusSearch()
+    })
+    return
+  }
+  if (event.key === '/' && !meta && !event.altKey && !isTypingTarget(event.target)) {
+    event.preventDefault()
+    focusComposer()
+  }
 }
 
 async function handleCopyMarkdown(index: number) {
@@ -285,9 +381,50 @@ async function handleGenerateShareImage() {
   await renderAndShare(turns)
 }
 
-function handleClearMessages() {
+function handleNewChat() {
   exitShareSelectMode()
-  clearMessages()
+  startNewChat()
+}
+
+function handleSelectSession(id: string) {
+  if (id === sessionId.value) {
+    return
+  }
+  exitShareSelectMode()
+  router.push(`/assistant/${id}`)
+}
+
+async function handleRenameSession(session: AssistantSessionSummary) {
+  try {
+    const { value } = await ElMessageBox.prompt('输入新的会话标题', '重命名', {
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValue: session.title,
+      inputValidator: (value: string) => !!value?.trim() || '标题不能为空',
+    })
+    if (!value?.trim()) {
+      return
+    }
+    await renameSession(session.id, value.trim())
+  } catch {
+    // 用户取消
+  }
+}
+
+async function handleDeleteSession(id: string) {
+  try {
+    await ElMessageBox.confirm('确定删除该会话吗？此操作不可恢复。', '删除会话', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    await removeSession(id)
+    if (sessionId.value === id) {
+      router.push('/assistant')
+    }
+  } catch {
+    // 用户取消
+  }
 }
 
 async function handleLike(index: number) {
@@ -323,9 +460,6 @@ async function handleDislike(index: number) {
   }
 }
 
-const inputText = ref('')
-const chatContainerRef = ref<HTMLElement | null>(null)
-
 async function handleSend() {
   const text = inputText.value
   if (!text.trim()) return
@@ -350,55 +484,58 @@ watch(messages, () => {
   scrollToBottom()
 }, { deep: true })
 
+watch(deepThinkSupported, (supported) => {
+  if (!supported) {
+    deepThink.value = false
+  }
+})
+
 onMounted(() => {
   fetchStatus()
+  fetchSessions()
+  window.addEventListener('keydown', handleShortcut)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleShortcut)
 })
 </script>
 
 <style scoped lang="scss">
+.assistant-layout {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  text-align: left;
+}
+
 .assistant-page {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 16px 24px;
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 120px);
-  text-align: left;
 
   &--share-select {
     padding-bottom: 88px;
   }
 }
 
-.assistant-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-  flex-shrink: 0;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--ep-text-color-primary);
-}
-
-.page-subtitle {
-  margin: 4px 0 0;
-  font-size: 0.875rem;
-  color: var(--ep-text-color-secondary);
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .setup-alert {
-  margin-bottom: 12px;
+  margin: 12px 16px 0;
   flex-shrink: 0;
+}
+
+.welcome-text {
+  margin: 16px 0 8px;
+  color: var(--ep-text-color-regular);
+}
+
+.welcome-readonly {
+  margin: 0 0 24px;
+  font-size: 13px;
+  color: var(--ep-text-color-secondary);
 }
 
 .alert-link {
@@ -414,25 +551,26 @@ onMounted(() => {
 .chat-container {
   flex: 1;
   overflow-y: auto;
-  border: 1px solid var(--ep-border-color-light);
-  border-radius: 12px;
-  padding: 16px;
+  padding: 16px 24px;
   background: var(--ep-fill-color-blank);
   min-height: 0;
+
+  &--welcome {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
 }
 
 .welcome-panel {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 16px;
+  min-height: 0;
+  padding: 24px 16px;
   text-align: center;
-}
-
-.welcome-text {
-  margin: 16px 0 24px;
-  color: var(--ep-text-color-regular);
 }
 
 .example-chips {
@@ -545,11 +683,11 @@ onMounted(() => {
 }
 
 .share-select-bar {
-  position: fixed;
+  position: absolute;
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 2000;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -618,21 +756,49 @@ onMounted(() => {
 }
 
 .input-area {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
   flex-shrink: 0;
+  padding: 12px 24px 20px;
+  border-top: 1px solid var(--ep-border-color-lighter);
+  background: var(--ep-bg-color);
+}
 
-  .ep-textarea {
-    width: 100%;
+.composer {
+  max-width: 840px;
+  margin: 0 auto;
+  width: 100%;
+  border: 1px solid var(--ep-border-color);
+  border-radius: 16px;
+  padding: 8px 12px 10px;
+  background: var(--ep-fill-color-blank);
+
+  :deep(.ep-textarea__inner) {
+    box-shadow: none;
+    padding: 8px 4px;
+    overflow-y: hidden;
   }
+}
+
+.composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.composer-meta {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--ep-text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .input-actions {
   display: flex;
   gap: 12px;
   align-items: center;
-  justify-content: flex-end;
+  flex-shrink: 0;
 }
 </style>

@@ -1,12 +1,19 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getAssistantStatus, streamAssistantChat, submitAssistantFeedback } from '../api/assistant'
+import type { Router } from 'vue-router'
+import {
+  getAssistantSession,
+  getAssistantStatus,
+  streamAssistantChat,
+  submitAssistantFeedback,
+} from '../api/assistant'
 import type {
   AssistantFeedbackRating,
   AssistantStatus,
   AssistantStreamEvent,
   ChatMessage,
   QueryRecord,
+  StoredChatMessage,
 } from '../types/assistant'
 
 const EXAMPLE_QUESTIONS = [
@@ -20,9 +27,29 @@ function createMessageId(): string {
   return crypto.randomUUID()
 }
 
-export function useAssistantChat() {
+function mapStoredMessage(message: StoredChatMessage): ChatMessage {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    thinking: message.thinking || '',
+    reasoning: message.reasoning || '',
+    thinkingExpanded: false,
+    queries: message.queries || [],
+    feedback: message.feedback,
+  }
+}
+
+export function useAssistantChat(options: {
+  sessionId: Ref<string | undefined>
+  router: Router
+  onSessionsChanged?: () => void
+}) {
+  const { sessionId, router, onSessionsChanged } = options
+
   const messages = ref<ChatMessage[]>([])
   const loading = ref(false)
+  const sessionLoading = ref(false)
   const deepThink = ref(false)
   const status = ref<AssistantStatus | null>(null)
   const statusLoading = ref(false)
@@ -34,17 +61,21 @@ export function useAssistantChat() {
     return status.value.api_key_configured && status.value.ledger_exists
   })
 
-  const keySourceLabel = computed(() => {
-    if (!status.value?.api_key_configured) return '未配置'
-    if (status.value.api_key_source === 'user') return '用户 Key'
-    if (status.value.api_key_source === 'platform') return '平台 Key'
-    return '未配置'
-  })
+  const deepThinkSupported = computed(() => status.value?.deep_think_supported ?? false)
 
   function getAssistantMessage(): ChatMessage | undefined {
     const last = messages.value[messages.value.length - 1]
     if (last?.role === 'assistant') {
       return last
+    }
+    return undefined
+  }
+
+  function getLastUserMessage(): ChatMessage | undefined {
+    for (let i = messages.value.length - 1; i >= 0; i -= 1) {
+      if (messages.value[i].role === 'user') {
+        return messages.value[i]
+      }
     }
     return undefined
   }
@@ -76,24 +107,40 @@ export function useAssistantChat() {
   }
 
   function handleStreamEvent(event: AssistantStreamEvent) {
-    const assistant = getAssistantMessage()
-    if (!assistant) {
-      return
-    }
-
     switch (event.event) {
-      case 'status':
-        assistant.status = event.data.phase
+      case 'session': {
+        const userMessage = getLastUserMessage()
+        if (userMessage) {
+          userMessage.id = event.data.user_message_id
+        }
+        if (!sessionId.value) {
+          router.replace(`/assistant/${event.data.id}`)
+        }
+        onSessionsChanged?.()
         break
-      case 'reasoning_delta':
+      }
+      case 'status': {
+        const assistant = getAssistantMessage()
+        if (assistant) {
+          assistant.status = event.data.phase
+        }
+        break
+      }
+      case 'reasoning_delta': {
+        const assistant = getAssistantMessage()
+        if (!assistant) break
         assistant.reasoning = (assistant.reasoning || '') + event.data.content
         assistant.thinking = (assistant.thinking || '') + event.data.content
         assistant.thinkingExpanded = true
         break
-      case 'thinking_set':
+      }
+      case 'thinking_set': {
+        const assistant = getAssistantMessage()
+        if (!assistant) break
         assistant.thinking = event.data.content
         assistant.reasoning = event.data.reasoning ?? ''
         break
+      }
       case 'tool_end':
         if (event.data.bql && event.data.result_preview) {
           appendQuery({
@@ -102,12 +149,17 @@ export function useAssistantChat() {
           })
         }
         break
-      case 'delta':
+      case 'delta': {
+        const assistant = getAssistantMessage()
+        if (!assistant) break
         assistant.content += event.data.content
         assistant.status = 'writing'
         assistant.thinkingExpanded = false
         break
-      case 'done':
+      }
+      case 'done': {
+        const assistant = getAssistantMessage()
+        if (!assistant) break
         assistant.content = event.data.reply
         assistant.queries = event.data.queries
         assistant.thinking = event.data.thinking || assistant.thinking || ''
@@ -115,13 +167,28 @@ export function useAssistantChat() {
         assistant.streaming = false
         assistant.status = undefined
         assistant.thinkingExpanded = false
+        if (event.data.assistant_message_id) {
+          assistant.id = event.data.assistant_message_id
+        }
+        if (event.data.user_message_id) {
+          const userMessage = getLastUserMessage()
+          if (userMessage) {
+            userMessage.id = event.data.user_message_id
+          }
+        }
+        onSessionsChanged?.()
         break
-      case 'error':
-        assistant.content = event.data.detail
-        assistant.streaming = false
-        assistant.status = undefined
+      }
+      case 'error': {
+        const assistant = getAssistantMessage()
+        if (assistant) {
+          assistant.content = event.data.detail
+          assistant.streaming = false
+          assistant.status = undefined
+        }
         error.value = event.data.detail
         break
+      }
       default:
         break
     }
@@ -140,6 +207,52 @@ export function useAssistantChat() {
       statusLoading.value = false
     }
   }
+
+  async function loadSession(id: string) {
+    sessionLoading.value = true
+    error.value = null
+    try {
+      const { data } = await getAssistantSession(id)
+      messages.value = data.messages.map(mapStoredMessage)
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number; data?: { detail?: string } } }
+      if (err.response?.status === 404) {
+        ElMessage.warning('会话不存在或无权访问')
+        router.replace('/assistant')
+      } else {
+        error.value = err.response?.data?.detail || '加载会话失败'
+      }
+      messages.value = []
+    } finally {
+      sessionLoading.value = false
+    }
+  }
+
+  watch(
+    sessionId,
+    async (id, previousId) => {
+      if (id === previousId) {
+        return
+      }
+
+      // 首条消息创建会话并 replace URL 时，保持本地流式状态，不从服务端覆盖
+      if (loading.value && !previousId && id) {
+        return
+      }
+
+      if (loading.value) {
+        stop()
+      }
+      if (!id) {
+        if (previousId) {
+          messages.value = []
+        }
+        return
+      }
+      await loadSession(id)
+    },
+    { immediate: true },
+  )
 
   function stop() {
     abortController?.abort()
@@ -184,9 +297,8 @@ export function useAssistantChat() {
 
     try {
       const payload = {
-        messages: messages.value
-          .filter((m) => !m.streaming)
-          .map((m) => ({ role: m.role, content: m.content })),
+        session_id: sessionId.value,
+        content: text,
         show_bql: false,
         deep_think: deepThink.value,
       }
@@ -255,26 +367,31 @@ export function useAssistantChat() {
     }
   }
 
-  function clearMessages() {
+  function startNewChat() {
     stop()
     messages.value = []
     error.value = null
+    if (sessionId.value) {
+      router.push('/assistant')
+    }
   }
 
   return {
     messages,
     loading,
+    sessionLoading,
     deepThink,
     status,
     statusLoading,
     error,
     canChat,
-    keySourceLabel,
+    deepThinkSupported,
     exampleQuestions: EXAMPLE_QUESTIONS,
     fetchStatus,
     send,
     stop,
     submitFeedback,
-    clearMessages,
+    startNewChat,
+    loadSession,
   }
 }

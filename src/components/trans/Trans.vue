@@ -1,7 +1,7 @@
 <template>
   <el-upload class="upload-demo" :drag="true" :action=action method="POST" :data="getUploadData" :multiple="false"
     :headers=headers accept=".csv,.pdf,.xls,.xlsx,.zip" show-file-list name="trans" @success="handleUploadSuccess"
-    @error="handleUploadError" @change="handleChange">
+    @error="handleUploadError">
     <div class="el-upload__text">
       <el-icon class="el-icon--upload"><upload-filled /></el-icon>
       拖拽文件至此处 或 <em>单击上传</em>
@@ -53,11 +53,6 @@
     status: "ALiPay - 交易成功"
     Expenses:TransPort:Private:Park +5.00 CNY
     Liabilities:CreditCard:Bank:CITIC:C6428 -5.00 CNY
-
-or
-
-2024-04-16 balance Assets:Savings:Bank:BOC:C0814 84543.23 CNY
-2024-04-15 pad Assets:Savings:Bank:BOC:C0814 Income:Investment:Interest
 '></el-input>
   <div class="table-container">
     <el-table :data="responseList" style="width: 100%;" border highlight-current-row>
@@ -140,14 +135,12 @@ import { UploadFilled, DocumentCopy, Plus, Edit } from '@element-plus/icons-vue'
 import { ref, computed, watch } from 'vue';
 import axios from '../../utils/request';
 import { hasAuthTokens } from '../../utils/auth';
-import type { UploadFile, UploadFiles } from 'element-plus'
 import AccountSelector from '../common/AccountSelector.vue';
 import TagSelector from '../common/TagSelector.vue';
 import { useInlineMappingDialog, defaultMappingKeyFromOriginalRow } from '../../composables/useInlineMappingDialog';
 
 
 const input = ref()
-const filename = ref()
 const wechatUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E5%BE%AE%E4%BF%A1.csv');
 const alipayUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E6%94%AF%E4%BB%98%E5%AE%9D.csv');
 const value4 = ref<string[]>([]);
@@ -167,14 +160,6 @@ const options = [
   {
     value: '招行信用卡忽略支付宝微信条目',
     label: '招行信用卡忽略支付宝微信条目',
-  },
-  {
-    value: '生成balance对账信息',
-    label: '生成balance对账信息',
-  },
-  {
-    value: '仅返回CSV格式账单',
-    label: '仅返回CSV格式账单',
   }
 ]
 
@@ -184,8 +169,6 @@ const isWrite = ref(false)
 const cmbCreditIgnore = ref(false)
 const bocDebitIgnore = ref(false)
 const showPassword = ref(false)
-const isbalance = ref(false)
-const isCSVOnly = ref(false)
 interface BillEntry {
   id: string;
   formatted: string;
@@ -218,8 +201,6 @@ const getUploadData = () => {
     boc_debit_ignore: bocDebitIgnore.value,
     write: isWrite.value,
     password: input.value,
-    balance: isbalance.value,
-    isCSVOnly: isCSVOnly.value,
     csrfmiddlewaretoken: csrfToken.value
   };
 };
@@ -244,16 +225,6 @@ watch(value4, (newValue) => {
   } else {
     showPassword.value = false;
   };
-  if (newValue.includes('生成balance对账信息')) {
-    isbalance.value = true;
-  } else {
-    isbalance.value = false;
-  };
-  if (newValue.includes('仅返回CSV格式账单')) {
-    isCSVOnly.value = true;
-  } else {
-    isCSVOnly.value = false;
-  };
 });
 
 axios.defaults.withCredentials = true
@@ -267,48 +238,20 @@ const headers = computed(() => ({
 
 const handleUploadSuccess = (response: any, file: any) => {
   if (file.status === 'error') return;
-  if (isCSVOnly.value == true) {
-    responseData.value = response
-    downloadCSV(responseData.value)
-  } else {
-    const normalizedResults: BillEntry[] = Array.isArray(response.results)
-      ? response.results.map((item: BillEntry & { ai_candidates?: any[] }) => {
-        const candidates = Array.isArray(item.ai_candidates) ? item.ai_candidates : []
-        const firstCandidate = candidates[0]?.key || ''
-        return {
-          ...item,
-          ai_candidates: candidates,
-          ai_choose: item.ai_choose || firstCandidate || ''
-        }
-      })
-      : []
+  const normalizedResults: BillEntry[] = Array.isArray(response.results)
+    ? response.results.map((item: BillEntry & { ai_candidates?: any[] }) => {
+      const candidates = Array.isArray(item.ai_candidates) ? item.ai_candidates : []
+      const firstCandidate = candidates[0]?.key || ''
+      return {
+        ...item,
+        ai_candidates: candidates,
+        ai_choose: item.ai_choose || firstCandidate || ''
+      }
+    })
+    : []
 
-    responseList.value = normalizedResults // 存储所有条目
-    responseData.value = normalizedResults.map((item) => item.formatted).join('\n') // 存储所有条目
-  }
-};
-
-// 函数用于下载CSV文件
-const downloadCSV = (csvData: string) => {
-  // 假设csvData已经是正确格式的CSV文本
-  const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement("a");
-  if (link.download !== undefined) { // 检查浏览器是否支持下载属性
-    const url = URL.createObjectURL(blob);
-    const baseName = filename.value ? String(filename.value) : 'beancount-trans-result'
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${baseName}.csv`);  // 设定下载文件名
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();  // 触发下载
-    document.body.removeChild(link); // 下载后移除元素
-  }
-}
-
-const handleChange = (uploadFile: UploadFile, _uploadFiles: UploadFiles) => {
-  if (uploadFile?.name) {
-    filename.value = uploadFile.name.split('.')[0]
-  }
+  responseList.value = normalizedResults // 存储所有条目
+  responseData.value = normalizedResults.map((item) => item.formatted).join('\n') // 存储所有条目
 };
 
 const handleUploadError = (err: any, file: any) => {
