@@ -5,6 +5,7 @@
         新对话
       </el-button>
       <el-input
+        ref="searchInputRef"
         v-model="searchModel"
         placeholder="搜索会话"
         clearable
@@ -21,25 +22,39 @@
         v-for="session in sessions"
         :key="session.id"
         class="session-item"
-        :class="{ active: session.id === activeSessionId }"
+        :class="{
+          active: session.id === activeSessionId,
+          'is-menu-open': openMenuId === session.id,
+        }"
         @click="emit('select', session.id)"
       >
         <div class="session-title" :title="session.title">{{ session.title || '新对话' }}</div>
-        <div class="session-actions" @click.stop>
-          <el-button text size="small" @click="emit('rename', session)">
-            重命名
+        <el-dropdown
+          trigger="click"
+          @command="(command) => handleCommand(command, session)"
+          @visible-change="(visible) => onMenuVisible(session.id, visible)"
+          @click.stop
+        >
+          <el-button class="session-more" text size="small" title="更多" @click.stop>
+            <el-icon><More /></el-icon>
           </el-button>
-          <el-button text size="small" type="danger" @click="emit('delete', session.id)">
-            删除
-          </el-button>
-        </div>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="rename">重命名</el-dropdown-item>
+              <el-dropdown-item command="delete" divided>
+                <span class="session-delete">删除</span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
   </aside>
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { More } from '@element-plus/icons-vue'
 import type { AssistantSessionSummary } from '../../types/assistant'
 
 const props = defineProps<{
@@ -63,7 +78,23 @@ const searchModel = computed({
   set: (value: string) => emit('update:searchQuery', value),
 })
 
+const searchInputRef = ref<{ focus: () => void } | null>(null)
+const openMenuId = ref<string | null>(null)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+function handleCommand(command: string, session: AssistantSessionSummary) {
+  if (command === 'rename') {
+    emit('rename', session)
+    return
+  }
+  if (command === 'delete') {
+    emit('delete', session.id)
+  }
+}
+
+function onMenuVisible(sessionId: string, visible: boolean) {
+  openMenuId.value = visible ? sessionId : null
+}
 
 function handleSearchInput() {
   if (searchTimer) {
@@ -73,12 +104,19 @@ function handleSearchInput() {
     emit('search')
   }, 300)
 }
+
+function focusSearch() {
+  searchInputRef.value?.focus()
+}
+
+defineExpose({ focusSearch })
 </script>
 
 <style scoped lang="scss">
 .assistant-sidebar {
   width: 260px;
   flex-shrink: 0;
+  align-self: stretch;
   border-right: 1px solid var(--ep-border-color-light);
   display: flex;
   flex-direction: column;
@@ -112,14 +150,18 @@ function handleSearchInput() {
 }
 
 .session-item {
-  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 8px 12px;
   border-radius: 8px;
   cursor: pointer;
   margin-bottom: 4px;
   transition: background-color 0.15s ease;
 
   &:hover,
-  &.active {
+  &.active,
+  &.is-menu-open {
     background: var(--ep-fill-color-light);
   }
 
@@ -129,23 +171,31 @@ function handleSearchInput() {
 }
 
 .session-title {
+  flex: 1;
+  min-width: 0;
   font-size: 14px;
   color: var(--ep-text-color-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 4px;
 }
 
-.session-actions {
-  display: flex;
-  gap: 4px;
+.session-more {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   opacity: 0;
   transition: opacity 0.15s ease;
 }
 
-.session-item:hover .session-actions,
-.session-item.active .session-actions {
+.session-item:hover .session-more,
+.session-item.active .session-more,
+.session-item.is-menu-open .session-more {
   opacity: 1;
+}
+
+.session-delete {
+  color: var(--ep-color-danger);
 }
 </style>

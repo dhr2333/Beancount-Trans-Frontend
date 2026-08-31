@@ -1,6 +1,7 @@
 <template>
   <div class="assistant-layout">
     <AssistantSessionSidebar
+      ref="sessionSidebarRef"
       :sessions="sessions"
       :sessions-loading="sessionsLoading"
       v-model:search-query="searchQuery"
@@ -13,19 +14,6 @@
     />
 
     <div class="assistant-page" :class="{ 'assistant-page--share-select': shareSelectMode }">
-      <div class="assistant-header">
-        <div class="header-left">
-          <h2 class="page-title">AI 账本助手</h2>
-          <p class="page-subtitle">用自然语言查询账本数据与汇总</p>
-        </div>
-        <div class="header-right">
-          <el-tag v-if="statusLoading" type="info">检查中...</el-tag>
-          <el-tag v-else-if="status?.api_key_configured" type="success">已配置</el-tag>
-          <el-tag v-else type="warning">未配置</el-tag>
-          <el-button text @click="handleNewChat">新对话</el-button>
-        </div>
-      </div>
-
     <el-alert v-if="!statusLoading && status && !status.api_key_configured" type="warning" :closable="false" show-icon
       class="setup-alert" title="尚未配置账本助手">
       <template #default>
@@ -128,28 +116,39 @@
     </div>
 
     <div v-if="!shareSelectMode" class="input-area">
-      <el-input v-model="inputText" type="textarea" :rows="2" placeholder="输入问题，例如：本月餐饮支出多少？"
-        :disabled="!canChat || loading" resize="none" @keydown.enter.exact.prevent="handleSend" />
-      <div class="input-actions">
-        <el-tooltip
-          content="开启后模型会先推理再回答，更慢但更准"
-          placement="top"
+      <div class="composer">
+        <el-input
+          ref="composerInputRef"
+          v-model="inputText"
+          type="textarea"
+          :autosize="{ minRows: 1, maxRows: 8 }"
+          placeholder="输入问题，例如：本月餐饮支出多少？"
           :disabled="!canChat || loading"
-        >
-          <el-switch
-            v-model="deepThink"
-            inline-prompt
-            active-text="DeepThink"
-            inactive-text="DeepThink"
-            :disabled="!canChat || loading"
-          />
-        </el-tooltip>
-        <el-button v-if="loading" @click="stop">
-          停止
-        </el-button>
-        <el-button v-else type="primary" :disabled="!canChat || !inputText.trim()" @click="handleSend">
-          发送
-        </el-button>
+          resize="none"
+          @keydown.enter.exact.prevent="handleSend"
+        />
+        <div class="composer-footer">
+          <span class="composer-meta">{{ modelLabel }}</span>
+          <div class="input-actions">
+            <el-tooltip :content="deepThinkTooltip" placement="top">
+              <span class="deepthink-switch">
+                <el-switch
+                  v-model="deepThink"
+                  inline-prompt
+                  active-text="DeepThink"
+                  inactive-text="DeepThink"
+                  :disabled="!canChat || loading || !deepThinkSupported"
+                />
+              </span>
+            </el-tooltip>
+            <el-button v-if="loading" @click="stop">
+              停止
+            </el-button>
+            <el-button v-else type="primary" :disabled="!canChat || !inputText.trim()" @click="handleSend">
+              发送
+            </el-button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -172,10 +171,10 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { CheckboxValueType } from 'element-plus'
+import type { CheckboxValueType, InputInstance } from 'element-plus'
 import { ChatDotRound, CircleCheck, CircleClose, DocumentCopy, Share } from '@element-plus/icons-vue'
 import AssistantSessionSidebar from '../../components/assistant/AssistantSessionSidebar.vue'
 import AssistantShareCard from '../../components/assistant/AssistantShareCard.vue'
@@ -231,10 +230,57 @@ const {
   onSessionsChanged: fetchSessions,
 })
 
+const sessionSidebarRef = ref<{ focusSearch: () => void } | null>(null)
+const composerInputRef = ref<InputInstance>()
+const inputText = ref('')
+const chatContainerRef = ref<HTMLElement | null>(null)
+
+const modelLabel = computed(() => status.value?.assistant_model?.trim() || '')
+
+const deepThinkTooltip = computed(() => {
+  if (!canChat.value) {
+    return '配置助手并生成账本后可用'
+  }
+  if (!deepThinkSupported.value) {
+    return '当前模型不支持 DeepThink'
+  }
+  return '开启后模型会先推理再回答，更慢但更准'
+})
+
 function statusHint(phase?: AssistantPhase): string {
   if (phase === 'querying') return '正在查询账本...'
   if (phase === 'writing') return '正在撰写回答...'
   return '正在思考...'
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+  const tag = target.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
+}
+
+function focusComposer() {
+  composerInputRef.value?.focus()
+}
+
+function handleShortcut(event: KeyboardEvent) {
+  const meta = event.ctrlKey || event.metaKey
+  if (meta && event.key.toLowerCase() === 'n') {
+    event.preventDefault()
+    handleNewChat()
+    return
+  }
+  if (meta && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
+    sessionSidebarRef.value?.focusSearch()
+    return
+  }
+  if (event.key === '/' && !meta && !event.altKey && !isTypingTarget(event.target)) {
+    event.preventDefault()
+    focusComposer()
+  }
 }
 
 async function handleCopyMarkdown(index: number) {
@@ -409,9 +455,6 @@ async function handleDislike(index: number) {
   }
 }
 
-const inputText = ref('')
-const chatContainerRef = ref<HTMLElement | null>(null)
-
 async function handleSend() {
   const text = inputText.value
   if (!text.trim()) return
@@ -436,67 +479,45 @@ watch(messages, () => {
   scrollToBottom()
 }, { deep: true })
 
-watch(deepThink, (enabled) => {
-  if (enabled && status.value && !status.value.deep_think_supported) {
-    ElMessage.info('当前模型不支持 DeepThink，将使用简要分析')
+watch(deepThinkSupported, (supported) => {
+  if (!supported) {
+    deepThink.value = false
   }
 })
 
 onMounted(() => {
   fetchStatus()
   fetchSessions()
+  window.addEventListener('keydown', handleShortcut)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleShortcut)
 })
 </script>
 
 <style scoped lang="scss">
 .assistant-layout {
   display: flex;
-  height: calc(100vh - 120px);
-  margin: 0 -16px;
+  height: 100%;
+  min-height: 0;
   text-align: left;
 }
 
 .assistant-page {
   flex: 1;
   min-width: 0;
-  padding: 0 16px 24px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
 
   &--share-select {
     padding-bottom: 88px;
   }
 }
 
-.assistant-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-  flex-shrink: 0;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--ep-text-color-primary);
-}
-
-.page-subtitle {
-  margin: 4px 0 0;
-  font-size: 0.875rem;
-  color: var(--ep-text-color-secondary);
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .setup-alert {
-  margin-bottom: 12px;
+  margin: 12px 16px 0;
   flex-shrink: 0;
 }
 
@@ -513,9 +534,7 @@ onMounted(() => {
 .chat-container {
   flex: 1;
   overflow-y: auto;
-  border: 1px solid var(--ep-border-color-light);
-  border-radius: 12px;
-  padding: 16px;
+  padding: 16px 24px;
   background: var(--ep-fill-color-blank);
   min-height: 0;
 }
@@ -525,6 +544,7 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  min-height: 100%;
   padding: 48px 16px;
   text-align: center;
 }
@@ -717,21 +737,53 @@ onMounted(() => {
 }
 
 .input-area {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
   flex-shrink: 0;
+  padding: 12px 24px 20px;
+  border-top: 1px solid var(--ep-border-color-lighter);
+  background: var(--ep-bg-color);
+}
 
-  .ep-textarea {
-    width: 100%;
+.composer {
+  max-width: 840px;
+  margin: 0 auto;
+  width: 100%;
+  border: 1px solid var(--ep-border-color);
+  border-radius: 16px;
+  padding: 8px 12px 10px;
+  background: var(--ep-fill-color-blank);
+
+  :deep(.ep-textarea__inner) {
+    box-shadow: none;
+    padding: 8px 4px;
   }
+}
+
+.composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.composer-meta {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--ep-text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deepthink-switch {
+  display: inline-flex;
+  align-items: center;
 }
 
 .input-actions {
   display: flex;
   gap: 12px;
   align-items: center;
-  justify-content: flex-end;
+  flex-shrink: 0;
 }
 </style>

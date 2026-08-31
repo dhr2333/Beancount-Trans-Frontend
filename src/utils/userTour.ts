@@ -149,7 +149,7 @@ const driverObj = driver({
       popover: {
         title: '📊 查看账本',
         description:
-          '引导完成！「财务报表」→「Fava 专业报表」看图表，或「AI 账本助手」用自然语言查账。',
+          '引导完成！「财务报表」→「Fava 专业报表」看图表；顶栏「AI 账本助手」可用自然语言查账。',
         side: 'bottom',
         align: 'start',
         disableButtons: ['previous'], // 禁用 Previous 按钮，使用与步骤一 Previous 相同的效果
