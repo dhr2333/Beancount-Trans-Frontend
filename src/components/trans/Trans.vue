@@ -269,8 +269,8 @@ const handleUploadError = (err: any, file: any) => {
   else if (errMsg === "当前账单不支持" || errMsg.includes("Unsupported")) {
     ElMessage.error("当前账单不支持或文件损坏");
   }
-  else if (errMsg === "使用DeepSeek模型需要API密钥") {
-    ElMessage.error("使用DeepSeek模型需要API密钥");
+  else if (errMsg.includes("API密钥") || errMsg.includes("API 密钥")) {
+    ElMessage.error(errMsg);
   }
   else if (errMsg === "DeepSeek调用失败，请检查API密钥是否正确") {
     ElMessage.error("DeepSeek调用失败，请检查API密钥是否正确");

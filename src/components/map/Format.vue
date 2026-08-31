@@ -135,7 +135,11 @@
                             <el-select v-model="aiModel" placeholder="选择AI处理引擎" class="model-selector">
                                 <el-option label="单规则匹配" value="None" />
                                 <el-option label="BERT - 本地模型 (平衡模式)" value="BERT" />
-                                <el-option label="DeepSeek - 云端大模型 (高精度模式)" value="DeepSeek" />
+                                <el-option
+                                    label="DeepSeek - 云端大模型 (高精度模式)"
+                                    value="DeepSeek"
+                                    :disabled="!hasUserAssistantKey"
+                                />
                             </el-select>
 
                             <el-alert
@@ -148,19 +152,11 @@
                             </el-alert>
                         </div>
                     </el-form-item>
-
-                    <!-- DeepSeek专属配置 -->
-                    <template v-if="aiModel === 'DeepSeek'">
-                        <el-form-item label="API密钥" prop="deepseek_apikey">
-                            <el-input v-model="deepseek_apikey" type="password" placeholder="输入DeepSeek API密钥"
-                                show-password clearable />
-                        </el-form-item>
-                    </template>
                 </div>
             </el-collapse-item>
 
             <!-- Copilot -->
-            <el-collapse-item title="Copilot" name="assistant" class="config-item">
+            <el-collapse-item title="BYOK" name="assistant" class="config-item">
                 <div class="config-group">
                     <el-form-item label="Provider 预设">
                         <el-select v-model="assistantPreset" class="model-selector" @change="applyAssistantPreset">
@@ -175,8 +171,12 @@
                     </el-form-item>
 
                     <el-form-item label="API 密钥">
-                        <el-input v-model="assistantApiKey" type="password" placeholder="Ollama 等本地服务可留空"
-                            show-password clearable />
+                        <div class="api-key-row">
+                            <el-input v-model="assistantApiKey" type="password"
+                                placeholder="未填写时 Copilot 可走平台密钥；云端解析需填写"
+                                show-password clearable />
+                            <el-button @click="testApiKey" :loading="loading.test">测试</el-button>
+                        </div>
                     </el-form-item>
 
                     <el-form-item label="模型名称">
@@ -184,7 +184,7 @@
                     </el-form-item>
 
                     <el-alert type="info" :closable="false" class="engine-description-alert">
-                        Copilot 与上方解析引擎独立配置，只读查询账本，不会改账。DeepSeek 支持 DeepThink（thinking 参数）；Ollama 等自定义接口仅使用简要分析。
+                        Copilot 只读查询账本，不会改账。未填写密钥时可用平台密钥聊天，但不能使用云端解析；填写后 Copilot 与云端解析共用这一把密钥。
                     </el-alert>
                 </div>
             </el-collapse-item>
@@ -216,21 +216,18 @@ import type { FormInstance } from 'element-plus'
 const configForm = ref<FormInstance>()
 const formModel = computed(() => ({
     aiModel: aiModel.value,
-    deepseek_apikey: deepseek_apikey.value
+    assistantApiKey: assistantApiKey.value,
 }))
-const formRules = computed(() => ({
-    deepseek_apikey: aiModel.value === 'DeepSeek' ? [
-        { required: true, message: 'API密钥不能为空', trigger: 'blur' }
-    ] : []
-}))
+const formRules = computed(() => ({}))
 
 // 修改提交方法
 const validateAndSubmit = async () => {
     try {
-        // 先验证表单
         await configForm.value?.validate()
-
-        // 验证通过后提交
+        if (aiModel.value === 'DeepSeek' && !assistantApiKey.value.trim()) {
+            ElMessage.error('云端解析需要先在 Copilot 填写 API 密钥')
+            return
+        }
         await applyConfig()
     } catch (error) {
         // 验证失败会自动显示错误信息
@@ -295,7 +292,6 @@ const commissionTemplateId = ref<number | null>(null)
 const reconciliationFallbackAccountId = ref<number | null>(null)
 const currency = ref('')
 const aiModel = ref('BERT') // 默认使用 BERT
-const deepseek_apikey = ref('')
 const assistantPreset = ref<AssistantPreset>('deepseek')
 const assistantBaseUrl = ref('')
 const assistantApiKey = ref('')
@@ -305,20 +301,21 @@ const parsingModePreference = ref('review') // 默认审核模式
 
 const loading = ref({
     save: false,
-    reset: false
+    reset: false,
+    test: false,
 })
 
 // 匿名用户提示
 const showAnonymousPrompt = ref(false)
+
+const hasUserAssistantKey = computed(() => assistantApiKey.value.trim() !== '')
 
 const engineDescription = computed(() => {
     switch (aiModel.value) {
         case 'None':
             return '选择第一个'
         case 'BERT':
-            return '基于Transformer架构，适合复杂语义理解，准确度较高（F1 0.87），推理速度 32ms/token'
-        case 'DeepSeek':
-            return '千亿参数LLM（需API密钥），复杂场景准确度提升35%，延迟 800-1200ms/请求'
+            return '默认推荐。分类在部署环境内完成，不调用云端大模型'
         default:
             return ''
     }
@@ -333,9 +330,8 @@ const convertToFrontend = (config: Config) => {
         reconciliationFallbackAccount: config.reconciliation_fallback_account || 'Equity:Adjustments',
         currency: config.currency || 'CNY',
         aiModel: config.ai_model === 'spaCy' ? 'BERT' : (config.ai_model || 'BERT'),
-        deepseek_apikey: config.deepseek_apikey || '',
         assistantBaseUrl: config.assistant_base_url || '',
-        assistantApiKey: config.assistant_api_key || '',
+        assistantApiKey: config.assistant_api_key || config.deepseek_apikey || '',
         assistantModel: config.assistant_model || '',
         parsingModePreference: config.parsing_mode_preference || 'review',
 
@@ -439,7 +435,6 @@ const loadConfig = async () => {
         ])
         const frontendConfig = convertToFrontend(data)
         aiModel.value = frontendConfig.aiModel
-        deepseek_apikey.value = frontendConfig.deepseek_apikey
         assistantBaseUrl.value = frontendConfig.assistantBaseUrl
         assistantApiKey.value = frontendConfig.assistantApiKey
         assistantModel.value = frontendConfig.assistantModel
@@ -509,10 +504,6 @@ const currentConfig = computed(() => {
         assistant_model: assistantModel.value.trim(),
     }
 
-    if (aiModel.value === 'DeepSeek') {
-        config.deepseek_apikey = deepseek_apikey.value
-    }
-
     return config
 })
 
@@ -529,7 +520,7 @@ const applyConfig = async () => {
                     ElMessage.error('未认证，请登录后重试')
                     break
                 case 400:
-                    ElMessage.error(`配置保存失败: ${error.response.data?.message || '参数错误'}`)
+                    ElMessage.error(`配置保存失败: ${formatConfigError(error.response.data)}`)
                     break
                 default:
                     ElMessage.error('配置保存失败，请稍后重试')
@@ -539,6 +530,50 @@ const applyConfig = async () => {
         }
     } finally {
         loading.value.save = false
+    }
+}
+
+const formatConfigError = (data: unknown) => {
+    if (!data || typeof data !== 'object') {
+        return '参数错误'
+    }
+    const payload = data as Record<string, unknown>
+    if (typeof payload.message === 'string') {
+        return payload.message
+    }
+    const firstField = Object.values(payload)[0]
+    if (Array.isArray(firstField) && typeof firstField[0] === 'string') {
+        return firstField[0]
+    }
+    if (typeof firstField === 'string') {
+        return firstField
+    }
+    return '参数错误'
+}
+
+const testApiKey = async () => {
+    try {
+        loading.value.test = true
+        const { data } = await axios.post('assistant/test-key/', {
+            api_key: assistantApiKey.value.trim(),
+            base_url: assistantBaseUrl.value.trim(),
+            model: assistantModel.value.trim(),
+        })
+        if (data.ok && data.parse_available) {
+            ElMessage.success(data.detail)
+        } else if (data.ok) {
+            ElMessage.warning(data.detail)
+        } else {
+            ElMessage.error(data.detail)
+        }
+    } catch (error: any) {
+        if (error.response?.status === 401) {
+            ElMessage.error('未认证，请登录后重试')
+        } else {
+            ElMessage.error(error.response?.data?.detail || '密钥测试失败')
+        }
+    } finally {
+        loading.value.test = false
     }
 }
 
@@ -563,6 +598,7 @@ const resetToDefault = async () => {
             assistant_base_url: '',
             assistant_api_key: '',
             assistant_model: '',
+            deepseek_apikey: '',
         })
         await loadConfig() // 重新加载最新配置
         ElMessage.success('已恢复默认配置')
@@ -667,6 +703,16 @@ const resetToDefault = async () => {
 
 .model-selector {
     width: 100%;
+}
+
+.api-key-row {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+}
+
+.api-key-row .el-input {
+    flex: 1;
 }
 
 .el-form-item {
