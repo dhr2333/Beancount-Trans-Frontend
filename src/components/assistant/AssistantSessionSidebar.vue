@@ -32,7 +32,11 @@
         />
       </div>
 
-      <div v-loading="sessionsLoading" class="session-list">
+      <div
+        v-loading="sessionsLoading"
+        class="session-list"
+        :class="{ 'session-list--empty': sessions.length === 0 && !sessionsLoading }"
+      >
         <div v-if="sessions.length === 0 && !sessionsLoading" class="empty-sessions">
           暂无历史会话
         </div>
@@ -204,8 +208,13 @@ defineExpose({ focusSearch })
 
 .session-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 8px;
+
+  &--empty {
+    overflow: hidden;
+  }
 }
 
 .empty-sessions {

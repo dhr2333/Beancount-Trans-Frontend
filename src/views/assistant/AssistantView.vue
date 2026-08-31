@@ -35,7 +35,12 @@
       </template>
     </el-alert>
 
-    <div class="chat-container" ref="chatContainerRef" v-loading="sessionLoading">
+    <div
+      class="chat-container"
+      ref="chatContainerRef"
+      :class="{ 'chat-container--welcome': messages.length === 0 }"
+      v-loading="sessionLoading"
+    >
       <div v-if="messages.length === 0" class="welcome-panel">
         <el-icon :size="48" color="var(--ep-color-primary)">
           <ChatDotRound />
@@ -126,7 +131,7 @@
           v-model="inputText"
           type="textarea"
           :autosize="{ minRows: 1, maxRows: 8 }"
-          placeholder="输入问题，例如：本月餐饮支出多少？"
+          placeholder="给 Beancount-Trans Copilot 发送消息"
           :disabled="!canChat || loading"
           resize="none"
           @keydown.enter.exact.prevent="handleSend"
@@ -549,15 +554,22 @@ onUnmounted(() => {
   padding: 16px 24px;
   background: var(--ep-fill-color-blank);
   min-height: 0;
+
+  &--welcome {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
 }
 
 .welcome-panel {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100%;
-  padding: 48px 16px;
+  min-height: 0;
+  padding: 24px 16px;
   text-align: center;
 }
 
@@ -762,6 +774,7 @@ onUnmounted(() => {
   :deep(.ep-textarea__inner) {
     box-shadow: none;
     padding: 8px 4px;
+    overflow-y: hidden;
   }
 }
 
