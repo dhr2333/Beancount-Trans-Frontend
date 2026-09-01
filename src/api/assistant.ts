@@ -48,6 +48,9 @@ export function submitAssistantFeedback(
   return axios.post('/assistant/feedback/', request)
 }
 
+/** SSE 空闲超时：超过该时间未收到任何帧则中止请求。 */
+const ASSISTANT_STREAM_IDLE_TIMEOUT_MS = 90_000
+
 function parseSseFrame(frame: string): AssistantStreamEvent | null {
   let eventType = 'message'
   let dataLine = ''
@@ -74,63 +77,99 @@ export async function streamAssistantChat(
   request: AssistantChatRequest,
   onEvent: (event: AssistantStreamEvent) => void,
   signal?: AbortSignal,
+  options?: { idleTimeoutMs?: number },
 ): Promise<void> {
-  const response = await fetchWithAuth('/assistant/chat/stream/', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
-    body: JSON.stringify(request),
-    signal,
-  })
+  const idleTimeoutMs = options?.idleTimeoutMs ?? ASSISTANT_STREAM_IDLE_TIMEOUT_MS
+  const streamController = new AbortController()
+  let idleTimer: ReturnType<typeof setTimeout> | null = null
 
-  if (!response.ok) {
-    let detail = '发送失败，请稍后重试'
-    try {
-      const payload = await response.json()
-      detail = payload.detail || detail
-    } catch {
-      // ignore JSON parse errors
+  const clearIdleTimer = () => {
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+      idleTimer = null
     }
-    throw new Error(detail)
   }
 
-  if (!response.body) {
-    throw new Error('流式响应不可用')
+  const resetIdleTimer = () => {
+    clearIdleTimer()
+    idleTimer = setTimeout(() => {
+      streamController.abort(new DOMException('响应超时，请重试', 'TimeoutError'))
+    }, idleTimeoutMs)
   }
 
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
+  const onParentAbort = () => {
+    streamController.abort()
+  }
+  signal?.addEventListener('abort', onParentAbort)
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) {
-      break
-    }
+  const notifyEvent = (event: AssistantStreamEvent) => {
+    resetIdleTimer()
+    onEvent(event)
+  }
 
-    buffer += decoder.decode(value, { stream: true })
-    const frames = buffer.split('\n\n')
-    buffer = frames.pop() || ''
+  resetIdleTimer()
 
-    for (const frame of frames) {
-      const trimmed = frame.trim()
-      if (!trimmed) {
-        continue
+  try {
+    const response = await fetchWithAuth('/assistant/chat/stream/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify(request),
+      signal: streamController.signal,
+    })
+
+    if (!response.ok) {
+      let detail = '发送失败，请稍后重试'
+      try {
+        const payload = await response.json()
+        detail = payload.detail || detail
+      } catch {
+        // ignore JSON parse errors
       }
-      const event = parseSseFrame(trimmed)
+      throw new Error(detail)
+    }
+
+    if (!response.body) {
+      throw new Error('流式响应不可用')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) {
+        break
+      }
+
+      buffer += decoder.decode(value, { stream: true })
+      const frames = buffer.split('\n\n')
+      buffer = frames.pop() || ''
+
+      for (const frame of frames) {
+        const trimmed = frame.trim()
+        if (!trimmed) {
+          continue
+        }
+        const event = parseSseFrame(trimmed)
+        if (event) {
+          notifyEvent(event)
+        }
+      }
+    }
+
+    const tail = buffer.trim()
+    if (tail) {
+      const event = parseSseFrame(tail)
       if (event) {
-        onEvent(event)
+        notifyEvent(event)
       }
     }
-  }
-
-  const tail = buffer.trim()
-  if (tail) {
-    const event = parseSseFrame(tail)
-    if (event) {
-      onEvent(event)
-    }
+  } finally {
+    clearIdleTimer()
+    signal?.removeEventListener('abort', onParentAbort)
   }
 }

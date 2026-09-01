@@ -55,8 +55,11 @@ export function useAssistantChat(options: {
   const statusLoading = ref(false)
   const error = ref<string | null>(null)
   let abortController: AbortController | null = null
+  let activeRequestId = 0
+  let userStopRequested = false
 
   const canChat = computed(() => {
+    if (statusLoading.value) return false
     if (!status.value) return false
     return status.value.api_key_configured && status.value.ledger_exists
   })
@@ -103,6 +106,19 @@ export function useAssistantChat(options: {
       assistant.queries[existing] = record
     } else {
       assistant.queries.push(record)
+    }
+  }
+
+  function resetSendingState(requestId: number) {
+    if (requestId !== activeRequestId) {
+      return
+    }
+    loading.value = false
+    abortController = null
+    const assistant = getAssistantMessage()
+    if (assistant?.streaming) {
+      assistant.streaming = false
+      assistant.status = undefined
     }
   }
 
@@ -255,9 +271,8 @@ export function useAssistantChat(options: {
   )
 
   function stop() {
+    userStopRequested = true
     abortController?.abort()
-    abortController = null
-    loading.value = false
     const assistant = getAssistantMessage()
     if (assistant?.streaming) {
       assistant.streaming = false
@@ -266,11 +281,17 @@ export function useAssistantChat(options: {
         assistant.content = '已停止生成'
       }
     }
+    resetSendingState(activeRequestId)
   }
 
-  async function send(content: string) {
+  async function send(content: string): Promise<boolean> {
     const text = content.trim()
-    if (!text || loading.value) return
+    if (!text || loading.value) {
+      return false
+    }
+
+    const requestId = ++activeRequestId
+    userStopRequested = false
 
     messages.value.push({
       id: createMessageId(),
@@ -309,18 +330,44 @@ export function useAssistantChat(options: {
         abortController.signal,
       )
 
+      if (requestId !== activeRequestId) {
+        return true
+      }
+
       const assistant = getAssistantMessage()
       if (assistant?.streaming) {
         assistant.streaming = false
         assistant.status = undefined
         if (!assistant.content.trim()) {
-          assistant.content = '未收到完整回复，请重试'
+          const incompleteMessage = '未收到完整回复，请重试'
+          assistant.content = incompleteMessage
+          error.value = incompleteMessage
         }
       }
+      return true
     } catch (e: unknown) {
-      if (e instanceof DOMException && e.name === 'AbortError') {
-        return
+      if (requestId !== activeRequestId) {
+        return true
       }
+
+      if (e instanceof DOMException && (e.name === 'AbortError' || e.name === 'TimeoutError')) {
+        const assistant = getAssistantMessage()
+        if (assistant) {
+          assistant.streaming = false
+          assistant.status = undefined
+          if (!assistant.content.trim()) {
+            if (userStopRequested) {
+              assistant.content = '已停止生成'
+            } else {
+              const timeoutMessage = e.message || '响应超时，请重试'
+              assistant.content = timeoutMessage
+              error.value = timeoutMessage
+            }
+          }
+        }
+        return true
+      }
+
       const detail = e instanceof Error ? e.message : '发送失败，请稍后重试'
       error.value = detail
       const assistant = getAssistantMessage()
@@ -329,9 +376,12 @@ export function useAssistantChat(options: {
         assistant.streaming = false
         assistant.status = undefined
       }
+      return true
     } finally {
-      loading.value = false
-      abortController = null
+      if (requestId === activeRequestId) {
+        loading.value = false
+        abortController = null
+      }
     }
   }
 

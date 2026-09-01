@@ -35,6 +35,19 @@
       </template>
     </el-alert>
 
+    <el-alert
+      v-if="error && !loading"
+      type="error"
+      :closable="false"
+      show-icon
+      class="setup-alert"
+      :title="error"
+    >
+      <template #default>
+        <el-button size="small" @click="fetchStatus">重试连接</el-button>
+      </template>
+    </el-alert>
+
     <div
       class="chat-container"
       ref="chatContainerRef"
@@ -221,6 +234,7 @@ const {
   deepThink,
   status,
   statusLoading,
+  error,
   canChat,
   deepThinkSupported,
   exampleQuestions,
@@ -463,8 +477,13 @@ async function handleDislike(index: number) {
 async function handleSend() {
   const text = inputText.value
   if (!text.trim()) return
+  if (loading.value) return
   inputText.value = ''
-  await send(text)
+  const sent = await send(text)
+  if (!sent) {
+    inputText.value = text
+    return
+  }
   await scrollToBottom()
 }
 
@@ -497,6 +516,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  stop()
   window.removeEventListener('keydown', handleShortcut)
 })
 </script>

@@ -1499,7 +1499,7 @@ const handleKeywordSelect = async (uuid: string, selectedKey: string) => {
   }
 }
 
-async function persistEntryEdit(uuid: string, editedFormatted: string) {
+async function persistEntryEdit(uuid: string, editedFormatted: string, options?: { silent?: boolean }) {
   if (errorEntries.value[uuid]) {
     delete errorEntries.value[uuid]
   }
@@ -1514,7 +1514,46 @@ async function persistEntryEdit(uuid: string, editedFormatted: string) {
     delete validationWarnings.value[uuid]
   }
 
-  ElMessage.success('编辑内容已保存')
+  if (!options?.silent) {
+    ElMessage.success('编辑内容已保存')
+  }
+}
+
+/** 确认写入前将本地 edited_formatted 静默同步至 Redis。 */
+async function flushEditedEntries(): Promise<boolean> {
+  const updatePromises: Promise<void>[] = []
+
+  for (const entry of formattedEntries.value) {
+    const editedContent = entry.edited_formatted.replace(/\n+$/, '')
+    updatePromises.push(
+      updateEntryEdit(taskId.value, entry.uuid, {
+        edited_formatted: editedContent,
+      }).then((response) => {
+        entry.edited_formatted = editedContent
+        if (response.data.validation_warning) {
+          validationWarnings.value[entry.uuid] = response.data.validation_warning
+        } else {
+          delete validationWarnings.value[entry.uuid]
+        }
+        if (errorEntries.value[entry.uuid]) {
+          delete errorEntries.value[entry.uuid]
+        }
+      }),
+    )
+  }
+
+  if (!updatePromises.length) {
+    return true
+  }
+
+  try {
+    await Promise.all(updatePromises)
+    return true
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: { error?: string } } }
+    ElMessage.error(axiosError.response?.data?.error || '同步审核草稿失败，请检查网络后重试')
+    return false
+  }
 }
 
 // 处理条目编辑
@@ -1594,40 +1633,25 @@ const handleSavePreview = async () => {
       }
     }
 
-    // 更新条目内容
-    const updatePromises: Promise<void>[] = []
+    // 更新条目内容（本地）
     const minLength = Math.min(editedEntries.length, formattedEntries.value.length)
 
     for (let i = 0; i < minLength; i++) {
       const entry = formattedEntries.value[i]
       const editedContent = editedEntries[i].replace(/\n+$/, '')
 
-      // 如果内容有变化，才更新
       if (entry.edited_formatted.replace(/\n+$/, '') !== editedContent) {
-        // 清除错误状态
+        entry.edited_formatted = editedContent
         if (errorEntries.value[entry.uuid]) {
           delete errorEntries.value[entry.uuid]
         }
-
-        updatePromises.push(
-          updateEntryEdit(taskId.value, entry.uuid, {
-            edited_formatted: editedContent
-          }).then((response) => {
-            // 更新本地数据
-            entry.edited_formatted = editedContent
-            
-            if (response.data.validation_warning) {
-              validationWarnings.value[entry.uuid] = response.data.validation_warning
-            } else {
-              delete validationWarnings.value[entry.uuid]
-            }
-          })
-        )
       }
     }
 
-    // 等待所有更新完成
-    await Promise.all(updatePromises)
+    const flushed = await flushEditedEntries()
+    if (!flushed) {
+      return
+    }
 
     ElMessage.success('预览内容已保存')
     showPreviewDialog.value = false
@@ -1648,6 +1672,11 @@ const handleConfirmWrite = async () => {
   loading.value.confirm = true
   errorEntries.value = {}
   try {
+    const flushed = await flushEditedEntries()
+    if (!flushed) {
+      return
+    }
+
     await confirmWrite(taskId.value)
     ElMessage.success('确认写入成功')
     
@@ -1660,6 +1689,12 @@ const handleConfirmWrite = async () => {
       emitTaskBannerRefresh()
     }, 500)
   } catch (error: any) {
+    if (error.response?.status === 404) {
+      ElMessage.error(
+        error.response?.data?.error || '审核缓存缺失，请勿重新解析，请先检查网络后重试写入',
+      )
+      return
+    }
     if (error.response?.data?.error_entries) {
       const entries = error.response.data.error_entries as ErrorEntry[]
       entries.forEach(entry => {
