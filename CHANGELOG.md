@@ -1,3 +1,20 @@
+## [5.12.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.11.0...5.12.0) (2026-09-02)
+
+### Features
+
+* Copilot Fava 引用来源 ([9f860e6](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/9f860e65dd74915976e25ffe28feb1f0b166033a))
+
+### Bug Fixes
+
+* 修复以下问题 ([a56199a](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/a56199a9e1f523b6dce15eddb7a0e2fdebd931c3))
+* 修复前端修改账本账户负债账户描述后会自动展开资产账户的问题 ([84fb998](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/84fb998685870176c398b0334ada1331d0aa787a))
+* 修复审核草稿一致性问题 ([43184e4](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/43184e42a3f469912a569d66fe1711fa312d28da))
+* 修复或新增 Copilot 以下问题： ([1654db4](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/1654db47db2aee93cc6bd545ce6d062d278a53ae))
+* 解决设置页两套 DeepSeek Key 的冗余问题 ([ccf710f](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/ccf710f3e0c5e9c872f132b1be937f4c69114048))
+* 解析审核支持新增资产映射（参考新增支出映射和新增收入映射） ([1a18ee1](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/1a18ee14e8f49e5ed5186999c04e37a532dfe8c0))
+* 请求只负责落库和投递任务，生成在 Celery 上跑；页面只订阅进度 ([c80e715](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/c80e715eb3a006db49f2fee6cad1da06a9d3b477))
+* 预览保存为真源，删除条目后无空行 ([12f4f94](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/12f4f94f75ae639e9d008749c893ef2d98f1de00))
+
 ## [5.11.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.10.0...5.11.0) (2026-06-20)
 
 ### Features
