@@ -19,10 +19,12 @@
         <div v-if="!showAnonymousPrompt" class="management-content">
             <!-- 左侧：账户树形结构 -->
             <div class="account-tree-panel">
-                <el-tree :data="accountTree" :props="treeProps" node-key="id" :expand-on-click-node="false"
-                    :default-expand-all="false" :default-expanded-keys="defaultExpandedKeys"
-                    @node-click="handleNodeClick" @node-expand="handleNodeExpand" @node-collapse="handleNodeCollapse"
-                    class="account-tree" v-loading="loading">
+                <el-tree ref="accountTreeRef" :key="accountTreeRenderKey" :data="accountTree" :props="treeProps"
+                    node-key="id" :expand-on-click-node="false" :default-expand-all="false"
+                    :default-expanded-keys="expandedKeys" :current-node-key="currentSelectedAccountId ?? undefined"
+                    highlight-current class="account-tree" v-loading="loading"
+                    @node-click="handleNodeClick" @node-expand="handleNodeExpand"
+                    @node-collapse="handleNodeCollapse">
                     <template #default="{ node, data }">
                         <div class="tree-node">
                             <span class="node-label">{{ data.account }}</span>
@@ -389,7 +391,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
@@ -459,7 +461,8 @@ type AccountOption = Omit<Account, 'children'> & CascaderOption & {
 const loading = ref(false)
 const accountTree = ref<AccountOption[]>([])
 const selectedAccount = ref<AccountOption | null>(null)
-const defaultExpandedKeys = ref<number[]>([])
+const accountTreeRef = ref<{ setCurrentKey: (key: number | null) => void } | null>(null)
+const accountTreeRenderKey = ref(0)
 
 // 树形结构状态保持
 const expandedKeys = ref<number[]>([])
@@ -644,8 +647,12 @@ const fetchAccountTree = async () => {
         const response = await axios.get('/account/tree/')
         accountTree.value = response.data as AccountOption[]
 
-        // 保持之前的展开状态
-        defaultExpandedKeys.value = previousExpandedKeys.length > 0 ? previousExpandedKeys : calculateDefaultExpandedKeys(response.data)
+        // default-expanded-keys 只在挂载时生效，刷新数据后重挂载以保留展开状态
+        expandedKeys.value = previousExpandedKeys.length > 0
+            ? previousExpandedKeys
+            : calculateDefaultExpandedKeys(response.data)
+        accountTreeRenderKey.value += 1
+        await nextTick()
 
         // 恢复选中的账户
         if (previousSelectedId) {
@@ -653,6 +660,7 @@ const fetchAccountTree = async () => {
             if (matchedAccount) {
                 selectedAccount.value = matchedAccount
                 currentSelectedAccountId.value = previousSelectedId
+                accountTreeRef.value?.setCurrentKey(previousSelectedId)
                 // 重新获取映射数据
                 await fetchAccountMappings()
             }
@@ -808,7 +816,15 @@ const updateAccount = async () => {
         await axios.put(`/account/${selectedAccount.value.id}/`, updateData)
         ElMessage.success('账户更新成功')
         editAccountDialog.value = false
-        await fetchAccountTree()
+
+        const pathChanged = selectedAccount.value.account !== updateData.account
+        if (pathChanged) {
+            await fetchAccountTree()
+        } else {
+            selectedAccount.value.description = updateData.description
+            selectedAccount.value.reconciliation_cycle_unit = updateData.reconciliation_cycle_unit ?? null
+            selectedAccount.value.reconciliation_cycle_interval = updateData.reconciliation_cycle_interval ?? null
+        }
         emitAccountTreeUpdated()
 
         // 如果对账周期配置发生变化（开启或删除），触发横幅刷新
