@@ -113,8 +113,17 @@
       <el-form-item label="映射账户" prop="accountId">
         <AccountSelector v-model="mappingForm.accountId" placeholder="请选择或搜索账户" />
       </el-form-item>
-      <el-form-item :label="mappingForm.type === 'expense' ? '对方' : '付款方'" prop="party">
-        <el-input v-model="mappingForm.party" :placeholder="mappingForm.type === 'expense' ? '如腾讯、星巴克' : '选填：付款方信息'" />
+      <el-form-item :label="mappingPartyLabel" :prop="mappingPartyProp">
+        <el-input
+          v-if="mappingForm.type === 'asset'"
+          v-model="mappingForm.full"
+          placeholder="选填：对方信息"
+        />
+        <el-input
+          v-else
+          v-model="mappingForm.party"
+          :placeholder="mappingForm.type === 'expense' ? '如腾讯、星巴克' : '选填：付款方信息'"
+        />
       </el-form-item>
       <el-form-item label="标签" prop="tag_ids">
         <TagSelector v-model="mappingForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签" />
@@ -137,7 +146,7 @@ import axios from '../../utils/request';
 import { hasAuthTokens } from '../../utils/auth';
 import AccountSelector from '../common/AccountSelector.vue';
 import TagSelector from '../common/TagSelector.vue';
-import { useInlineMappingDialog, defaultMappingKeyFromOriginalRow } from '../../composables/useInlineMappingDialog';
+import { useInlineMappingDialog, defaultMappingKeyFromOriginalRow, defaultAssetMappingKeyFromOriginalRow } from '../../composables/useInlineMappingDialog';
 
 
 const input = ref()
@@ -175,6 +184,8 @@ interface BillEntry {
   ai_choose: string;
   counterparty?: string;
   commodity?: string;
+  payment_method?: string;
+  transaction_type?: string;
   ai_candidates?: Array<{
     key: string;
     score?: number;
@@ -189,6 +200,8 @@ const {
   mappingForm,
   mappingRules,
   mappingDialogTitle,
+  mappingPartyLabel,
+  mappingPartyProp,
   openForCreate,
   openEditCurrentMapping,
   handleMappingSubmit
@@ -336,32 +349,50 @@ const handleAiChoose = async (rowIndex: number, key: string) => {
 }
 
 const inferTransMappingType = (row: BillEntry) => {
+  const txType = row.transaction_type?.trim()
+  if (txType === '/' || txType === '不计收支') return 'asset' as const
   if (row.formatted.includes(' Income:') || row.formatted.includes('\nIncome:')) return 'income' as const
-  return 'expense' as const
+  if (row.formatted.includes(' Expenses:') || row.formatted.includes('\nExpenses:')) return 'expense' as const
+  return 'asset' as const
 }
 
 const getTransCreateDefaults = (row: BillEntry) => {
   const type = inferTransMappingType(row)
+  if (type === 'asset') {
+    return {
+      type,
+      key: defaultAssetMappingKeyFromOriginalRow({ payment_method: row.payment_method }),
+      party: '',
+      full: ''
+    }
+  }
   const key = defaultMappingKeyFromOriginalRow({
     counterparty: row.counterparty,
     commodity: row.commodity
   })
-  return { type, key, party: '' }
+  return { type, key, party: '', full: '' }
 }
 
-const applyTransReparse = async (rowIndex: number, entryId: string, selectedKey: string) => {
+const applyTransReparse = async (
+  rowIndex: number,
+  entryId: string,
+  selectedKey: string,
+  mappingType?: 'asset'
+) => {
   if (rowIndex < 0 || !responseList.value[rowIndex]) {
     throw new Error('映射目标条目不存在')
   }
   const response = await axios.post('/translate/reparse', {
     entry_id: entryId,
-    selected_key: selectedKey
+    selected_key: selectedKey,
+    ...(mappingType ? { mapping_type: mappingType } : {})
   })
   const updatedData = response.data
+  const previousChoose = responseList.value[rowIndex].ai_choose
   responseList.value[rowIndex] = {
     ...responseList.value[rowIndex],
     formatted: updatedData.formatted,
-    ai_choose: updatedData.ai_choose || selectedKey,
+    ai_choose: mappingType === 'asset' ? (updatedData.ai_choose ?? previousChoose ?? '') : (updatedData.ai_choose || selectedKey),
     counterparty: updatedData.counterparty ?? responseList.value[rowIndex].counterparty,
     commodity: updatedData.commodity ?? responseList.value[rowIndex].commodity,
     ai_candidates: Array.isArray(updatedData.ai_candidates)
@@ -377,7 +408,8 @@ const buildTransMappingOptions = (row: BillEntry, rowIndex: number) => ({
   getSelectedKey: (r: BillEntry) => r.ai_choose,
   getCreateDefaults: getTransCreateDefaults,
   requireAuth: hasAuthTokens,
-  onReparse: (key: string) => applyTransReparse(rowIndex, row.id, key)
+  onReparse: (key: string, type: 'expense' | 'income' | 'asset') =>
+    applyTransReparse(rowIndex, row.id, key, type === 'asset' ? 'asset' : undefined)
 })
 
 const openCreateMappingForRow = (row: BillEntry, rowIndex: number) => {

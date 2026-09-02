@@ -79,6 +79,7 @@ export interface ParseReviewTask {
 export interface ReparseRequest {
   entry_uuid: string
   selected_key: string
+  mapping_type?: 'expense' | 'income' | 'asset'
 }
 
 /**
@@ -168,16 +169,15 @@ export interface ConfirmWriteErrorResponse {
 
 /**
  * 是否显示「新增映射」按钮。
- * 不计收支且已由内置规则解析（无映射关键字/候选）时，新增支出/收入映射无效，应隐藏。
+ * 不计收支条目显示资产映射入口；支出/收入条目显示对应收支映射入口。
  */
 export function shouldShowParseReviewCreateMapping(row: FormattedEntry): boolean {
-  if (row.installment_role === 'installment') return false
+  return row.installment_role !== 'installment'
+}
+
+export function isNeutralParseReviewEntry(row: FormattedEntry): boolean {
   const txType = row.original_row?.transaction_type?.trim()
-  const isNeutralTx = txType === '/' || txType === '不计收支'
-  if (!isNeutralTx) return true
-  if (row.selected_expense_key) return true
-  if (row.expense_candidates_with_score?.length) return true
-  return false
+  return txType === '/' || txType === '不计收支'
 }
 
 export function isInstallmentRepaymentEntry(row: FormattedEntry): boolean {

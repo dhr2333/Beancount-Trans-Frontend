@@ -138,7 +138,7 @@
             </div>
             <div v-else class="ai-classification-container">
               <div class="current-selection">
-                <span class="label">当前分类：</span>
+                <span class="label">{{ isNeutralParseReviewEntry(scope.row) ? '当前分类：' : '当前分类：' }}</span>
                 <el-tag
                   v-if="scope.row.selected_expense_key"
                   type="success"
@@ -147,7 +147,7 @@
                 >
                   {{ scope.row.selected_expense_key }}
                 </el-tag>
-                <span v-else class="no-category-tip">无分类建议</span>
+                <span v-else class="no-category-tip">{{ isNeutralParseReviewEntry(scope.row) ? '无分类建议' : '无分类建议' }}</span>
               </div>
               <div v-if="scope.row.expense_candidates_with_score && scope.row.expense_candidates_with_score.length > 0"
                 class="candidates">
@@ -227,8 +227,17 @@
           <AccountSelector v-model="mappingForm.accountId"
             placeholder="请选择或搜索账户" />
         </el-form-item>
-        <el-form-item :label="mappingForm.type === 'expense' ? '对方' : '付款方'" prop="party">
-          <el-input v-model="mappingForm.party" :placeholder="mappingForm.type === 'expense' ? '如腾讯、星巴克' : '选填：付款方信息'" />
+        <el-form-item :label="mappingPartyLabel" :prop="mappingPartyProp">
+          <el-input
+            v-if="mappingForm.type === 'asset'"
+            v-model="mappingForm.full"
+            placeholder="选填：对方信息"
+          />
+          <el-input
+            v-else
+            v-model="mappingForm.party"
+            :placeholder="mappingForm.type === 'expense' ? '如腾讯、星巴克' : '选填：付款方信息'"
+          />
         </el-form-item>
         <el-form-item label="标签" prop="tag_ids">
           <TagSelector v-model="mappingForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签" />
@@ -378,7 +387,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit } from '@element-plus/icons-vue'
-import { useInlineMappingDialog, defaultMappingKeyFromOriginalRow } from '../../composables/useInlineMappingDialog'
+import { useInlineMappingDialog, defaultMappingKeyFromOriginalRow, defaultAssetMappingKeyFromOriginalRow } from '../../composables/useInlineMappingDialog'
 import AccountSelector from '../../components/common/AccountSelector.vue'
 import TagSelector from '../../components/common/TagSelector.vue'
 import axios from '../../utils/request'
@@ -396,6 +405,7 @@ import { getTask } from '../../api/reconciliation'
 import {
   shouldShowParseReviewCreateMapping,
   isInstallmentRepaymentEntry,
+  isNeutralParseReviewEntry,
   type FormattedEntry,
   type ParseResult,
   type ErrorEntry,
@@ -1330,6 +1340,8 @@ const {
   mappingForm,
   mappingRules,
   mappingDialogTitle,
+  mappingPartyLabel,
+  mappingPartyProp,
   openForCreate,
   openForEdit,
   openEditCurrentMapping,
@@ -1337,14 +1349,24 @@ const {
 } = useInlineMappingDialog()
 
 const inferParseReviewMappingType = (row: FormattedEntry) => {
-  if (row.original_row?.transaction_type?.includes('收入')) return 'income' as const
+  const txType = row.original_row?.transaction_type?.trim()
+  if (txType === '/' || txType === '不计收支') return 'asset' as const
+  if (txType?.includes('收入')) return 'income' as const
   return 'expense' as const
 }
 
 const getParseReviewCreateDefaults = (row: FormattedEntry) => {
   const type = inferParseReviewMappingType(row)
+  if (type === 'asset') {
+    return {
+      type,
+      key: defaultAssetMappingKeyFromOriginalRow(row.original_row),
+      party: '',
+      full: ''
+    }
+  }
   const key = defaultMappingKeyFromOriginalRow(row.original_row)
-  return { type, key, party: '' }
+  return { type, key, party: '', full: '' }
 }
 
 const applyReparsePayloadToEntry = (entryUuid: string, updated: ReparseResponse) => {
@@ -1362,10 +1384,15 @@ const applyReparsePayloadToEntry = (entryUuid: string, updated: ReparseResponse)
   }
 }
 
-const applyReparseToEntry = async (entryUuid: string, selectedKey: string) => {
+const applyReparseToEntry = async (
+  entryUuid: string,
+  selectedKey: string,
+  mappingType?: 'expense' | 'income' | 'asset'
+) => {
   const response = await reparseEntry(taskId.value, {
     entry_uuid: entryUuid,
-    selected_key: selectedKey
+    selected_key: selectedKey,
+    ...(mappingType ? { mapping_type: mappingType } : {})
   })
   const updated = response.data
   applyReparsePayloadToEntry(entryUuid, updated)
@@ -1384,7 +1411,8 @@ const buildParseReviewMappingOptions = (row: FormattedEntry) => ({
   inferType: inferParseReviewMappingType,
   getSelectedKey: (r: FormattedEntry) => r.selected_expense_key,
   getCreateDefaults: getParseReviewCreateDefaults,
-  onReparse: (key: string) => applyReparseToEntry(row.uuid, key)
+  onReparse: (key: string, type: 'expense' | 'income' | 'asset') =>
+    applyReparseToEntry(row.uuid, key, type === 'asset' ? 'asset' : undefined)
 })
 
 const openCreateMappingForRow = (row: FormattedEntry) => {
@@ -1397,11 +1425,12 @@ const openEditCurrentMappingForRow = (row: FormattedEntry) => {
 
 const openEditMappingForRowByKey = (row: FormattedEntry, source: TagSource) => {
   if (source.type !== 'mapping' || !source.key) return
-  if (source.mapping_type === 'asset') {
-    ElMessage.info('资产映射请在映射管理中编辑')
-    return
-  }
-  const mappingType = source.mapping_type === 'income' ? 'income' : 'expense'
+  const mappingType =
+    source.mapping_type === 'asset'
+      ? 'asset'
+      : source.mapping_type === 'income'
+        ? 'income'
+        : 'expense'
   void openForEdit({
     ...buildParseReviewMappingOptions(row),
     inferType: () => mappingType,

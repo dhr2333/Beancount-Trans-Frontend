@@ -2,9 +2,10 @@ import { ref, computed } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import axios from '../utils/request'
 
-export type MappingType = 'expense' | 'income'
+export type MappingType = 'expense' | 'income' | 'asset'
 
 const MAPPING_KEY_MAX_LENGTH = 16
+const ASSET_FULL_MAX_LENGTH = 16
 
 /** 从账单原始行的对方/商品信息生成新增映射的默认关键字 */
 export function defaultMappingKeyFromOriginalRow(originalRow?: {
@@ -22,13 +23,26 @@ export function defaultMappingKeyFromOriginalRow(originalRow?: {
   return ''
 }
 
+/** 从账单原始行的支付方式生成新增资产映射的默认关键字 */
+export function defaultAssetMappingKeyFromOriginalRow(originalRow?: {
+  payment_method?: string
+}): string {
+  let key = originalRow?.payment_method?.trim() ?? ''
+  if (key.includes('&')) {
+    key = key.split('&')[0]
+  }
+  return key.substring(0, MAPPING_KEY_MAX_LENGTH)
+}
+
 interface MappingListItem {
   id: number
   key: string
+  full?: string | null
   payee?: string | null
   payer?: string | null
   expend?: { id: number } | number | null
   income?: { id: number } | number | null
+  assets?: { id: number } | number | null
   tags?: Array<{ id: number }>
 }
 
@@ -36,12 +50,23 @@ export interface OpenMappingOptions<T> {
   row: T
   inferType: (row: T) => MappingType
   getSelectedKey: (row: T) => string | undefined
-  getCreateDefaults: (row: T) => { key: string; party: string; type: MappingType }
-  onReparse: (key: string) => Promise<void>
+  getCreateDefaults: (row: T) => {
+    key: string
+    party: string
+    full: string
+    type: MappingType
+  }
+  onReparse: (key: string, type: MappingType) => Promise<void>
   requireAuth?: () => boolean
 }
 
 function accountIdFromMapping(item: MappingListItem, type: MappingType): number | null {
+  if (type === 'asset') {
+    const field = item.assets
+    if (field == null) return null
+    if (typeof field === 'number') return field
+    return field.id ?? null
+  }
   const field = type === 'expense' ? item.expend : item.income
   if (field == null) return null
   if (typeof field === 'number') return field
@@ -57,9 +82,14 @@ function tagIdsFromMapping(item: MappingListItem): number[] {
   return item.tags?.map((tag) => tag.id) ?? []
 }
 
+function mappingEndpoint(type: MappingType): string {
+  if (type === 'expense') return 'expense/'
+  if (type === 'income') return 'income/'
+  return 'assets/'
+}
+
 async function fetchMappingByKey(type: MappingType, key: string): Promise<MappingListItem | null> {
-  const endpoint = type === 'expense' ? 'expense/' : 'income/'
-  const response = await axios.get<MappingListItem[]>(endpoint)
+  const response = await axios.get<MappingListItem[]>(mappingEndpoint(type))
   const list = Array.isArray(response.data) ? response.data : []
   return list.find((m) => m.key === key) ?? null
 }
@@ -67,18 +97,26 @@ async function fetchMappingByKey(type: MappingType, key: string): Promise<Mappin
 interface OfficialTemplateItem {
   key: string
   account?: string | null
+  full?: string | null
   payee?: string | null
   payer?: string | null
 }
 
-const officialTemplateItemsCache: Partial<Record<MappingType, OfficialTemplateItem[]>> = {}
+type OfficialTemplateType = MappingType | 'assets'
+
+const officialTemplateItemsCache: Partial<Record<OfficialTemplateType, OfficialTemplateItem[]>> = {}
+
+function officialTemplateApiType(type: MappingType): OfficialTemplateType {
+  return type === 'asset' ? 'assets' : type
+}
 
 async function fetchOfficialTemplateItems(type: MappingType): Promise<OfficialTemplateItem[]> {
-  if (officialTemplateItemsCache[type]) {
-    return officialTemplateItemsCache[type]!
+  const apiType = officialTemplateApiType(type)
+  if (officialTemplateItemsCache[apiType]) {
+    return officialTemplateItemsCache[apiType]!
   }
   const response = await axios.get<Array<{ id: number }>>('/templates/', {
-    params: { type, is_official: true }
+    params: { type: apiType, is_official: true }
   })
   const templates = Array.isArray(response.data) ? response.data : []
   const items: OfficialTemplateItem[] = []
@@ -92,7 +130,7 @@ async function fetchOfficialTemplateItems(type: MappingType): Promise<OfficialTe
       // 忽略单个模板详情加载失败
     }
   }
-  officialTemplateItemsCache[type] = items
+  officialTemplateItemsCache[apiType] = items
   return items
 }
 
@@ -131,6 +169,7 @@ export function useInlineMappingDialog() {
   const mappingForm = ref({
     type: 'expense' as MappingType,
     key: '',
+    full: '',
     accountId: null as number | null,
     party: '',
     tag_ids: [] as number[]
@@ -140,16 +179,32 @@ export function useInlineMappingDialog() {
     key: [
       { required: true, message: '请输入关键字', trigger: 'blur' },
       { max: 16, message: '长度应控制在16个字符以内', trigger: 'blur' }
+    ],
+    full: [
+      { max: ASSET_FULL_MAX_LENGTH, message: '长度应控制在16个字符以内', trigger: 'blur' }
     ]
   }
 
+  const mappingPartyLabel = computed(() =>
+    mappingForm.value.type === 'income' ? '付款方' : '对方'
+  )
+
+  const mappingPartyProp = computed(() =>
+    mappingForm.value.type === 'asset' ? 'full' : 'party'
+  )
+
   const mappingDialogTitle = computed(() => {
-    const typeLabel = mappingForm.value.type === 'expense' ? '支出' : '收入'
+    const typeLabel =
+      mappingForm.value.type === 'expense'
+        ? '支出'
+        : mappingForm.value.type === 'income'
+          ? '收入'
+          : '资产'
     const action = mappingDialog.value.mode === 'edit' ? '编辑' : '新增'
     return `${action}${typeLabel}映射`
   })
 
-  let reparseAfterSave: ((key: string) => Promise<void>) | null = null
+  let reparseAfterSave: ((key: string, type: MappingType) => Promise<void>) | null = null
 
   const checkAuth = (requireAuth?: () => boolean): boolean => {
     if (requireAuth && !requireAuth()) {
@@ -166,6 +221,7 @@ export function useInlineMappingDialog() {
     mappingForm.value = {
       type: defaults.type,
       key: defaults.key,
+      full: defaults.full,
       accountId: null,
       party: defaults.party,
       tag_ids: []
@@ -196,6 +252,7 @@ export function useInlineMappingDialog() {
         mappingForm.value = {
           type,
           key: mapping.key,
+          full: mapping.full ?? '',
           accountId: accountIdFromMapping(mapping, type),
           party: partyFromMapping(mapping, type),
           tag_ids: tagIdsFromMapping(mapping)
@@ -214,6 +271,7 @@ export function useInlineMappingDialog() {
           mappingForm.value = {
             type,
             key: templateItem.key,
+            full: templateItem.full ?? '',
             accountId,
             party: type === 'expense' ? (templateItem.payee ?? '') : (templateItem.payer ?? ''),
             tag_ids: []
@@ -223,6 +281,7 @@ export function useInlineMappingDialog() {
           mappingForm.value = {
             type,
             key,
+            full: '',
             accountId: null,
             party: '',
             tag_ids: []
@@ -259,7 +318,7 @@ export function useInlineMappingDialog() {
     if (!reparseAfterSave) return
 
     mappingDialog.value.loading = true
-    const { type, key, accountId, party, tag_ids } = mappingForm.value
+    const { type, key, full, accountId, party, tag_ids } = mappingForm.value
     const selectedKey = key.trim()
 
     try {
@@ -272,11 +331,18 @@ export function useInlineMappingDialog() {
             currency: 'CNY',
             tag_ids
           })
-        } else {
+        } else if (type === 'income') {
           await axios.put(`income/${mappingDialog.value.mappingId}/`, {
             key: selectedKey,
             income_id: accountId,
             payer: party,
+            tag_ids
+          })
+        } else {
+          await axios.put(`assets/${mappingDialog.value.mappingId}/`, {
+            key: selectedKey,
+            full: full.trim() || selectedKey,
+            assets_id: accountId,
             tag_ids
           })
         }
@@ -290,11 +356,18 @@ export function useInlineMappingDialog() {
             currency: 'CNY',
             tag_ids
           })
-        } else {
+        } else if (type === 'income') {
           await axios.post('/income/', {
             key: selectedKey,
             income_id: accountId,
             payer: party,
+            tag_ids
+          })
+        } else {
+          await axios.post('/assets/', {
+            key: selectedKey,
+            full: full.trim() || selectedKey,
+            assets_id: accountId,
             tag_ids
           })
         }
@@ -302,7 +375,7 @@ export function useInlineMappingDialog() {
       }
 
       try {
-        await reparseAfterSave(selectedKey)
+        await reparseAfterSave(selectedKey, type)
         ElMessage.success('重解析完成')
         mappingDialog.value.visible = false
       } catch (reparseError: unknown) {
@@ -336,6 +409,8 @@ export function useInlineMappingDialog() {
     mappingForm,
     mappingRules,
     mappingDialogTitle,
+    mappingPartyLabel,
+    mappingPartyProp,
     openForCreate,
     openForEdit,
     openEditCurrentMapping,
