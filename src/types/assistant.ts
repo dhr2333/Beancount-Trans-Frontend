@@ -1,3 +1,5 @@
+export const INTERRUPTED_REPLY = '生成已中断，请重试'
+
 export type ChatRole = 'user' | 'assistant'
 
 export type AssistantPhase = 'thinking' | 'querying' | 'writing'
@@ -27,6 +29,7 @@ export interface AssistantChatRequest {
   messages?: Array<{ role: ChatRole; content: string }>
   session_id?: string
   content?: string
+  edit_message_id?: string
   show_bql?: boolean
   deep_think?: boolean
 }
@@ -76,7 +79,7 @@ export interface StoredChatMessage {
 }
 
 export type AssistantStreamEvent =
-  | { event: 'session'; data: { id: string; title: string; user_message_id: string } }
+  | { event: 'session'; data: { id: string; title: string; user_message_id: string; assistant_message_id?: string } }
   | { event: 'status'; data: { phase: AssistantPhase } }
   | { event: 'reasoning_delta'; data: { content: string; source?: 'api' | 'planning' } }
   | { event: 'thinking_set'; data: { content: string; reasoning?: string } }

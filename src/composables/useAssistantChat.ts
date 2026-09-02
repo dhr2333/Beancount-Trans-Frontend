@@ -7,13 +7,14 @@ import {
   streamAssistantChat,
   submitAssistantFeedback,
 } from '../api/assistant'
-import type {
-  AssistantFeedbackRating,
-  AssistantStatus,
-  AssistantStreamEvent,
-  ChatMessage,
-  QueryRecord,
-  StoredChatMessage,
+import {
+  INTERRUPTED_REPLY,
+  type AssistantFeedbackRating,
+  type AssistantStatus,
+  type AssistantStreamEvent,
+  type ChatMessage,
+  type QueryRecord,
+  type StoredChatMessage,
 } from '../types/assistant'
 
 const EXAMPLE_QUESTIONS = [
@@ -129,6 +130,10 @@ export function useAssistantChat(options: {
         if (userMessage) {
           userMessage.id = event.data.user_message_id
         }
+        const assistant = getAssistantMessage()
+        if (assistant && event.data.assistant_message_id) {
+          assistant.id = event.data.assistant_message_id
+        }
         if (!sessionId.value) {
           router.replace(`/assistant/${event.data.id}`)
         }
@@ -198,7 +203,9 @@ export function useAssistantChat(options: {
       case 'error': {
         const assistant = getAssistantMessage()
         if (assistant) {
-          assistant.content = event.data.detail
+          if (!assistant.content.trim()) {
+            assistant.content = event.data.detail
+          }
           assistant.streaming = false
           assistant.status = undefined
         }
@@ -284,20 +291,39 @@ export function useAssistantChat(options: {
     resetSendingState(activeRequestId)
   }
 
-  async function send(content: string): Promise<boolean> {
+  async function send(content: string, options?: { editMessageId?: string }): Promise<boolean> {
     const text = content.trim()
     if (!text || loading.value) {
       return false
     }
 
+    const editMessageId = options?.editMessageId
+    if (editMessageId) {
+      if (!sessionId.value) {
+        ElMessage.error('当前会话尚未保存，无法编辑历史消息')
+        return false
+      }
+      const editIndex = messages.value.findIndex(
+        (message) => message.id === editMessageId && message.role === 'user',
+      )
+      if (editIndex < 0) {
+        ElMessage.error('要编辑的消息不存在')
+        return false
+      }
+      messages.value = messages.value.slice(0, editIndex + 1)
+      messages.value[editIndex].content = text
+    }
+
     const requestId = ++activeRequestId
     userStopRequested = false
 
-    messages.value.push({
-      id: createMessageId(),
-      role: 'user',
-      content: text,
-    })
+    if (!editMessageId) {
+      messages.value.push({
+        id: createMessageId(),
+        role: 'user',
+        content: text,
+      })
+    }
     messages.value.push({
       id: createMessageId(),
       role: 'assistant',
@@ -322,6 +348,7 @@ export function useAssistantChat(options: {
         content: text,
         show_bql: false,
         deep_think: deepThink.value,
+        ...(editMessageId ? { edit_message_id: editMessageId } : {}),
       }
 
       await streamAssistantChat(
@@ -417,6 +444,25 @@ export function useAssistantChat(options: {
     }
   }
 
+  function isInterruptedAssistant(message: ChatMessage | undefined): boolean {
+    if (!message || message.role !== 'assistant' || message.streaming) {
+      return false
+    }
+    const text = message.content.trim()
+    return !text || text === INTERRUPTED_REPLY
+  }
+
+  async function retryFromAssistant(index: number): Promise<boolean> {
+    for (let i = index - 1; i >= 0; i -= 1) {
+      const message = messages.value[i]
+      if (message.role === 'user' && message.id) {
+        return send(message.content, { editMessageId: message.id })
+      }
+    }
+    ElMessage.error('找不到可重新生成的用户消息')
+    return false
+  }
+
   function startNewChat() {
     stop()
     messages.value = []
@@ -443,5 +489,7 @@ export function useAssistantChat(options: {
     submitFeedback,
     startNewChat,
     loadSession,
+    isInterruptedAssistant,
+    retryFromAssistant,
   }
 }

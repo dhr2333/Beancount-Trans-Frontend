@@ -53,6 +53,7 @@
       ref="chatContainerRef"
       :class="{ 'chat-container--welcome': messages.length === 0 }"
       v-loading="sessionLoading"
+      @scroll.passive="handleChatScroll"
     >
       <div v-if="messages.length === 0" class="welcome-panel">
         <el-icon :size="48" color="var(--ep-color-primary)">
@@ -78,7 +79,34 @@
           @change="(val: CheckboxValueType) => toggleShareSelection(index, val === true)" />
         <div class="message-bubble">
           <div class="message-role">{{ msg.role === 'user' ? '你' : 'Copilot' }}</div>
-          <div v-if="msg.role === 'user'" class="message-content message-content--user">{{ msg.content }}</div>
+          <div v-if="msg.role === 'user'" class="user-message">
+            <template v-if="editingIndex === index">
+              <el-input
+                v-model="editDraft"
+                type="textarea"
+                :autosize="{ minRows: 2, maxRows: 8 }"
+                :disabled="loading"
+                @click.stop
+                @keydown.enter.exact.prevent="confirmEdit"
+                @keydown.esc="cancelEdit"
+              />
+              <div class="user-edit-actions" @click.stop>
+                <el-button size="small" :disabled="loading" @click="cancelEdit">取消</el-button>
+                <el-button size="small" type="primary" :disabled="loading || !editDraft.trim()" @click="confirmEdit">
+                  重新发送
+                </el-button>
+              </div>
+            </template>
+            <template v-else>
+              <div class="message-content message-content--user">{{ msg.content }}</div>
+              <div v-if="!loading && !shareSelectMode && msg.id" class="user-message-actions" @click.stop>
+                <el-button size="small" text @click="startEdit(index)">
+                  <el-icon><EditPen /></el-icon>
+                  编辑
+                </el-button>
+              </div>
+            </template>
+          </div>
           <template v-else>
             <AssistantThinkingBlock v-if="msg.thinking?.trim()" v-model:expanded="msg.thinkingExpanded"
               :thinking="msg.thinking" :streaming="!!msg.streaming && !msg.content" @click.stop />
@@ -92,8 +120,16 @@
                 <span class="streaming-cursor">▍</span>
               </template>
             </div>
-            <MarkdownContent v-else :content="msg.content" class="message-content message-content--assistant" />
-            <div v-if="msg.role === 'assistant' && !msg.streaming && msg.content" class="feedback-bar" @click.stop>
+            <MarkdownContent
+              v-else-if="!isInterruptedAssistant(msg)"
+              :content="msg.content"
+              class="message-content message-content--assistant"
+            />
+            <div
+              v-if="msg.role === 'assistant' && !msg.streaming && msg.content && !isInterruptedAssistant(msg)"
+              class="feedback-bar"
+              @click.stop
+            >
               <el-button size="small" text @click="handleCopyMarkdown(index)">
                 <el-icon>
                   <DocumentCopy />
@@ -122,6 +158,16 @@
                   <CircleClose />
                 </el-icon>
                 不喜欢
+              </el-button>
+            </div>
+            <div
+              v-if="isInterruptedAssistant(msg) && !shareSelectMode"
+              class="interrupted-bar"
+              @click.stop
+            >
+              <span>生成已中断</span>
+              <el-button size="small" :disabled="loading" @click="handleRetryInterrupted(index)">
+                重新生成
               </el-button>
             </div>
           </template>
@@ -193,7 +239,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { CheckboxValueType, InputInstance } from 'element-plus'
-import { ChatDotRound, CircleCheck, CircleClose, DocumentCopy, Share } from '@element-plus/icons-vue'
+import { ChatDotRound, CircleCheck, CircleClose, DocumentCopy, EditPen, Share } from '@element-plus/icons-vue'
 import AssistantSessionSidebar from '../../components/assistant/AssistantSessionSidebar.vue'
 import AssistantShareCard from '../../components/assistant/AssistantShareCard.vue'
 import AssistantThinkingBlock from '../../components/assistant/AssistantThinkingBlock.vue'
@@ -243,6 +289,8 @@ const {
   stop,
   submitFeedback,
   startNewChat,
+  isInterruptedAssistant,
+  retryFromAssistant,
 } = useAssistantChat({
   sessionId,
   router,
@@ -260,6 +308,10 @@ const sessionSidebarRef = ref<{ focusSearch: () => void } | null>(null)
 const composerInputRef = ref<InputInstance>()
 const inputText = ref('')
 const chatContainerRef = ref<HTMLElement | null>(null)
+const stickToBottom = ref(true)
+const editingIndex = ref<number | null>(null)
+const editDraft = ref('')
+const STICK_THRESHOLD_PX = 80
 
 const modelLabel = computed(() => status.value?.assistant_model?.trim() || '')
 
@@ -396,6 +448,7 @@ async function handleGenerateShareImage() {
 }
 
 function handleNewChat() {
+  cancelEdit()
   exitShareSelectMode()
   startNewChat()
 }
@@ -404,7 +457,9 @@ function handleSelectSession(id: string) {
   if (id === sessionId.value) {
     return
   }
+  cancelEdit()
   exitShareSelectMode()
+  stickToBottom.value = true
   router.push(`/assistant/${id}`)
 }
 
@@ -478,7 +533,9 @@ async function handleSend() {
   const text = inputText.value
   if (!text.trim()) return
   if (loading.value) return
+  cancelEdit()
   inputText.value = ''
+  stickToBottom.value = true
   const sent = await send(text)
   if (!sent) {
     inputText.value = text
@@ -488,20 +545,74 @@ async function handleSend() {
 }
 
 async function handleExample(question: string) {
+  cancelEdit()
+  stickToBottom.value = true
   await send(question)
   await scrollToBottom()
+}
+
+function startEdit(index: number) {
+  const message = messages.value[index]
+  if (!message || message.role !== 'user' || !message.id || loading.value) {
+    return
+  }
+  editingIndex.value = index
+  editDraft.value = message.content
+}
+
+function cancelEdit() {
+  editingIndex.value = null
+  editDraft.value = ''
+}
+
+async function confirmEdit() {
+  if (editingIndex.value === null) {
+    return
+  }
+  const message = messages.value[editingIndex.value]
+  const text = editDraft.value.trim()
+  if (!message?.id || !text || loading.value) {
+    return
+  }
+  const editMessageId = message.id
+  cancelEdit()
+  stickToBottom.value = true
+  await send(text, { editMessageId })
+  await scrollToBottom()
+}
+
+async function handleRetryInterrupted(index: number) {
+  stickToBottom.value = true
+  await retryFromAssistant(index)
+  await scrollToBottom()
+}
+
+function handleChatScroll() {
+  const el = chatContainerRef.value
+  if (!el) {
+    return
+  }
+  const gap = el.scrollHeight - el.scrollTop - el.clientHeight
+  stickToBottom.value = gap <= STICK_THRESHOLD_PX
 }
 
 async function scrollToBottom() {
   await nextTick()
   if (chatContainerRef.value) {
     chatContainerRef.value.scrollTop = chatContainerRef.value.scrollHeight
+    stickToBottom.value = true
   }
 }
 
 watch(messages, () => {
-  scrollToBottom()
+  if (stickToBottom.value) {
+    scrollToBottom()
+  }
 }, { deep: true })
+
+watch(sessionId, () => {
+  cancelEdit()
+})
 
 watch(deepThinkSupported, (supported) => {
   if (!supported) {
@@ -664,6 +775,30 @@ onUnmounted(() => {
   &--streaming {
     white-space: pre-wrap;
   }
+}
+
+.user-message {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.user-message-actions,
+.user-edit-actions,
+.interrupted-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-message-actions {
+  justify-content: flex-end;
+}
+
+.interrupted-bar {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ep-text-color-secondary);
 }
 
 .status-hint {
