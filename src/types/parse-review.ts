@@ -95,6 +95,7 @@ export interface ReparseResponse {
   }>
   tag_details?: TagDetail[]
   tag_overrides?: TagOverrides
+  propagated_entries?: ReparseResponse[]
 }
 
 /**
@@ -143,6 +144,10 @@ export interface ErrorEntry {
 /**
  * 确认写入错误响应
  */
+export interface ReparseAllRequest {
+  password?: string
+}
+
 export interface ReparseAllResponse {
   message: string
   file_id: number

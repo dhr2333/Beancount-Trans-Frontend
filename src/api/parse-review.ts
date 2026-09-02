@@ -6,6 +6,7 @@ import type {
   ParseResult,
   ReparseRequest,
   ReparseResponse,
+  ReparseAllRequest,
   UpdateEditRequest,
   UpdateEditResponse,
   UpdateTagsRequest,
@@ -69,8 +70,11 @@ export function confirmWrite(taskId: number): Promise<{ data: { message: string;
 /**
  * 重新解析（异步 Celery 任务）
  */
-export function reparseAll(taskId: number): Promise<{ data: ReparseAllResponse }> {
-  return axios.post(`/translate/parse-review/${taskId}/reparse-all`)
+export function reparseAll(
+  taskId: number,
+  request?: ReparseAllRequest
+): Promise<{ data: ReparseAllResponse }> {
+  return axios.post(`/translate/parse-review/${taskId}/reparse-all`, request ?? {})
 }
 
 /**

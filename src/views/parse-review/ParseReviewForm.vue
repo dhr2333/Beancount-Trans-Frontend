@@ -347,6 +347,29 @@
         </div>
       </div>
     </Teleport>
+
+    <el-dialog
+      v-model="reparsePasswordDialogVisible"
+      title="输入解密密码"
+      width="450px"
+      :close-on-click-modal="false"
+    >
+      <p class="reparse-password-tip">
+        全部重新解析会覆盖本批手改内容。若文件已加密，请输入密码后重试。
+      </p>
+      <el-input
+        v-model="reparsePassword"
+        type="password"
+        placeholder="密码（选填）"
+        show-password
+      />
+      <template #footer>
+        <el-button @click="reparsePasswordDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="loading.reparseAll" @click="confirmReparseAllWithPassword">
+          确认重新解析
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -377,7 +400,8 @@ import {
   type ParseResult,
   type ErrorEntry,
   type TagDetail,
-  type TagSource
+  type TagSource,
+  type ReparseResponse
 } from '../../types/parse-review'
 import type { Tag } from '../../types/tag'
 import type { ScheduledTask } from '../../types/reconciliation'
@@ -410,6 +434,8 @@ const validationWarnings = ref<Record<string, string>>({})
 const REPARSE_POLL_INTERVAL_MS = 2000
 const REPARSE_POLL_MAX_ATTEMPTS = 150
 let reparsePollAborted = false
+const reparsePasswordDialogVisible = ref(false)
+const reparsePassword = ref('')
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -1321,12 +1347,7 @@ const getParseReviewCreateDefaults = (row: FormattedEntry) => {
   return { type, key, party: '' }
 }
 
-const applyReparseToEntry = async (entryUuid: string, selectedKey: string) => {
-  const response = await reparseEntry(taskId.value, {
-    entry_uuid: entryUuid,
-    selected_key: selectedKey
-  })
-  const updated = response.data
+const applyReparsePayloadToEntry = (entryUuid: string, updated: ReparseResponse) => {
   const index = formattedEntries.value.findIndex((e) => e.uuid === entryUuid)
   if (index !== -1) {
     formattedEntries.value[index] = {
@@ -1338,6 +1359,23 @@ const applyReparseToEntry = async (entryUuid: string, selectedKey: string) => {
       tag_details: updated.tag_details,
       tag_overrides: updated.tag_overrides
     }
+  }
+}
+
+const applyReparseToEntry = async (entryUuid: string, selectedKey: string) => {
+  const response = await reparseEntry(taskId.value, {
+    entry_uuid: entryUuid,
+    selected_key: selectedKey
+  })
+  const updated = response.data
+  applyReparsePayloadToEntry(entryUuid, updated)
+
+  const propagated = updated.propagated_entries ?? []
+  for (const item of propagated) {
+    applyReparsePayloadToEntry(item.uuid, item)
+  }
+  if (propagated.length > 0) {
+    ElMessage.success(`已自动套用 ${propagated.length} 条相似条目`)
   }
 }
 
@@ -1718,42 +1756,79 @@ const handleConfirmWrite = async () => {
 }
 
 // 重新解析
-const handleReparseAll = async () => {
+const pollReparseAllTask = async (celeryTaskId: string) => {
+  ElMessage.info('正在重新解析，完成后将自动刷新')
+
+  for (let attempt = 0; attempt < REPARSE_POLL_MAX_ATTEMPTS; attempt++) {
+    if (reparsePollAborted) return
+    await sleep(REPARSE_POLL_INTERVAL_MS)
+    const statusRes = await getParseTaskStatus(celeryTaskId)
+    const status = statusRes.data.status
+
+    if (status === 'pending_review') {
+      await loadResults()
+      ElMessage.success('重新解析完成')
+      reparsePasswordDialogVisible.value = false
+      reparsePassword.value = ''
+      return
+    }
+    if (status === 'needs_password') {
+      reparsePasswordDialogVisible.value = true
+      ElMessage.warning('该文件需要解密密码，请输入后重试')
+      return
+    }
+    if (status === 'failed' || status === 'cancelled') {
+      ElMessage.error(statusRes.data.error || '重新解析失败')
+      return
+    }
+  }
+
+  ElMessage.warning('解析耗时较长，请稍后手动刷新页面')
+}
+
+const submitReparseAll = async (password?: string) => {
   loading.value.reparseAll = true
   reparsePollAborted = false
   try {
-    const response = await reparseAll(taskId.value)
+    try {
+      await ElMessageBox.confirm(
+        '全部重新解析会覆盖本批手改内容，是否继续？',
+        '重新解析',
+        {
+          confirmButtonText: '继续',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      )
+    } catch {
+      return
+    }
+
+    const response = await reparseAll(
+      taskId.value,
+      password ? { password } : undefined
+    )
     const celeryTaskId = response.data.celery_task_id
     if (!celeryTaskId) {
       ElMessage.warning('未获取到解析任务 ID，请稍后手动刷新')
       return
     }
 
-    ElMessage.info('正在重新解析，完成后将自动刷新')
-
-    for (let attempt = 0; attempt < REPARSE_POLL_MAX_ATTEMPTS; attempt++) {
-      if (reparsePollAborted) return
-      await sleep(REPARSE_POLL_INTERVAL_MS)
-      const statusRes = await getParseTaskStatus(celeryTaskId)
-      const status = statusRes.data.status
-
-      if (status === 'pending_review') {
-        await loadResults()
-        ElMessage.success('重新解析完成')
-        return
-      }
-      if (status === 'failed' || status === 'cancelled' || status === 'needs_password') {
-        ElMessage.error(statusRes.data.error || '重新解析失败')
-        return
-      }
-    }
-
-    ElMessage.warning('解析耗时较长，请稍后手动刷新页面')
+    await pollReparseAllTask(celeryTaskId)
   } catch (error: any) {
     ElMessage.error(error.response?.data?.error || '重新解析失败')
   } finally {
     loading.value.reparseAll = false
   }
+}
+
+const handleReparseAll = async () => {
+  await submitReparseAll()
+}
+
+const confirmReparseAllWithPassword = async () => {
+  const password = reparsePassword.value.trim()
+  await submitReparseAll(password || undefined)
 }
 
 // 返回

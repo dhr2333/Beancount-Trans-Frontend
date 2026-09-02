@@ -64,6 +64,61 @@ async function fetchMappingByKey(type: MappingType, key: string): Promise<Mappin
   return list.find((m) => m.key === key) ?? null
 }
 
+interface OfficialTemplateItem {
+  key: string
+  account?: string | null
+  payee?: string | null
+  payer?: string | null
+}
+
+const officialTemplateItemsCache: Partial<Record<MappingType, OfficialTemplateItem[]>> = {}
+
+async function fetchOfficialTemplateItems(type: MappingType): Promise<OfficialTemplateItem[]> {
+  if (officialTemplateItemsCache[type]) {
+    return officialTemplateItemsCache[type]!
+  }
+  const response = await axios.get<Array<{ id: number }>>('/templates/', {
+    params: { type, is_official: true }
+  })
+  const templates = Array.isArray(response.data) ? response.data : []
+  const items: OfficialTemplateItem[] = []
+  for (const template of templates) {
+    try {
+      const detail = await axios.get<{ items?: OfficialTemplateItem[] }>(
+        `/templates/${template.id}/`
+      )
+      items.push(...(detail.data.items ?? []))
+    } catch {
+      // 忽略单个模板详情加载失败
+    }
+  }
+  officialTemplateItemsCache[type] = items
+  return items
+}
+
+async function fetchOfficialTemplateItemByKey(
+  type: MappingType,
+  key: string
+): Promise<OfficialTemplateItem | null> {
+  const items = await fetchOfficialTemplateItems(type)
+  return items.find((item) => item.key === key) ?? null
+}
+
+async function resolveAccountIdByPath(accountPath?: string | null): Promise<number | null> {
+  const path = accountPath?.trim()
+  if (!path) return null
+  try {
+    const response = await axios.get<Array<{ id: number; account: string }>>('/account/', {
+      params: { search: path }
+    })
+    const list = Array.isArray(response.data) ? response.data : []
+    const exact = list.find((item) => item.account === path)
+    return exact?.id ?? null
+  } catch {
+    return null
+  }
+}
+
 export function useInlineMappingDialog() {
   const mappingFormRef = ref<FormInstance>()
   const mappingDialog = ref({
@@ -152,13 +207,26 @@ export function useInlineMappingDialog() {
           mappingId: mapping.id
         }
       } else {
-        ElMessage.info('未找到映射，将创建新映射')
-        mappingForm.value = {
-          type,
-          key,
-          accountId: null,
-          party: '',
-          tag_ids: []
+        const templateItem = await fetchOfficialTemplateItemByKey(type, key)
+        if (templateItem) {
+          ElMessage.info('将基于官方模板创建个人映射')
+          const accountId = await resolveAccountIdByPath(templateItem.account)
+          mappingForm.value = {
+            type,
+            key: templateItem.key,
+            accountId,
+            party: type === 'expense' ? (templateItem.payee ?? '') : (templateItem.payer ?? ''),
+            tag_ids: []
+          }
+        } else {
+          ElMessage.info('未找到映射，将创建新映射')
+          mappingForm.value = {
+            type,
+            key,
+            accountId: null,
+            party: '',
+            tag_ids: []
+          }
         }
         mappingDialog.value = {
           visible: true,
