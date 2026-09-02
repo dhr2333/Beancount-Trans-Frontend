@@ -287,6 +287,7 @@ const {
   fetchStatus,
   send,
   stop,
+  abortSubscription,
   submitFeedback,
   startNewChat,
   isInterruptedAssistant,
@@ -627,7 +628,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  stop()
+  abortSubscription()
   window.removeEventListener('keydown', handleShortcut)
 })
 </script>

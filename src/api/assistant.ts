@@ -42,6 +42,10 @@ export function sendAssistantChat(
   return axios.post('/assistant/chat/', request)
 }
 
+export function stopAssistantMessage(messageId: string): Promise<{ data: { detail: string } }> {
+  return axios.post(`/assistant/messages/${messageId}/stop/`)
+}
+
 export function submitAssistantFeedback(
   request: AssistantFeedbackRequest
 ): Promise<{ data: AssistantFeedbackResponse }> {
@@ -73,13 +77,12 @@ function parseSseFrame(frame: string): AssistantStreamEvent | null {
   } as AssistantStreamEvent
 }
 
-export async function streamAssistantChat(
-  request: AssistantChatRequest,
+async function consumeSseResponse(
+  response: Response,
   onEvent: (event: AssistantStreamEvent) => void,
-  signal?: AbortSignal,
-  options?: { idleTimeoutMs?: number },
+  signal: AbortSignal,
+  idleTimeoutMs: number,
 ): Promise<void> {
-  const idleTimeoutMs = options?.idleTimeoutMs ?? ASSISTANT_STREAM_IDLE_TIMEOUT_MS
   const streamController = new AbortController()
   let idleTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -100,7 +103,7 @@ export async function streamAssistantChat(
   const onParentAbort = () => {
     streamController.abort()
   }
-  signal?.addEventListener('abort', onParentAbort)
+  signal.addEventListener('abort', onParentAbort)
 
   const notifyEvent = (event: AssistantStreamEvent) => {
     resetIdleTimer()
@@ -110,27 +113,6 @@ export async function streamAssistantChat(
   resetIdleTimer()
 
   try {
-    const response = await fetchWithAuth('/assistant/chat/stream/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-      },
-      body: JSON.stringify(request),
-      signal: streamController.signal,
-    })
-
-    if (!response.ok) {
-      let detail = '发送失败，请稍后重试'
-      try {
-        const payload = await response.json()
-        detail = payload.detail || detail
-      } catch {
-        // ignore JSON parse errors
-      }
-      throw new Error(detail)
-    }
-
     if (!response.body) {
       throw new Error('流式响应不可用')
     }
@@ -170,6 +152,77 @@ export async function streamAssistantChat(
     }
   } finally {
     clearIdleTimer()
-    signal?.removeEventListener('abort', onParentAbort)
+    signal.removeEventListener('abort', onParentAbort)
   }
+}
+
+export async function streamAssistantChat(
+  request: AssistantChatRequest,
+  onEvent: (event: AssistantStreamEvent) => void,
+  signal?: AbortSignal,
+  options?: { idleTimeoutMs?: number },
+): Promise<void> {
+  const idleTimeoutMs = options?.idleTimeoutMs ?? ASSISTANT_STREAM_IDLE_TIMEOUT_MS
+  const streamController = new AbortController()
+  const parentSignal = signal ?? streamController.signal
+
+  const response = await fetchWithAuth('/assistant/chat/stream/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    },
+    body: JSON.stringify(request),
+    signal: parentSignal,
+  })
+
+  if (!response.ok) {
+    let detail = '发送失败，请稍后重试'
+    try {
+      const payload = await response.json()
+      detail = payload.detail || detail
+    } catch {
+      // ignore JSON parse errors
+    }
+    const err = new Error(detail) as Error & { status?: number }
+    err.status = response.status
+    throw err
+  }
+
+  await consumeSseResponse(response, onEvent, parentSignal, idleTimeoutMs)
+}
+
+export async function reconnectAssistantStream(
+  assistantMessageId: string,
+  onEvent: (event: AssistantStreamEvent) => void,
+  signal?: AbortSignal,
+  options?: { idleTimeoutMs?: number },
+): Promise<void> {
+  const idleTimeoutMs = options?.idleTimeoutMs ?? ASSISTANT_STREAM_IDLE_TIMEOUT_MS
+  const streamController = new AbortController()
+  const parentSignal = signal ?? streamController.signal
+
+  const response = await fetchWithAuth(
+    `/assistant/chat/stream/${assistantMessageId}/`,
+    {
+      method: 'GET',
+      headers: {
+        Accept: 'text/event-stream',
+      },
+      signal: parentSignal,
+    },
+  )
+
+  if (!response.ok) {
+    let detail = '重连接失败，请稍后重试'
+    try {
+      const payload = await response.json()
+      detail = payload.detail || detail
+    } catch {
+      // ignore JSON parse errors
+    }
+    throw new Error(detail)
+  }
+
+  await consumeSseResponse(response, onEvent, parentSignal, idleTimeoutMs)
 }

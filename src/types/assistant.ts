@@ -66,6 +66,8 @@ export interface AssistantSessionDetail extends AssistantSessionSummary {
   messages: StoredChatMessage[]
 }
 
+export type GenerationStatus = 'generating' | 'complete' | 'cancelled' | 'failed'
+
 export interface StoredChatMessage {
   id: string
   role: ChatRole
@@ -74,6 +76,7 @@ export interface StoredChatMessage {
   reasoning: string
   queries: QueryRecord[]
   position: number
+  generation_status?: GenerationStatus
   feedback: AssistantFeedbackRating | null
   created: string
 }

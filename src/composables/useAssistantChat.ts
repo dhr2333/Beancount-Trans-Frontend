@@ -4,6 +4,8 @@ import type { Router } from 'vue-router'
 import {
   getAssistantSession,
   getAssistantStatus,
+  reconnectAssistantStream,
+  stopAssistantMessage,
   streamAssistantChat,
   submitAssistantFeedback,
 } from '../api/assistant'
@@ -29,15 +31,18 @@ function createMessageId(): string {
 }
 
 function mapStoredMessage(message: StoredChatMessage): ChatMessage {
+  const isGenerating = message.generation_status === 'generating'
   return {
     id: message.id,
     role: message.role,
     content: message.content,
     thinking: message.thinking || '',
     reasoning: message.reasoning || '',
-    thinkingExpanded: false,
+    thinkingExpanded: isGenerating,
     queries: message.queries || [],
     feedback: message.feedback,
+    streaming: isGenerating,
+    status: isGenerating ? 'thinking' : undefined,
   }
 }
 
@@ -107,19 +112,6 @@ export function useAssistantChat(options: {
       assistant.queries[existing] = record
     } else {
       assistant.queries.push(record)
-    }
-  }
-
-  function resetSendingState(requestId: number) {
-    if (requestId !== activeRequestId) {
-      return
-    }
-    loading.value = false
-    abortController = null
-    const assistant = getAssistantMessage()
-    if (assistant?.streaming) {
-      assistant.streaming = false
-      assistant.status = undefined
     }
   }
 
@@ -231,12 +223,68 @@ export function useAssistantChat(options: {
     }
   }
 
+  async function subscribeStream(
+    assistantMessageId: string,
+    requestId: number,
+    mode: 'send' | 'reconnect',
+  ) {
+    abortController?.abort()
+    abortController = new AbortController()
+
+    try {
+      const subscribe = mode === 'reconnect'
+        ? reconnectAssistantStream
+        : null
+
+      if (subscribe) {
+        await subscribe(
+          assistantMessageId,
+          handleStreamEvent,
+          abortController.signal,
+        )
+      }
+    } catch (e: unknown) {
+      if (requestId !== activeRequestId) {
+        return
+      }
+
+      if (e instanceof DOMException && (e.name === 'AbortError' || e.name === 'TimeoutError')) {
+        const assistant = getAssistantMessage()
+        if (assistant?.streaming) {
+          assistant.streaming = false
+          assistant.status = undefined
+        }
+        return
+      }
+
+      const detail = e instanceof Error ? e.message : '连接失败，请稍后重试'
+      error.value = detail
+    } finally {
+      if (requestId === activeRequestId) {
+        loading.value = false
+        abortController = null
+        const assistant = getAssistantMessage()
+        if (assistant?.streaming) {
+          assistant.streaming = false
+          assistant.status = undefined
+        }
+      }
+    }
+  }
+
   async function loadSession(id: string) {
     sessionLoading.value = true
     error.value = null
     try {
       const { data } = await getAssistantSession(id)
       messages.value = data.messages.map(mapStoredMessage)
+
+      const last = messages.value[messages.value.length - 1]
+      if (last?.role === 'assistant' && last.streaming && last.id) {
+        const requestId = ++activeRequestId
+        loading.value = true
+        await subscribeStream(last.id, requestId, 'reconnect')
+      }
     } catch (e: unknown) {
       const err = e as { response?: { status?: number; data?: { detail?: string } } }
       if (err.response?.status === 404) {
@@ -264,7 +312,7 @@ export function useAssistantChat(options: {
       }
 
       if (loading.value) {
-        stop()
+        abortSubscription()
       }
       if (!id) {
         if (previousId) {
@@ -277,18 +325,34 @@ export function useAssistantChat(options: {
     { immediate: true },
   )
 
-  function stop() {
-    userStopRequested = true
+  function abortSubscription() {
     abortController?.abort()
+    abortController = null
+    activeRequestId += 1
+  }
+
+  async function stop() {
+    userStopRequested = true
     const assistant = getAssistantMessage()
+    const messageId = assistant?.id
+
+    abortSubscription()
+
     if (assistant?.streaming) {
       assistant.streaming = false
       assistant.status = undefined
+      if (messageId) {
+        try {
+          await stopAssistantMessage(messageId)
+        } catch {
+          // 停止请求失败时仍保留本地已展示内容
+        }
+      }
       if (!assistant.content.trim()) {
         assistant.content = '已停止生成'
       }
     }
-    resetSendingState(activeRequestId)
+    loading.value = false
   }
 
   async function send(content: string, options?: { editMessageId?: string }): Promise<boolean> {
@@ -382,28 +446,38 @@ export function useAssistantChat(options: {
         if (assistant) {
           assistant.streaming = false
           assistant.status = undefined
-          if (!assistant.content.trim()) {
-            if (userStopRequested) {
-              assistant.content = '已停止生成'
-            } else {
-              const timeoutMessage = e.message || '响应超时，请重试'
-              assistant.content = timeoutMessage
-              error.value = timeoutMessage
-            }
+          if (!assistant.content.trim() && userStopRequested) {
+            assistant.content = '已停止生成'
+          } else if (!assistant.content.trim()) {
+            const timeoutMessage = e.message || '响应超时，请重试'
+            assistant.content = timeoutMessage
+            error.value = timeoutMessage
           }
         }
         return true
       }
 
-      const detail = e instanceof Error ? e.message : '发送失败，请稍后重试'
+      const err = e as Error & { status?: number }
+      let detail = err.message || '发送失败，请稍后重试'
+      if (err.status === 409) {
+        detail = detail || '上一轮回复仍在生成中，请稍候或停止后再试'
+      }
       error.value = detail
+      ElMessage.warning(detail)
+
       const assistant = getAssistantMessage()
       if (assistant) {
-        assistant.content = detail
+        messages.value.pop()
+        if (!editMessageId) {
+          const lastUser = getLastUserMessage()
+          if (lastUser && !lastUser.id) {
+            messages.value.pop()
+          }
+        }
         assistant.streaming = false
         assistant.status = undefined
       }
-      return true
+      return false
     } finally {
       if (requestId === activeRequestId) {
         loading.value = false
@@ -464,9 +538,10 @@ export function useAssistantChat(options: {
   }
 
   function startNewChat() {
-    stop()
+    abortSubscription()
     messages.value = []
     error.value = null
+    loading.value = false
     if (sessionId.value) {
       router.push('/assistant')
     }
@@ -486,6 +561,7 @@ export function useAssistantChat(options: {
     fetchStatus,
     send,
     stop,
+    abortSubscription,
     submitFeedback,
     startNewChat,
     loadSession,
