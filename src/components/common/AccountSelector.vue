@@ -21,16 +21,17 @@
             </template>
         </el-cascader>
 
-        <!-- 账户详情预览 -->
-        <div v-if="showDetails && selectedAccount" class="account-preview">
-            <el-card size="small">
+        <!-- 账户详情预览：完整卡片（映射编辑）或仅描述标签（差额分配等表格内选择） -->
+        <div
+            v-if="showPreview && selectedAccount"
+            class="account-preview"
+            :class="{ 'is-compact': compact }"
+        >
+            <el-card v-if="!compact" size="small">
                 <div class="preview-content">
                     <div class="account-info">
                         <div class="account-path">{{ selectedAccount.account }}</div>
-                        <div
-                            v-if="selectedAccount.account_type || selectedAccount.description"
-                            class="account-meta"
-                        >
+                        <div class="account-meta">
                             <el-tag v-if="selectedAccount.account_type" :type="getAccountTypeColor(selectedAccount.account_type)">
                                 {{ selectedAccount.account_type }}
                             </el-tag>
@@ -41,6 +42,11 @@
                     </div>
                 </div>
             </el-card>
+            <div v-else class="account-meta">
+                <el-tag type="info" size="small">
+                    {{ selectedAccount.description }}
+                </el-tag>
+            </div>
         </div>
     </div>
 </template>
@@ -79,7 +85,9 @@ interface Props {
     accountType?: string // 过滤账户类型：'Expenses', 'Income', 'Assets'
     placeholder?: string
     disabled?: boolean
-    showDetails?: boolean // 是否显示账户类型、映射统计等详细信息
+    showDetails?: boolean // 是否显示账户类型、描述等详细信息
+    /** 紧凑模式：选中后只展示类型/描述标签，不展示预览卡片（用于表格单元格） */
+    compact?: boolean
     /** 外部注入的账户树；传入且非空时使用该数据，不再请求 tree/ */
     accountTree?: AccountOption[] | null
 }
@@ -90,6 +98,7 @@ const props = withDefaults(defineProps<Props>(), {
     placeholder: '请选择账户',
     disabled: false,
     showDetails: true,
+    compact: false,
     accountTree: undefined
 })
 
@@ -119,6 +128,12 @@ const cascaderValue = computed<CascaderValue | undefined>({
 })
 const selectedAccount = ref<AccountOption | null>(null)
 const loading = ref(false)
+
+const showPreview = computed(() => {
+    if (!props.showDetails || !selectedAccount.value) return false
+    if (props.compact) return Boolean(selectedAccount.value.description)
+    return Boolean(selectedAccount.value.account_type || selectedAccount.value.description)
+})
 let unsubscribeAccountTreeUpdated: (() => void) | null = null
 
 // 级联选择器配置
@@ -296,19 +311,27 @@ const handleVisibleChange = (visible: boolean) => {
     }
 }
 
+function syncSelectedAccount(id: number | null) {
+    if (id == null) {
+        selectedAccount.value = null
+        return
+    }
+    selectedAccount.value = findAccountById(effectiveAccountTree.value, id)
+}
+
 // 监听外部值变化
 watch(() => props.modelValue, (newValue) => {
     if (normalizeCascaderValue(selectedValue.value) !== (newValue ?? null)) {
         selectedValue.value = newValue ?? null
     }
-
-    if (newValue) {
-        const account = findAccountById(effectiveAccountTree.value, newValue)
-        selectedAccount.value = account
-    } else {
-        selectedAccount.value = null
-    }
+    syncSelectedAccount(newValue ?? null)
 }, { immediate: true })
+
+// 注入的账户树异步到位后，补全选中账户的类型/描述
+watch(effectiveAccountTree, () => {
+    const id = normalizeCascaderValue(selectedValue.value) ?? (props.modelValue ?? null)
+    syncSelectedAccount(id)
+})
 
 // 组件挂载时初始化
 onMounted(() => {
@@ -391,6 +414,10 @@ onBeforeUnmount(() => {
 
 .account-preview {
     margin-top: 12px;
+}
+
+.account-preview.is-compact {
+    margin-top: 8px;
 }
 
 .preview-content {

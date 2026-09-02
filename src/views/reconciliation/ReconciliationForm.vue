@@ -110,7 +110,7 @@
             <el-table :data="formData.transactionItems" border class="allocation-table">
               <el-table-column label="账户" min-width="300">
                 <template #default="{ row }">
-                  <AccountSelector v-model="row.accountId" placeholder="选择账户" :show-details="false"
+                  <AccountSelector v-model="row.accountId" placeholder="选择账户" compact
                     :account-tree="accountTree" @change="(account) => handleAccountChange(row, account)" />
                 </template>
               </el-table-column>
@@ -212,6 +212,7 @@ interface AccountOption {
   parent?: number
   parent_account?: string
   account_type: string
+  description?: string
   enable: boolean
   mapping_count?: {
     expense: number
