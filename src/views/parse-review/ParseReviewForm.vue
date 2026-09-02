@@ -398,8 +398,13 @@ import {
   patchEntryTags,
   confirmWrite,
   reparseAll,
-  getParseTaskStatus
+  getParseTaskStatus,
+  syncPreviewEntries
 } from '../../api/parse-review'
+import {
+  alignPreviewBlocksToEntries,
+  parsePreviewContent
+} from '../../utils/parse-review-preview'
 import { fetchTagTree } from '../../api/tags'
 import { getTask } from '../../api/reconciliation'
 import {
@@ -411,7 +416,8 @@ import {
   type ErrorEntry,
   type TagDetail,
   type TagSource,
-  type ReparseResponse
+  type ReparseResponse,
+  type PreviewSyncResponse
 } from '../../types/parse-review'
 import type { Tag } from '../../types/tag'
 import type { ScheduledTask } from '../../types/reconciliation'
@@ -1122,6 +1128,11 @@ function startTextEdit(uuid: string, caret?: number) {
 
 async function onEntryTextareaBlur(row: FormattedEntry) {
   try {
+    const normalized = row.edited_formatted.replace(/\n+$/, '').trim()
+    if (!normalized) {
+      await removeEntryFromReview(row.uuid)
+      return
+    }
     await handleEntryEdit(row.uuid, row.edited_formatted)
   } finally {
     setEntryTextEditMode(row.uuid, false)
@@ -1632,6 +1643,51 @@ const handleEntryEdit = async (uuid: string, editedFormatted: string) => {
   }
 }
 
+function buildSyncEntriesPayload(entries: FormattedEntry[] = formattedEntries.value) {
+  return entries
+    .filter((entry) => entry.edited_formatted.replace(/\n+$/, '').trim())
+    .map((entry) => ({
+      uuid: entry.uuid,
+      edited_formatted: entry.edited_formatted.replace(/\n+$/, '')
+    }))
+}
+
+function applySyncResponse(data: PreviewSyncResponse) {
+  formattedEntries.value = data.formatted_data.map((entry) => ({
+    ...entry,
+    edited_formatted: (entry.edited_formatted || entry.formatted || '').replace(/\n+$/, ''),
+    tag_details: entry.tag_details ?? [],
+    tag_overrides: entry.tag_overrides ?? { removed_paths: [], added_paths: [] }
+  }))
+
+  validationWarnings.value = {}
+  for (const [uuid, message] of Object.entries(data.validation_warnings ?? {})) {
+    validationWarnings.value[uuid] = message
+  }
+
+  const keptUuidSet = new Set(formattedEntries.value.map((entry) => entry.uuid))
+  for (const uuid of Object.keys(errorEntries.value)) {
+    if (!keptUuidSet.has(uuid)) {
+      delete errorEntries.value[uuid]
+    }
+  }
+}
+
+async function removeEntryFromReview(uuid: string) {
+  const remaining = formattedEntries.value.filter((entry) => entry.uuid !== uuid)
+  if (remaining.length === formattedEntries.value.length) {
+    return
+  }
+
+  const response = await syncPreviewEntries(taskId.value, {
+    entries: buildSyncEntriesPayload(remaining)
+  })
+  applySyncResponse(response.data)
+  clearTabCompleteSession(uuid)
+  entryInputRefs.delete(uuid)
+  ElMessage.success('条目已移除')
+}
+
 /** 编辑框高度随条目行数变化，避免短条目被固定撑到 7 行。 */
 function getEntryAutosize(text: string) {
   const lineCount = Math.max(1, (text || '').split('\n').length)
@@ -1661,12 +1717,13 @@ const getEntryClasses = (uuid: string, editedFormatted: string) => {
 // 预览所有条目
 const handlePreview = () => {
   previewContent.value = formattedEntries.value
-    .map(entry => entry.edited_formatted.replace(/\n+$/, ''))
+    .map((entry) => entry.edited_formatted.replace(/\n+$/, ''))
+    .filter((text) => text.trim())
     .join('\n\n')
   showPreviewDialog.value = true
 }
 
-// 保存预览框中的编辑内容
+// 保存预览框中的编辑内容（预览文本为真源）
 const handleSavePreview = async () => {
   if (!previewContent.value.trim()) {
     ElMessage.warning('预览内容不能为空')
@@ -1675,52 +1732,33 @@ const handleSavePreview = async () => {
 
   loading.value.savePreview = true
   try {
-    // 将预览内容按空行分割成条目
-    const editedEntries = previewContent.value
-      .split(/\n\n+/)
-      .map(entry => entry.trim())
-      .filter(entry => entry.length > 0)
+    const blocks = parsePreviewContent(previewContent.value)
+    const { kept, removedCount } = alignPreviewBlocksToEntries(
+      blocks,
+      formattedEntries.value.map((entry) => ({
+        uuid: entry.uuid,
+        edited_formatted: entry.edited_formatted
+      }))
+    )
 
-    // 检查条目数量是否匹配
-    if (editedEntries.length !== formattedEntries.value.length) {
-      try {
-        await ElMessageBox.confirm(
-          `预览框中有 ${editedEntries.length} 条条目，列表中应有 ${formattedEntries.value.length} 条。是否继续保存？将只更新前 ${Math.min(editedEntries.length, formattedEntries.value.length)} 条。`,
-          '条目数量不匹配',
-          {
-            confirmButtonText: '继续保存',
-            cancelButtonText: '取消',
-            type: 'warning'
-          }
-        )
-      } catch {
-        // 用户取消
-        loading.value.savePreview = false
-        return
-      }
-    }
-
-    // 更新条目内容（本地）
-    const minLength = Math.min(editedEntries.length, formattedEntries.value.length)
-
-    for (let i = 0; i < minLength; i++) {
-      const entry = formattedEntries.value[i]
-      const editedContent = editedEntries[i].replace(/\n+$/, '')
-
-      if (entry.edited_formatted.replace(/\n+$/, '') !== editedContent) {
-        entry.edited_formatted = editedContent
-        if (errorEntries.value[entry.uuid]) {
-          delete errorEntries.value[entry.uuid]
-        }
-      }
-    }
-
-    const flushed = await flushEditedEntries()
-    if (!flushed) {
+    if (kept.length === 0) {
+      ElMessage.warning('预览内容无有效条目')
       return
     }
 
-    ElMessage.success('预览内容已保存')
+    if (kept.length > formattedEntries.value.length) {
+      ElMessage.warning('预览中新增了条目，暂不支持在预览中新增，请回到列表操作')
+      return
+    }
+
+    const response = await syncPreviewEntries(taskId.value, { entries: kept })
+    applySyncResponse(response.data)
+
+    if (removedCount > 0) {
+      ElMessage.success(`预览内容已保存，并移除 ${removedCount} 条已删除条目`)
+    } else {
+      ElMessage.success('预览内容已保存')
+    }
     showPreviewDialog.value = false
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {

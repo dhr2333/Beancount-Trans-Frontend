@@ -12,7 +12,9 @@ import type {
   UpdateTagsRequest,
   UpdateTagsResponse,
   ReparseAllResponse,
-  ParseTaskStatusResponse
+  ParseTaskStatusResponse,
+  PreviewSyncRequest,
+  PreviewSyncResponse
 } from '../types/parse-review'
 
 /**
@@ -58,6 +60,16 @@ export function patchEntryTags(
     `/translate/parse-review/${taskId}/entries/${encodeURIComponent(entryUuid)}/tags`,
     request
   )
+}
+
+/**
+ * 预览批量同步（以预览文本为真源）
+ */
+export function syncPreviewEntries(
+  taskId: number,
+  request: PreviewSyncRequest
+): Promise<{ data: PreviewSyncResponse }> {
+  return axios.put(`/translate/parse-review/${taskId}/preview-sync`, request)
 }
 
 /**

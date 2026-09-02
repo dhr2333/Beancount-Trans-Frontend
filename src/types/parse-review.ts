@@ -115,6 +115,21 @@ export interface UpdateEditResponse {
   validation_warning?: string
 }
 
+export interface PreviewSyncEntry {
+  uuid: string
+  edited_formatted: string
+}
+
+export interface PreviewSyncRequest {
+  entries: PreviewSyncEntry[]
+}
+
+export interface PreviewSyncResponse {
+  formatted_data: FormattedEntry[]
+  removed_count: number
+  validation_warnings?: Record<string, string>
+}
+
 /**
  * 更新标签请求
  */
