@@ -20,9 +20,17 @@ export interface ChatMessage {
   feedbackSubmitting?: boolean
 }
 
+export interface QueryReportLink {
+  name: string
+  label: string
+  path: string
+}
+
 export interface QueryRecord {
   bql: string
   result_preview: string
+  fava_path?: string
+  report?: QueryReportLink | null
 }
 
 export interface AssistantChatRequest {
@@ -87,7 +95,7 @@ export type AssistantStreamEvent =
   | { event: 'reasoning_delta'; data: { content: string; source?: 'api' | 'planning' } }
   | { event: 'thinking_set'; data: { content: string; reasoning?: string } }
   | { event: 'tool_start'; data: { name: string; query?: string } }
-  | { event: 'tool_end'; data: { name: string; bql?: string; result_preview?: string } }
+  | { event: 'tool_end'; data: { name: string; bql?: string; result_preview?: string; fava_path?: string; report?: QueryReportLink | null } }
   | { event: 'delta'; data: { content: string } }
   | { event: 'done'; data: AssistantChatResponse }
   | { event: 'error'; data: { detail: string } }

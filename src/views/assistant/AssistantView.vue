@@ -170,6 +170,37 @@
                 重新生成
               </el-button>
             </div>
+            <div
+              v-if="msg.role === 'assistant' && !msg.streaming && hasQuerySources(msg)"
+              class="query-sources"
+              @click.stop
+            >
+              <div class="query-sources-title">来源</div>
+              <div v-for="(q, qi) in msg.queries" :key="`source-${qi}`" class="query-source-group">
+                <template v-if="q.fava_path || q.report?.path">
+                  <el-button
+                    v-if="q.fava_path"
+                    size="small"
+                    text
+                    type="primary"
+                    :loading="openingFavaPath === q.fava_path"
+                    @click="handleOpenFavaPath(q.fava_path)"
+                  >
+                    打开本次查询{{ msg.queries!.length > 1 ? ` (${qi + 1})` : '' }}
+                  </el-button>
+                  <el-button
+                    v-if="q.report?.path"
+                    size="small"
+                    text
+                    type="primary"
+                    :loading="openingFavaPath === q.report.path"
+                    @click="handleOpenFavaPath(q.report.path)"
+                  >
+                    打开{{ q.report.label }}
+                  </el-button>
+                </template>
+              </div>
+            </div>
           </template>
           <el-collapse v-if="msg.role === 'assistant' && msg.queries?.length" class="query-collapse" @click.stop>
             <el-collapse-item title="查看查询详情" name="queries">
@@ -246,6 +277,7 @@ import AssistantThinkingBlock from '../../components/assistant/AssistantThinking
 import MarkdownContent from '../../components/assistant/MarkdownContent.vue'
 import { useAssistantChat } from '../../composables/useAssistantChat'
 import { useAssistantSessions } from '../../composables/useAssistantSessions'
+import { ensureFavaThenOpen } from '../../composables/useFavaDeepLink'
 import { copyText } from '../../utils/clipboard'
 import {
   buildShareTurns,
@@ -312,6 +344,7 @@ const chatContainerRef = ref<HTMLElement | null>(null)
 const stickToBottom = ref(true)
 const editingIndex = ref<number | null>(null)
 const editDraft = ref('')
+const openingFavaPath = ref<string | null>(null)
 const STICK_THRESHOLD_PX = 80
 
 const modelLabel = computed(() => status.value?.assistant_model?.trim() || '')
@@ -320,6 +353,29 @@ function statusHint(phase?: AssistantPhase): string {
   if (phase === 'querying') return '正在查询账本...'
   if (phase === 'writing') return '正在撰写回答...'
   return '正在思考...'
+}
+
+function hasQuerySources(message: ChatMessage): boolean {
+  return Boolean(message.queries?.some((query) => query.fava_path || query.report?.path))
+}
+
+async function handleOpenFavaPath(relativePath: string) {
+  if (!relativePath || openingFavaPath.value) {
+    return
+  }
+  openingFavaPath.value = relativePath
+  try {
+    const opened = await ensureFavaThenOpen(relativePath)
+    if (opened) {
+      ElMessage.success('已在新标签打开 Fava')
+    } else {
+      ElMessage.error('打开 Fava 失败，请检查登录状态或允许弹出窗口')
+    }
+  } catch {
+    ElMessage.error('打开 Fava 失败')
+  } finally {
+    openingFavaPath.value = null
+  }
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -884,6 +940,25 @@ onUnmounted(() => {
     border: none;
     background: transparent;
   }
+}
+
+.query-sources {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--ep-border-color-lighter);
+}
+
+.query-sources-title {
+  font-size: 0.75rem;
+  color: var(--ep-text-color-secondary);
+  margin-bottom: 4px;
+}
+
+.query-source-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 2px;
 }
 
 .query-block {
