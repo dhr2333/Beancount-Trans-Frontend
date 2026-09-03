@@ -176,8 +176,24 @@
               @click.stop
             >
               <div class="query-sources-title">来源</div>
-              <div v-for="(q, qi) in msg.queries" :key="`source-${qi}`" class="query-source-group">
-                <template v-if="q.fava_path || q.report?.path">
+              <div v-for="(q, qi) in msg.queries" :key="`source-${qi}`" class="query-source-item">
+                <div v-if="msg.queries!.length > 1" class="query-source-index">查询 {{ qi + 1 }}</div>
+                <div v-if="q.evidence?.summary" class="query-evidence-summary">{{ q.evidence.summary }}</div>
+                <div v-if="q.evidence?.rows?.length" class="query-evidence-table-wrap">
+                  <table class="query-evidence-table">
+                    <thead>
+                      <tr>
+                        <th v-for="(col, ci) in q.evidence.columns" :key="`h-${qi}-${ci}`">{{ col }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(row, ri) in q.evidence.rows" :key="`r-${qi}-${ri}`">
+                        <td v-for="(cell, ci) in row" :key="`c-${qi}-${ri}-${ci}`">{{ cell }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div v-if="q.fava_path || q.report?.path" class="query-source-group">
                   <el-button
                     v-if="q.fava_path"
                     size="small"
@@ -186,7 +202,7 @@
                     :loading="openingFavaPath === q.fava_path"
                     @click="handleOpenFavaPath(q.fava_path)"
                   >
-                    打开本次查询{{ msg.queries!.length > 1 ? ` (${qi + 1})` : '' }}
+                    打开本次查询
                   </el-button>
                   <el-button
                     v-if="q.report?.path"
@@ -198,7 +214,7 @@
                   >
                     打开{{ q.report.label }}
                   </el-button>
-                </template>
+                </div>
               </div>
             </div>
           </template>
@@ -356,7 +372,11 @@ function statusHint(phase?: AssistantPhase): string {
 }
 
 function hasQuerySources(message: ChatMessage): boolean {
-  return Boolean(message.queries?.some((query) => query.fava_path || query.report?.path))
+  return Boolean(
+    message.queries?.some(
+      (query) => query.fava_path || query.report?.path || query.evidence?.rows?.length || query.evidence?.summary,
+    ),
+  )
 }
 
 async function handleOpenFavaPath(relativePath: string) {
@@ -951,14 +971,63 @@ onUnmounted(() => {
 .query-sources-title {
   font-size: 0.75rem;
   color: var(--ep-text-color-secondary);
+  margin-bottom: 6px;
+}
+
+.query-source-item {
+  margin-bottom: 10px;
+}
+
+.query-source-item:last-child {
+  margin-bottom: 0;
+}
+
+.query-source-index {
+  font-size: 0.72rem;
+  color: var(--ep-text-color-secondary);
+  margin-bottom: 2px;
+}
+
+.query-evidence-summary {
+  font-size: 0.78rem;
+  color: var(--ep-text-color-regular);
   margin-bottom: 4px;
+}
+
+.query-evidence-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 4px;
+}
+
+.query-evidence-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.query-evidence-table th,
+.query-evidence-table td {
+  text-align: left;
+  padding: 3px 8px 3px 0;
+  border-bottom: 1px solid var(--ep-border-color-extra-light);
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+
+.query-evidence-table th {
+  color: var(--ep-text-color-secondary);
+  font-weight: 500;
 }
 
 .query-source-group {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
-  margin-bottom: 2px;
+  margin-top: 2px;
 }
 
 .query-block {

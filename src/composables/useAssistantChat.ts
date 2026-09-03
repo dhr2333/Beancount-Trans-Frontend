@@ -161,6 +161,7 @@ export function useAssistantChat(options: {
             result_preview: event.data.result_preview,
             fava_path: event.data.fava_path,
             report: event.data.report,
+            evidence: event.data.evidence,
           })
         }
         break
