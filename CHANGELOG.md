@@ -1,3 +1,9 @@
+## [5.12.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.12.0...5.12.1) (2026-09-03)
+
+### Bug Fixes
+
+* 落地「来源 = 证据切片 + Fava 链接」 ([210f9df](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/210f9df54ed35820ec8ea88cab945184ff09b89a))
+
 ## [5.12.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.11.0...5.12.0) (2026-09-02)
 
 ### Features
