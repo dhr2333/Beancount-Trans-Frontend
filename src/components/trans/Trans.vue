@@ -1,6 +1,6 @@
 <template>
-  <el-upload class="upload-demo" :drag="true" :action=action method="POST" :data="getUploadData" :multiple="false"
-    :headers=headers accept=".csv,.pdf,.xls,.xlsx,.zip" show-file-list name="trans" @success="handleUploadSuccess"
+  <el-upload class="upload-demo" :drag="true" :action="action" method="POST" :data="getUploadData" :multiple="false"
+    :headers="headers" accept=".csv,.pdf,.xls,.xlsx,.zip" show-file-list name="trans" @success="handleUploadSuccess"
     @error="handleUploadError">
     <div class="el-upload__text">
       <el-icon class="el-icon--upload"><upload-filled /></el-icon>
@@ -39,13 +39,24 @@
       </div>
     </template>
   </el-upload>
-  <!-- 添加复制按钮和结果框 -->
-  <div class="result-container">
-    <el-button class="copy-btn" type="success" :icon="DocumentCopy" @click="copyResponseData" :disabled="!responseData">
+
+  <div class="result-toolbar">
+    <el-button type="success" :icon="DocumentCopy" @click="copyResponseData" :disabled="!hasEntries">
       复制结果
     </el-button>
+    <el-button @click="handlePreview" :disabled="!hasEntries">
+      预览
+    </el-button>
   </div>
-  <el-input class="result-textarea" type="textarea" :rows="30" readonly :value="responseData" placeholder='完成解析后将自动填充到此处,可直接进行复制，解析案例如下：
+
+  <el-input
+    v-if="!hasEntries"
+    class="result-textarea"
+    type="textarea"
+    :rows="30"
+    readonly
+    :value="''"
+    placeholder='完成解析后将自动填充到此处,可直接进行复制，解析案例如下：
 
 2022-06-19 * "温州市数据管理发展集团有限公司" "HIK-停车缴费-洞头人民路停车场(人民路区域共享)"
     time: "15:27:44"
@@ -53,114 +64,65 @@
     status: "ALiPay - 交易成功"
     Expenses:TransPort:Private:Park +5.00 CNY
     Liabilities:CreditCard:Bank:CITIC:C6428 -5.00 CNY
-'></el-input>
-  <div class="table-container">
-    <el-table :data="responseList" style="width: 100%;" border highlight-current-row>
-      <el-table-column label="Beancount 条目预览" min-width="400">
-        <template #default="scope">
-          <pre class="bill-formatted-content" style="white-space: pre-wrap; margin: 0; cursor: pointer;"
-            @click="copySingleFormatted(scope.row.formatted)" :title="'点击复制该条账单内容'">{{ scope.row.formatted }}</pre>
-        </template>
-      </el-table-column>
-      <el-table-column label="AI分类反馈" min-width="400">
-        <template #default="scope">
-          <div class="ai-classification-container">
-            <div class="current-selection">
-              <span class="label">当前分类：</span>
-              <el-tag
-                v-if="scope.row.ai_choose"
-                type="success"
-                class="selected-tag is-editable"
-                @click="openEditCurrentMappingForRow(scope.row, scope.$index)"
-              >
-                {{ scope.row.ai_choose }}
-              </el-tag>
-              <span v-else class="no-category-tip">无分类建议</span>
-            </div>
-              <div v-if="scope.row.ai_candidates && scope.row.ai_candidates.length > 0" class="candidates">
-              <span class="label">候选分类：</span>
-              <div class="candidate-tags">
-                <el-tag v-for="(candidate, idx) in scope.row.ai_candidates" :key="idx"
-                  :type="candidate.key === scope.row.ai_choose ? 'success' : 'info'"
-                  :class="['candidate-tag', { 'is-selected': candidate.key === scope.row.ai_choose }]"
-                  @click="handleAiChoose(scope.$index, candidate.key)">
-                  {{ candidate.key }}
-                  <span class="score" v-if="candidate.score !== undefined">
-                    ({{ candidate.score }})
-                  </span>
-                </el-tag>
-                  <el-button size="small" plain @click="openCreateMappingForRow(scope.row, scope.$index)" class="add-mapping-btn">
-                    <el-icon><Plus /></el-icon> 新增映射
-                  </el-button>
-              </div>
-            </div>
-            <div v-else class="candidates">
-              <span class="label muted">无候选分类</span>
-                <el-button size="small" plain @click="openCreateMappingForRow(scope.row, scope.$index)" class="add-mapping-btn">
-                  <el-icon><Plus /></el-icon> 新增映射
-                </el-button>
-            </div>
-          </div>
-        </template>
-      </el-table-column>
-    </el-table>
+'
+  />
+
+  <div v-else class="table-container">
+    <ParseEntryTable
+      :entries="formattedEntries"
+      :error-entries="errorEntries"
+      :validation-warnings="validationWarnings"
+      :on-reparse="handleTableReparse"
+      :on-persist-edit="handlePersistEdit"
+      :on-patch-tags="handlePatchTags"
+      :on-remove-entry="handleRemoveEntry"
+      :require-auth="hasAuthTokens"
+    />
   </div>
-  <el-dialog v-model="mappingDialog.visible" :title="mappingDialogTitle" width="600px">
-    <el-form ref="mappingFormRef" :model="mappingForm" :rules="mappingRules" label-width="100px">
-      <el-form-item label="关键字" prop="key">
-        <el-input v-model="mappingForm.key" placeholder="请输入关键字" />
-      </el-form-item>
-      <el-form-item label="映射账户" prop="accountId">
-        <AccountSelector v-model="mappingForm.accountId" placeholder="请选择或搜索账户" />
-      </el-form-item>
-      <el-form-item :label="mappingPartyLabel" :prop="mappingPartyProp">
-        <el-input
-          v-if="mappingForm.type === 'asset'"
-          v-model="mappingForm.full"
-          placeholder="选填：对方信息"
-        />
-        <el-input
-          v-else
-          v-model="mappingForm.party"
-          :placeholder="mappingForm.type === 'expense' ? '如腾讯、星巴克' : '选填：付款方信息'"
-        />
-      </el-form-item>
-      <el-form-item label="标签" prop="tag_ids">
-        <TagSelector v-model="mappingForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签" />
-      </el-form-item>
-    </el-form>
+
+  <el-dialog v-model="showPreviewDialog" title="预览所有条目" width="80%">
+    <el-input
+      v-model="previewContent"
+      type="textarea"
+      :rows="20"
+      class="preview-textarea"
+      placeholder="可以在此处编辑所有条目，编辑后点击保存按钮将更新到列表中"
+    />
     <template #footer>
-      <el-button @click="mappingDialog.visible = false">取消</el-button>
-      <el-button type="primary" :loading="mappingDialog.loading" @click="handleMappingSubmit">
-        保存并重解析
+      <el-button @click="showPreviewDialog = false">取消</el-button>
+      <el-button type="primary" @click="handleSavePreview" :loading="savingPreview">
+        保存
       </el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElPopover } from 'element-plus';
-import { UploadFilled, DocumentCopy, Plus, Edit } from '@element-plus/icons-vue'
-import { ref, computed, watch } from 'vue';
-import axios from '../../utils/request';
-import { hasAuthTokens } from '../../utils/auth';
-import AccountSelector from '../common/AccountSelector.vue';
-import TagSelector from '../common/TagSelector.vue';
-import { useInlineMappingDialog, defaultMappingKeyFromOriginalRow, defaultAssetMappingKeyFromOriginalRow } from '../../composables/useInlineMappingDialog';
-
+import { ElMessage, ElPopover } from 'element-plus'
+import { UploadFilled, DocumentCopy, Lock } from '@element-plus/icons-vue'
+import { ref, computed, watch } from 'vue'
+import axios from '../../utils/request'
+import { hasAuthTokens } from '../../utils/auth'
+import ParseEntryTable from '../parse/ParseEntryTable.vue'
+import {
+  alignPreviewBlocksToEntries,
+  parsePreviewContent
+} from '../../utils/parse-review-preview'
+import { applyTagOverridesToHeader } from '../../utils/beancount-header-tags'
+import type { FormattedEntry, TagDetail, OriginalRow } from '../../types/parse-review'
 
 const input = ref()
-const wechatUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E5%BE%AE%E4%BF%A1.csv');
-const alipayUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E6%94%AF%E4%BB%98%E5%AE%9D.csv');
-const value4 = ref<string[]>([]);
+const wechatUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E5%BE%AE%E4%BF%A1.csv')
+const alipayUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E6%94%AF%E4%BB%98%E5%AE%9D.csv')
+const value4 = ref<string[]>([])
 const options = [
-  // {
-  //   value: '写入Beancount-Trans-Assets',
-  //   label: '写入Beancount-Trans-Assets',
-  // },
   {
     value: '文件若加密请选择',
     label: '文件若加密请选择',
+  },
+  {
+    value: '无忽略',
+    label: '无忽略',
   },
   {
     value: '中国银行借记卡忽略支付宝微信条目',
@@ -172,258 +134,385 @@ const options = [
   }
 ]
 
-const csrfToken = ref('');
+const csrfToken = ref('')
 const action = axios.defaults.baseURL + '/translate/trans'
 const isWrite = ref(false)
 const cmbCreditIgnore = ref(false)
 const bocDebitIgnore = ref(false)
+const noIgnore = ref(false)
 const showPassword = ref(false)
-interface BillEntry {
-  id: string;
-  formatted: string;
-  ai_choose: string;
-  counterparty?: string;
-  commodity?: string;
-  payment_method?: string;
-  transaction_type?: string;
-  ai_candidates?: Array<{
-    key: string;
-    score?: number;
-  }>;
-}
-const responseData = ref('')
-const responseList = ref<BillEntry[]>([]);
 
-const {
-  mappingFormRef,
-  mappingDialog,
-  mappingForm,
-  mappingRules,
-  mappingDialogTitle,
-  mappingPartyLabel,
-  mappingPartyProp,
-  openForCreate,
-  openEditCurrentMapping,
-  handleMappingSubmit
-} = useInlineMappingDialog()
+const formattedEntries = ref<FormattedEntry[]>([])
+const errorEntries = ref<Record<string, string>>({})
+const validationWarnings = ref<Record<string, string>>({})
+const showPreviewDialog = ref(false)
+const previewContent = ref('')
+const savingPreview = ref(false)
 
+const hasEntries = computed(() => formattedEntries.value.length > 0)
+
+const joinedEditedText = computed(() =>
+  formattedEntries.value
+    .map((entry) => (entry.edited_formatted || entry.formatted || '').replace(/\n+$/, ''))
+    .filter((text) => text.trim())
+    .join('\n\n')
+)
 
 const getUploadData = () => {
   return {
     cmb_credit_ignore: cmbCreditIgnore.value,
     boc_debit_ignore: bocDebitIgnore.value,
+    no_ignore: noIgnore.value,
     write: isWrite.value,
     password: input.value,
     csrfmiddlewaretoken: csrfToken.value
-  };
-};
+  }
+}
+
 watch(value4, (newValue) => {
-  if (newValue.includes('写入Beancount-Trans-Assets')) {
-    isWrite.value = true;
-  } else {
-    isWrite.value = false;
-  };
-  if (newValue.includes('招行信用卡忽略支付宝微信条目')) {
-    cmbCreditIgnore.value = true;
-  } else {
-    cmbCreditIgnore.value = false;
-  };
-  if (newValue.includes('中国银行借记卡忽略支付宝微信条目')) {
-    bocDebitIgnore.value = true;
-  } else {
-    bocDebitIgnore.value = false;
-  };
-  if (newValue.includes('文件若加密请选择')) {
-    showPassword.value = true;
-  } else {
-    showPassword.value = false;
-  };
-});
+  isWrite.value = newValue.includes('写入Beancount-Trans-Assets')
+  cmbCreditIgnore.value = newValue.includes('招行信用卡忽略支付宝微信条目')
+  bocDebitIgnore.value = newValue.includes('中国银行借记卡忽略支付宝微信条目')
+  noIgnore.value = newValue.includes('无忽略')
+  showPassword.value = newValue.includes('文件若加密请选择')
+})
 
 axios.defaults.withCredentials = true
 
-const token = localStorage.getItem("access");
+const token = localStorage.getItem('access')
 
 const headers = computed(() => ({
-  "X-CSRFToken": csrfToken.value,
-  "Authorization": `Bearer ${token}`,
+  'X-CSRFToken': csrfToken.value,
+  Authorization: `Bearer ${token}`,
 }))
 
+function normalizeOriginalRow(item: Record<string, any>): OriginalRow {
+  const fromApi = (item.original_row && typeof item.original_row === 'object')
+    ? item.original_row
+    : {}
+  return {
+    transaction_time: fromApi.transaction_time || '',
+    transaction_category: fromApi.transaction_category || '',
+    counterparty: fromApi.counterparty || item.counterparty || '',
+    commodity: fromApi.commodity || item.commodity || '',
+    transaction_type: fromApi.transaction_type || item.transaction_type || '',
+    amount: fromApi.amount ?? '',
+    payment_method: fromApi.payment_method || item.payment_method || '',
+    transaction_status: fromApi.transaction_status,
+    bill_identifier: fromApi.bill_identifier,
+    ...fromApi
+  }
+}
+
+function toFormattedEntry(item: Record<string, any>): FormattedEntry {
+  const candidates = Array.isArray(item.ai_candidates)
+    ? item.ai_candidates
+    : (Array.isArray(item.expense_candidates_with_score) ? item.expense_candidates_with_score : [])
+  const firstCandidate = candidates[0]?.key || ''
+  const formatted = (item.formatted || '').replace(/\n+$/, '')
+  const edited = (item.edited_formatted || formatted).replace(/\n+$/, '')
+  const uuid = String(item.uuid || item.id || '')
+  const tagDetails: TagDetail[] = Array.isArray(item.tag_details) ? item.tag_details : []
+
+  return {
+    uuid,
+    formatted,
+    edited_formatted: edited,
+    selected_expense_key: item.selected_expense_key || item.ai_choose || firstCandidate || '',
+    expense_candidates_with_score: candidates.map((c: { key: string; score?: number }) => ({
+      key: c.key,
+      score: c.score ?? 0
+    })),
+    original_row: normalizeOriginalRow(item),
+    tag_details: tagDetails,
+    tag_overrides: item.tag_overrides ?? { removed_paths: [], added_paths: [] },
+    installment_role: item.installment_role ?? null,
+    installment_period: item.installment_period ?? null
+  }
+}
+
+/** 重解析后保留本地标签覆盖并套回首行 */
+function applyLocalTagOverrides(entry: FormattedEntry): FormattedEntry {
+  const overrides = entry.tag_overrides ?? { removed_paths: [], added_paths: [] }
+  const hasOverrides =
+    (overrides.removed_paths?.length ?? 0) > 0 || (overrides.added_paths?.length ?? 0) > 0
+  if (!hasOverrides) return entry
+
+  const baseDetails = entry.tag_details ?? []
+  const edited = applyTagOverridesToHeader(
+    entry.edited_formatted || entry.formatted,
+    baseDetails,
+    overrides
+  )
+  return {
+    ...entry,
+    edited_formatted: edited.replace(/\n+$/, '')
+  }
+}
+
 const handleUploadSuccess = (response: any, file: any) => {
-  if (file.status === 'error') return;
-  const normalizedResults: BillEntry[] = Array.isArray(response.results)
-    ? response.results.map((item: BillEntry & { ai_candidates?: any[] }) => {
-      const candidates = Array.isArray(item.ai_candidates) ? item.ai_candidates : []
-      const firstCandidate = candidates[0]?.key || ''
-      return {
-        ...item,
-        ai_candidates: candidates,
-        ai_choose: item.ai_choose || firstCandidate || ''
-      }
-    })
+  if (file.status === 'error') return
+  const normalized: FormattedEntry[] = Array.isArray(response.results)
+    ? response.results.map((item: Record<string, any>) => toFormattedEntry(item))
     : []
 
-  responseList.value = normalizedResults // 存储所有条目
-  responseData.value = normalizedResults.map((item) => item.formatted).join('\n') // 存储所有条目
-};
+  formattedEntries.value = normalized
+  errorEntries.value = {}
+  validationWarnings.value = {}
+}
 
-const handleUploadError = (err: any, file: any) => {
-  let errMsg = '';
+const handleUploadError = (err: any, _file: any) => {
+  let errMsg = ''
   try {
-    const parsed = JSON.parse(err.message);
-    errMsg = parsed?.error || parsed?.message || '';
+    const parsed = JSON.parse(err.message)
+    errMsg = parsed?.error || parsed?.message || ''
   } catch {
-    errMsg = err?.message || '';
+    errMsg = err?.message || ''
   }
-  
-  if (errMsg.includes("PDF解密失败") || errMsg.includes("ZIP 解密失败") || errMsg.includes("解密失败")) {
-    ElMessage.error(errMsg || "解密失败，请检查口令");
-  }
-  else if (errMsg === "当前账单不支持" || errMsg.includes("Unsupported")) {
-    ElMessage.error("当前账单不支持或文件损坏");
-  }
-  else if (errMsg.includes("API密钥") || errMsg.includes("API 密钥")) {
-    ElMessage.error(errMsg);
-  }
-  else if (errMsg === "DeepSeek调用失败，请检查API密钥是否正确") {
-    ElMessage.error("DeepSeek调用失败，请检查API密钥是否正确");
-  }
-  else {
-    ElMessage.error(errMsg || "未知错误");
-  }
-};
 
-// 在原有代码基础上添加复制方法
+  if (errMsg.includes('PDF解密失败') || errMsg.includes('ZIP 解密失败') || errMsg.includes('解密失败')) {
+    ElMessage.error(errMsg || '解密失败，请检查口令')
+  } else if (errMsg === '当前账单不支持' || errMsg.includes('Unsupported')) {
+    ElMessage.error('当前账单不支持或文件损坏')
+  } else if (errMsg.includes('API密钥') || errMsg.includes('API 密钥')) {
+    ElMessage.error(errMsg)
+  } else if (errMsg === 'DeepSeek调用失败，请检查API密钥是否正确') {
+    ElMessage.error('DeepSeek调用失败，请检查API密钥是否正确')
+  } else {
+    ElMessage.error(errMsg || '未知错误')
+  }
+}
+
 const copyResponseData = async () => {
   try {
-    await navigator.clipboard.writeText(responseData.value);
-    ElMessage.success('复制成功');
+    await navigator.clipboard.writeText(joinedEditedText.value)
+    ElMessage.success('复制成功')
   } catch (err) {
-    console.error('复制失败:', err);
-    ElMessage.error('复制失败，请手动选择内容复制');
-  }
-};
-
-// 复制单条账单内容
-const copySingleFormatted = async (text: string) => {
-  try {
-    await navigator.clipboard.writeText(text.trim())
-    ElMessage.success('已复制该条账单内容')
-  } catch (err) {
-    ElMessage.error('复制失败，请手动复制')
+    console.error('复制失败:', err)
+    ElMessage.error('复制失败，请手动选择内容复制')
   }
 }
 
-// 反馈AI选择
-const handleAiChoose = async (rowIndex: number, key: string) => {
-  const entryId = responseList.value[rowIndex].id;
+const handlePreview = () => {
+  previewContent.value = joinedEditedText.value
+  showPreviewDialog.value = true
+}
+
+const handleSavePreview = async () => {
+  if (!previewContent.value.trim()) {
+    ElMessage.warning('预览内容不能为空')
+    return
+  }
+
+  savingPreview.value = true
+  try {
+    const blocks = parsePreviewContent(previewContent.value)
+    const { kept, removedCount } = alignPreviewBlocksToEntries(
+      blocks,
+      formattedEntries.value.map((entry) => ({
+        uuid: entry.uuid,
+        edited_formatted: entry.edited_formatted
+      }))
+    )
+
+    if (kept.length === 0) {
+      ElMessage.warning('预览内容无有效条目')
+      return
+    }
+
+    const keptMap = new Map(kept.map((item) => [item.uuid, item.edited_formatted]))
+    formattedEntries.value = formattedEntries.value
+      .filter((entry) => keptMap.has(entry.uuid))
+      .map((entry) => ({
+        ...entry,
+        edited_formatted: (keptMap.get(entry.uuid) || entry.edited_formatted).replace(/\n+$/, '')
+      }))
+
+    // 校验更新后的条目
+    validationWarnings.value = {}
+    await Promise.all(
+      formattedEntries.value.map(async (entry) => {
+        try {
+          const response = await axios.post('/translate/validate-entry', {
+            edited_formatted: entry.edited_formatted
+          })
+          if (response.data?.validation_warning) {
+            validationWarnings.value[entry.uuid] = response.data.validation_warning
+          }
+        } catch {
+          // 校验失败不阻断本地保存
+        }
+      })
+    )
+
+    showPreviewDialog.value = false
+    if (removedCount > 0) {
+      ElMessage.success(`已保存预览，移除 ${removedCount} 条`)
+    } else {
+      ElMessage.success('预览已保存')
+    }
+  } finally {
+    savingPreview.value = false
+  }
+}
+
+const handleTableReparse = async (
+  uuid: string,
+  selectedKey: string,
+  mappingType?: 'expense' | 'income' | 'asset'
+) => {
+  const index = formattedEntries.value.findIndex((e) => e.uuid === uuid)
+  if (index < 0) {
+    ElMessage.error('条目不存在')
+    return
+  }
+  const entry = formattedEntries.value[index]
+  // entry.uuid 即 cache_key / 上传返回的 id
+  const entryId = entry.uuid
 
   try {
-    // 发送重新解析请求
     const response = await axios.post('/translate/reparse', {
       entry_id: entryId,
-      selected_key: key
-    });
-
-    if (response && response.data) {
-      // 更新当前行的格式化内容和AI选择
-      const updatedData = response.data;
-      responseList.value[rowIndex] = {
-        ...responseList.value[rowIndex], // 保留原有属性
-        formatted: updatedData.formatted, // 更新格式化内容
-        ai_choose: updatedData.ai_choose || key,
-        counterparty: updatedData.counterparty ?? responseList.value[rowIndex].counterparty,
-        commodity: updatedData.commodity ?? responseList.value[rowIndex].commodity
-      };
-
-      // 更新整个结果文本框
-      responseData.value = responseList.value.map(item => item.formatted).join('\n');
-
-      ElMessage.success('已反馈AI选择');
-    } else {
-      ElMessage.error('反馈AI选择失败，请稍后重试');
-    }
-  } catch (error) {
-    ElMessage.error('重新解析失败，请稍后重试');
+      selected_key: selectedKey,
+      ...(mappingType ? { mapping_type: mappingType } : {})
+    })
+    const updated = response.data
+    const previousKey = entry.selected_expense_key
+    let next = toFormattedEntry({
+      ...updated,
+      id: entryId,
+      uuid: entryId,
+      ai_choose:
+        mappingType === 'asset'
+          ? (updated.ai_choose ?? previousKey ?? '')
+          : (updated.ai_choose || selectedKey),
+      tag_overrides: entry.tag_overrides
+    })
+    next = applyLocalTagOverrides(next)
+    formattedEntries.value[index] = next
+    delete validationWarnings.value[uuid]
+    delete errorEntries.value[uuid]
+    ElMessage.success('已更新分类')
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.error || '重新解析失败，请稍后重试')
+    throw error
   }
 }
 
-const inferTransMappingType = (row: BillEntry) => {
-  const txType = row.transaction_type?.trim()
-  if (txType === '/' || txType === '不计收支') return 'asset' as const
-  if (row.formatted.includes(' Income:') || row.formatted.includes('\nIncome:')) return 'income' as const
-  if (row.formatted.includes(' Expenses:') || row.formatted.includes('\nExpenses:')) return 'expense' as const
-  return 'asset' as const
-}
-
-const getTransCreateDefaults = (row: BillEntry) => {
-  const type = inferTransMappingType(row)
-  if (type === 'asset') {
-    return {
-      type,
-      key: defaultAssetMappingKeyFromOriginalRow({ payment_method: row.payment_method }),
-      party: '',
-      full: ''
-    }
-  }
-  const key = defaultMappingKeyFromOriginalRow({
-    counterparty: row.counterparty,
-    commodity: row.commodity
-  })
-  return { type, key, party: '', full: '' }
-}
-
-const applyTransReparse = async (
-  rowIndex: number,
-  entryId: string,
-  selectedKey: string,
-  mappingType?: 'asset'
+const handlePersistEdit = async (
+  uuid: string,
+  editedFormatted: string,
+  options?: { silent?: boolean }
 ) => {
-  if (rowIndex < 0 || !responseList.value[rowIndex]) {
-    throw new Error('映射目标条目不存在')
+  const index = formattedEntries.value.findIndex((e) => e.uuid === uuid)
+  if (index < 0) return
+
+  const normalized = editedFormatted.replace(/\n+$/, '')
+  formattedEntries.value[index] = {
+    ...formattedEntries.value[index],
+    edited_formatted: normalized
   }
-  const response = await axios.post('/translate/reparse', {
-    entry_id: entryId,
-    selected_key: selectedKey,
-    ...(mappingType ? { mapping_type: mappingType } : {})
-  })
-  const updatedData = response.data
-  const previousChoose = responseList.value[rowIndex].ai_choose
-  responseList.value[rowIndex] = {
-    ...responseList.value[rowIndex],
-    formatted: updatedData.formatted,
-    ai_choose: mappingType === 'asset' ? (updatedData.ai_choose ?? previousChoose ?? '') : (updatedData.ai_choose || selectedKey),
-    counterparty: updatedData.counterparty ?? responseList.value[rowIndex].counterparty,
-    commodity: updatedData.commodity ?? responseList.value[rowIndex].commodity,
-    ai_candidates: Array.isArray(updatedData.ai_candidates)
-      ? updatedData.ai_candidates
-      : responseList.value[rowIndex].ai_candidates
+
+  if (errorEntries.value[uuid]) {
+    delete errorEntries.value[uuid]
   }
-  responseData.value = responseList.value.map((item) => item.formatted).join('\n')
+
+  try {
+    const response = await axios.post('/translate/validate-entry', {
+      edited_formatted: normalized
+    })
+    if (response.data?.validation_warning) {
+      validationWarnings.value[uuid] = response.data.validation_warning
+    } else {
+      delete validationWarnings.value[uuid]
+    }
+    if (!options?.silent) {
+      ElMessage.success('编辑内容已保存')
+    }
+    return {
+      validation_warning: response.data?.validation_warning as string | undefined
+    }
+  } catch (error: any) {
+    if (!options?.silent) {
+      ElMessage.error(error.response?.data?.error || '校验失败')
+    }
+    return
+  }
 }
 
-const buildTransMappingOptions = (row: BillEntry, rowIndex: number) => ({
-  row,
-  inferType: inferTransMappingType,
-  getSelectedKey: (r: BillEntry) => r.ai_choose,
-  getCreateDefaults: getTransCreateDefaults,
-  requireAuth: hasAuthTokens,
-  onReparse: (key: string, type: 'expense' | 'income' | 'asset') =>
-    applyTransReparse(rowIndex, row.id, key, type === 'asset' ? 'asset' : undefined)
-})
+const handlePatchTags = async (
+  uuid: string,
+  payload: { action: 'add' | 'remove'; tag_path: string }
+) => {
+  const index = formattedEntries.value.findIndex((e) => e.uuid === uuid)
+  if (index < 0) {
+    throw new Error('条目不存在')
+  }
+  const entry = formattedEntries.value[index]
+  const overrides = {
+    removed_paths: [...(entry.tag_overrides?.removed_paths ?? [])],
+    added_paths: [...(entry.tag_overrides?.added_paths ?? [])]
+  }
+  const path = payload.tag_path
+  const pathLower = path.toLowerCase()
 
-const openCreateMappingForRow = (row: BillEntry, rowIndex: number) => {
-  openForCreate(buildTransMappingOptions(row, rowIndex))
+  if (payload.action === 'add') {
+    overrides.removed_paths = overrides.removed_paths.filter((p) => p.toLowerCase() !== pathLower)
+    if (!overrides.added_paths.some((p) => p.toLowerCase() === pathLower)) {
+      overrides.added_paths.push(path)
+    }
+  } else {
+    overrides.added_paths = overrides.added_paths.filter((p) => p.toLowerCase() !== pathLower)
+    if (!overrides.removed_paths.some((p) => p.toLowerCase() === pathLower)) {
+      overrides.removed_paths.push(path)
+    }
+  }
+
+  const baseDetails = entry.tag_details ?? []
+  const edited = applyTagOverridesToHeader(
+    entry.edited_formatted || entry.formatted,
+    baseDetails,
+    overrides
+  ).replace(/\n+$/, '')
+
+  // 有效 tag_details：过滤 removed，追加 added
+  const removedSet = new Set(overrides.removed_paths.map((p) => p.toLowerCase()))
+  const effectiveDetails: TagDetail[] = baseDetails.filter(
+    (d) => d.path && !removedSet.has(d.path.toLowerCase())
+  )
+  const existing = new Set(effectiveDetails.map((d) => d.path.toLowerCase()))
+  for (const added of overrides.added_paths) {
+    if (!existing.has(added.toLowerCase())) {
+      effectiveDetails.push({ path: added, sources: [{ type: 'manual' }] })
+      existing.add(added.toLowerCase())
+    }
+  }
+
+  formattedEntries.value[index] = {
+    ...entry,
+    edited_formatted: edited,
+    tag_details: effectiveDetails,
+    tag_overrides: overrides
+  }
+
+  return {
+    edited_formatted: edited,
+    tag_details: effectiveDetails,
+    tag_overrides: overrides
+  }
 }
 
-const openEditCurrentMappingForRow = (row: BillEntry, rowIndex: number) => {
-  openEditCurrentMapping(buildTransMappingOptions(row, rowIndex))
+const handleRemoveEntry = async (uuid: string) => {
+  formattedEntries.value = formattedEntries.value.filter((e) => e.uuid !== uuid)
+  delete validationWarnings.value[uuid]
+  delete errorEntries.value[uuid]
+  ElMessage.success('条目已移除')
 }
 </script>
+
 <style>
-/* 添加样式 */
 .upload-demo,
-.result-container,
+.result-toolbar,
 .result-textarea {
   width: calc(100% - 24px);
   margin-left: 5px;
@@ -439,16 +528,12 @@ const openEditCurrentMappingForRow = (row: BillEntry, rowIndex: number) => {
   margin: 6px 0 0;
 }
 
-.result-container {
-  position: relative;
-  margin-top: 20px;
-}
-
-.copy-btn {
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  z-index: 100;
+.result-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  margin-bottom: 8px;
 }
 
 .result-textarea textarea {
@@ -456,110 +541,15 @@ const openEditCurrentMappingForRow = (row: BillEntry, rowIndex: number) => {
   font-size: 12px;
 }
 
-.ai-classification-container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.current-selection,
-.candidates {
-  display: flex;
-  align-items: center;
-}
-
-.label {
-  font-size: 12px;
-  color: var(--ep-text-color-secondary);
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-
-.label.muted {
-  color: var(--ep-text-color-placeholder);
-}
-
-.candidate-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.selected-tag.is-editable {
-  cursor: pointer;
-  transition: all 0.3s;
-
-  .edit-hint {
-    margin-left: 4px;
-    font-size: 12px;
-    vertical-align: -0.1em;
-  }
-}
-
-.selected-tag.is-editable:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-}
-
-.candidate-tag {
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.candidate-tag:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-}
-
-.candidate-tag.is-selected {
-  font-weight: bold;
-}
-
-.score {
-  font-size: 0.85em;
-  color: var(--ep-text-color-placeholder);
-  margin-left: 2px;
-}
-
-.no-category-tip {
-  color: var(--ep-text-color-placeholder, var(--el-text-color-placeholder));
-  font-size: 12px;
-  display: inline-block;
-  line-height: 22px;
-  padding: 0 9px;
-  border-radius: 4px;
-  background: var(--ep-fill-color-light, var(--el-fill-color-light));
-  vertical-align: middle;
-}
-
-.bill-formatted-content {
-  font-size: 12px;
-  font-family: Monaco, Consolas, 'Courier New', monospace;
-  line-height: 1.6;
-  background: none;
-  border: none;
-  box-shadow: none;
-  margin: 0;
-  padding: 0;
-}
-
 .table-container {
   padding-left: 15px;
   padding-right: 10px;
   box-sizing: border-box;
+  margin-top: 12px;
 }
 
-.add-mapping-btn {
-  margin-left: 8px;
-}
-
-html.dark .candidate-tag:hover,
-html.dark .selected-tag.is-editable:hover {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-}
-
-html.dark .no-category-tip {
-  background: var(--ep-fill-color-dark, var(--el-fill-color-dark));
-  color: var(--ep-text-color-placeholder, var(--el-text-color-placeholder));
+.preview-textarea textarea {
+  font-family: Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
 }
 </style>

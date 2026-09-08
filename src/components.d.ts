@@ -80,6 +80,7 @@ declare module '@vue/runtime-core' {
     MappingManagement: typeof import('./components/map/MappingManagement.vue')['default']
     MappingTemplates: typeof import('./components/template/MappingTemplates.vue')['default']
     MarkdownContent: typeof import('./components/assistant/MarkdownContent.vue')['default']
+    ParseEntryTable: typeof import('./components/parse/ParseEntryTable.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     TagManagement: typeof import('./components/config/TagManagement.vue')['default']
