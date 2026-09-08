@@ -121,8 +121,8 @@ const options = [
     label: '文件若加密请选择',
   },
   {
-    value: '无忽略',
-    label: '无忽略',
+    value: '关闭默认忽略',
+    label: '关闭默认忽略',
   },
   {
     value: '中国银行借记卡忽略支付宝微信条目',
@@ -173,7 +173,7 @@ watch(value4, (newValue) => {
   isWrite.value = newValue.includes('写入Beancount-Trans-Assets')
   cmbCreditIgnore.value = newValue.includes('招行信用卡忽略支付宝微信条目')
   bocDebitIgnore.value = newValue.includes('中国银行借记卡忽略支付宝微信条目')
-  noIgnore.value = newValue.includes('无忽略')
+  noIgnore.value = newValue.includes('关闭默认忽略')
   showPassword.value = newValue.includes('文件若加密请选择')
 })
 
