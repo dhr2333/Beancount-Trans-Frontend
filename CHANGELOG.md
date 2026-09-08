@@ -1,3 +1,10 @@
+## [5.12.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.12.0...5.12.1) (2026-09-08)
+
+### Bug Fixes
+
+* 优化选择候选分类后的提示 ([31d8761](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/31d87613b95923794c474b9814ebd089533e3d82))
+* 首页解析对齐现有解析审核 ([f6ea14b](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/f6ea14b1290bd1f87d5b9ded9737894bd3ecb401))
+
 ## [5.12.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.11.0...5.12.0) (2026-09-02)
 
 ### Features
