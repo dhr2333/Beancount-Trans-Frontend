@@ -191,6 +191,7 @@ const handleTableReparse = async (
   for (const item of propagated) {
     applyReparsePayloadToEntry(item.uuid, item)
   }
+  ElMessage.success('已更新分类')
   if (propagated.length > 0) {
     ElMessage.success(`已自动套用 ${propagated.length} 条相似条目`)
   }

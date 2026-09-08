@@ -478,7 +478,6 @@ const openEditMappingForRowByKey = (row: FormattedEntry, source: TagSource) => {
 const handleKeywordSelect = async (uuid: string, selectedKey: string) => {
   try {
     await props.onReparse(uuid, selectedKey)
-    ElMessage.success('已反馈AI选择')
   } catch (error: any) {
     ElMessage.error(error.response?.data?.error || '重解析失败')
   }
