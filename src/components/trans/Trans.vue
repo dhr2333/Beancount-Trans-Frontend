@@ -142,7 +142,12 @@ const bocDebitIgnore = ref(false)
 const noIgnore = ref(false)
 const showPassword = ref(false)
 
-const formattedEntries = ref<FormattedEntry[]>([])
+type LocalFormattedEntry = FormattedEntry & {
+  /** 最近一次解析/重解析返回的标签明细（不含本地 manual 覆盖） */
+  _source_tag_details?: TagDetail[]
+}
+
+const formattedEntries = ref<LocalFormattedEntry[]>([])
 const errorEntries = ref<Record<string, string>>({})
 const validationWarnings = ref<Record<string, string>>({})
 const showPreviewDialog = ref(false)
@@ -204,7 +209,7 @@ function normalizeOriginalRow(item: Record<string, any>): OriginalRow {
   }
 }
 
-function toFormattedEntry(item: Record<string, any>): FormattedEntry {
+function toFormattedEntry(item: Record<string, any>): LocalFormattedEntry {
   const candidates = Array.isArray(item.ai_candidates)
     ? item.ai_candidates
     : (Array.isArray(item.expense_candidates_with_score) ? item.expense_candidates_with_score : [])
@@ -213,6 +218,10 @@ function toFormattedEntry(item: Record<string, any>): FormattedEntry {
   const edited = (item.edited_formatted || formatted).replace(/\n+$/, '')
   const uuid = String(item.uuid || item.id || '')
   const tagDetails: TagDetail[] = Array.isArray(item.tag_details) ? item.tag_details : []
+  const overrides = item.tag_overrides ?? { removed_paths: [], added_paths: [] }
+  const sourceDetails: TagDetail[] = Array.isArray(item._source_tag_details)
+    ? item._source_tag_details
+    : tagDetails
 
   return {
     uuid,
@@ -225,27 +234,56 @@ function toFormattedEntry(item: Record<string, any>): FormattedEntry {
     })),
     original_row: normalizeOriginalRow(item),
     tag_details: tagDetails,
-    tag_overrides: item.tag_overrides ?? { removed_paths: [], added_paths: [] },
+    tag_overrides: overrides,
     installment_role: item.installment_role ?? null,
-    installment_period: item.installment_period ?? null
+    installment_period: item.installment_period ?? null,
+    _source_tag_details: sourceDetails
   }
 }
 
-/** 重解析后保留本地标签覆盖并套回首行 */
-function applyLocalTagOverrides(entry: FormattedEntry): FormattedEntry {
+/** 按 tag_overrides 计算有效 tag_details（与首行展示一致） */
+function effectiveTagDetails(
+  baseDetails: TagDetail[],
+  overrides?: FormattedEntry['tag_overrides']
+): TagDetail[] {
+  const removed = new Set((overrides?.removed_paths ?? []).map((p) => p.toLowerCase()))
+  const effective: TagDetail[] = (baseDetails ?? []).filter(
+    (d) => d.path && !removed.has(d.path.toLowerCase())
+  )
+  const existing = new Set(effective.map((d) => d.path.toLowerCase()))
+  for (const added of overrides?.added_paths ?? []) {
+    if (!added || existing.has(added.toLowerCase())) continue
+    effective.push({ path: added, sources: [{ type: 'manual' }] })
+    existing.add(added.toLowerCase())
+  }
+  return effective
+}
+
+/** 重解析后保留本地标签覆盖，并同步首行与 tag_details */
+function applyLocalTagOverrides(entry: LocalFormattedEntry): LocalFormattedEntry {
   const overrides = entry.tag_overrides ?? { removed_paths: [], added_paths: [] }
+  const sourceDetails = entry._source_tag_details ?? entry.tag_details ?? []
   const hasOverrides =
     (overrides.removed_paths?.length ?? 0) > 0 || (overrides.added_paths?.length ?? 0) > 0
-  if (!hasOverrides) return entry
+  if (!hasOverrides) {
+    return {
+      ...entry,
+      _source_tag_details: sourceDetails,
+      tag_details: sourceDetails
+    }
+  }
 
-  const baseDetails = entry.tag_details ?? []
+  const details = effectiveTagDetails(sourceDetails, overrides)
+  // 保留手改账户：以当前 edited 为底只改首行标签
   const edited = applyTagOverridesToHeader(
     entry.edited_formatted || entry.formatted,
-    baseDetails,
+    sourceDetails,
     overrides
   )
   return {
     ...entry,
+    _source_tag_details: sourceDetails,
+    tag_details: details,
     edited_formatted: edited.replace(/\n+$/, '')
   }
 }
@@ -356,6 +394,10 @@ const handleSavePreview = async () => {
   }
 }
 
+/**
+ * 表格关键字反馈 / 映射保存后的重解析。
+ * 成功不弹 toast（映射对话框会提示「重解析完成」）；失败向上抛出由调用方提示，避免重复 toast。
+ */
 const handleTableReparse = async (
   uuid: string,
   selectedKey: string,
@@ -363,39 +405,47 @@ const handleTableReparse = async (
 ) => {
   const index = formattedEntries.value.findIndex((e) => e.uuid === uuid)
   if (index < 0) {
-    ElMessage.error('条目不存在')
-    return
+    throw new Error('条目不存在')
   }
   const entry = formattedEntries.value[index]
   // entry.uuid 即 cache_key / 上传返回的 id
   const entryId = entry.uuid
 
-  try {
-    const response = await axios.post('/translate/reparse', {
-      entry_id: entryId,
-      selected_key: selectedKey,
-      ...(mappingType ? { mapping_type: mappingType } : {})
-    })
-    const updated = response.data
-    const previousKey = entry.selected_expense_key
-    let next = toFormattedEntry({
-      ...updated,
-      id: entryId,
-      uuid: entryId,
-      ai_choose:
-        mappingType === 'asset'
-          ? (updated.ai_choose ?? previousKey ?? '')
-          : (updated.ai_choose || selectedKey),
-      tag_overrides: entry.tag_overrides
-    })
-    next = applyLocalTagOverrides(next)
-    formattedEntries.value[index] = next
-    delete validationWarnings.value[uuid]
-    delete errorEntries.value[uuid]
-    ElMessage.success('已更新分类')
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.error || '重新解析失败，请稍后重试')
-    throw error
+  const response = await axios.post('/translate/reparse', {
+    entry_id: entryId,
+    selected_key: selectedKey,
+    ...(mappingType ? { mapping_type: mappingType } : {})
+  })
+  const updated = response.data
+  const previousKey = entry.selected_expense_key
+  const sourceDetails: TagDetail[] = Array.isArray(updated.tag_details) ? updated.tag_details : []
+  let next = toFormattedEntry({
+    ...updated,
+    id: entryId,
+    uuid: entryId,
+    ai_choose:
+      mappingType === 'asset'
+        ? (updated.ai_choose ?? previousKey ?? '')
+        : (updated.ai_choose || selectedKey),
+    tag_overrides: entry.tag_overrides,
+    _source_tag_details: sourceDetails,
+    // 先写入源明细，再由 applyLocalTagOverrides 生成有效明细
+    tag_details: sourceDetails
+  })
+  // 重解析后底稿已变：先用新 formatted 作为 edited，再套本地标签覆盖
+  next = {
+    ...next,
+    edited_formatted: (next.formatted || '').replace(/\n+$/, '')
+  }
+  next = applyLocalTagOverrides(next)
+  formattedEntries.value[index] = next
+  if (validationWarnings.value[uuid]) {
+    const { [uuid]: _removed, ...rest } = validationWarnings.value
+    validationWarnings.value = rest
+  }
+  if (errorEntries.value[uuid]) {
+    const { [uuid]: _removed, ...rest } = errorEntries.value
+    errorEntries.value = rest
   }
 }
 
@@ -468,28 +518,18 @@ const handlePatchTags = async (
     }
   }
 
-  const baseDetails = entry.tag_details ?? []
+  const sourceDetails = entry._source_tag_details ?? entry.tag_details ?? []
+  // 保留账户等手改：以当前 edited 为底只替换首行标签
   const edited = applyTagOverridesToHeader(
     entry.edited_formatted || entry.formatted,
-    baseDetails,
+    sourceDetails,
     overrides
   ).replace(/\n+$/, '')
-
-  // 有效 tag_details：过滤 removed，追加 added
-  const removedSet = new Set(overrides.removed_paths.map((p) => p.toLowerCase()))
-  const effectiveDetails: TagDetail[] = baseDetails.filter(
-    (d) => d.path && !removedSet.has(d.path.toLowerCase())
-  )
-  const existing = new Set(effectiveDetails.map((d) => d.path.toLowerCase()))
-  for (const added of overrides.added_paths) {
-    if (!existing.has(added.toLowerCase())) {
-      effectiveDetails.push({ path: added, sources: [{ type: 'manual' }] })
-      existing.add(added.toLowerCase())
-    }
-  }
+  const effectiveDetails = effectiveTagDetails(sourceDetails, overrides)
 
   formattedEntries.value[index] = {
     ...entry,
+    _source_tag_details: sourceDetails,
     edited_formatted: edited,
     tag_details: effectiveDetails,
     tag_overrides: overrides
