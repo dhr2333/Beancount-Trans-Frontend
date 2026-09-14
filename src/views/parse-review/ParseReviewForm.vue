@@ -3,15 +3,32 @@
     <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-left">
-        <h2>解析审核 - {{ fileName }}</h2>
+        <h2>条目审核</h2>
+        <el-text type="info" size="small" style="display: block; margin-top: 4px;">
+          共 {{ entryCount }} 条 · {{ sourceFiles.length }} 个账单
+        </el-text>
         <!-- <el-text v-if="remainingTime" type="info" size="small" style="display: block; margin-top: 4px;">
           剩余时间：{{ remainingTime }}
         </el-text> -->
       </div>
       <div class="header-right">
-        <el-button @click="handleReparseAll" :loading="loading.reparseAll" :disabled="reviewExpired">
-          重新解析
-        </el-button>
+        <el-dropdown :disabled="reviewExpired" @command="handleReparseAll">
+          <el-button :loading="loading.reparseAll" :disabled="reviewExpired">
+            重新解析
+            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item
+                v-for="file in sourceFiles"
+                :key="file.file_id"
+                :command="file.file_id"
+              >
+                重新解析「{{ file.file_name }}」
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button @click="handleBack">返回</el-button>
       </div>
     </div>
@@ -28,12 +45,13 @@
 
     <!-- 加载状态 -->
     <div v-loading="loading.results" class="content-container" :class="{ 'is-review-expired': reviewExpired }">
-      <!-- 解析结果表格 -->
+      <!-- 审核结果表格 -->
       <ParseEntryTable
         :entries="formattedEntries"
         :error-entries="errorEntries"
         :validation-warnings="validationWarnings"
         :disabled="reviewExpired"
+        :show-source-file="true"
         :on-reparse="handleTableReparse"
         :on-persist-edit="persistEntryEdit"
         :on-patch-tags="handleTablePatchTags"
@@ -71,7 +89,7 @@
       :close-on-click-modal="false"
     >
       <p class="reparse-password-tip">
-        全部重新解析会覆盖本批手改内容。若文件已加密，请输入密码后重试。
+        全部重新解析会覆盖该账单的手改内容。若文件已加密，请输入密码后重试。
       </p>
       <el-input
         v-model="reparsePassword"
@@ -91,11 +109,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowDown } from '@element-plus/icons-vue'
 import ParseEntryTable from '../../components/parse/ParseEntryTable.vue'
 import {
-  getParseResults,
+  getEntryReviewResults,
   reparseEntry,
   updateEntryEdit,
   patchEntryTags,
@@ -108,26 +127,21 @@ import {
   alignPreviewBlocksToEntries,
   parsePreviewContent
 } from '../../utils/parse-review-preview'
-import { getTask } from '../../api/reconciliation'
 import type {
-  FormattedEntry,
-  ParseResult,
   ErrorEntry,
-  ReparseResponse,
+  FormattedEntry,
+  PreviewSyncEntry,
   PreviewSyncResponse,
+  ReparseResponse,
   UpdateTagsRequest
 } from '../../types/parse-review'
-import type { ScheduledTask } from '../../types/reconciliation'
-import { isReviewExpired } from '../../types/reconciliation'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 
-const route = useRoute()
 const router = useRouter()
 
-const taskId = computed(() => parseInt(route.params.taskId as string))
-
-const fileName = ref('')
+const entryCount = ref(0)
 const formattedEntries = ref<FormattedEntry[]>([])
+const reviewExpiresAt = ref<number | null>(null)
 const loading = ref({
   results: false,
   reparseAll: false,
@@ -138,9 +152,6 @@ const loading = ref({
 const showPreviewDialog = ref(false)
 const previewContent = ref('')
 
-const taskInfo = ref<ScheduledTask | null>(null)
-const parseResult = ref<ParseResult | null>(null)
-
 const errorEntries = ref<Record<string, string>>({})
 const validationWarnings = ref<Record<string, string>>({})
 
@@ -149,6 +160,7 @@ const REPARSE_POLL_MAX_ATTEMPTS = 150
 let reparsePollAborted = false
 const reparsePasswordDialogVisible = ref(false)
 const reparsePassword = ref('')
+const reparseTargetFileId = ref<number | null>(null)
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -157,6 +169,29 @@ function sleep(ms: number) {
 onBeforeUnmount(() => {
   reparsePollAborted = true
 })
+
+/** 来源账单列表（按条目首次出现顺序去重） */
+const sourceFiles = computed(() => {
+  const seen = new Map<number, { file_id: number; file_name: string }>()
+  for (const entry of formattedEntries.value) {
+    if (entry.file_id == null || seen.has(entry.file_id)) continue
+    seen.set(entry.file_id, {
+      file_id: entry.file_id,
+      file_name: entry.file_name || `文件 #${entry.file_id}`
+    })
+  }
+  return [...seen.values()]
+})
+
+/** 按条目 uuid 定位其来源账单文件 ID；缺失时提示并中断操作 */
+const entryFileId = (uuid: string): number | undefined => {
+  const entry = formattedEntries.value.find((item) => item.uuid === uuid)
+  if (!entry || entry.file_id == null) {
+    ElMessage.error('条目缺少来源账单信息，请刷新页面')
+    return undefined
+  }
+  return entry.file_id
+}
 
 const applyReparsePayloadToEntry = (entryUuid: string, updated: ReparseResponse) => {
   const index = formattedEntries.value.findIndex((e) => e.uuid === entryUuid)
@@ -179,7 +214,11 @@ const handleTableReparse = async (
   selectedKey: string,
   mappingType?: 'expense' | 'income' | 'asset'
 ) => {
-  const response = await reparseEntry(taskId.value, {
+  const fileId = entryFileId(entryUuid)
+  if (fileId === undefined) return
+
+  const response = await reparseEntry({
+    file_id: fileId,
     entry_uuid: entryUuid,
     selected_key: selectedKey,
     ...(mappingType ? { mapping_type: mappingType } : {})
@@ -199,57 +238,18 @@ const handleTableReparse = async (
 
 /** 表格内标签增删，返回后端最新的 tag 字段供组件回写 */
 const handleTablePatchTags = async (uuid: string, payload: UpdateTagsRequest) => {
-  const response = await patchEntryTags(taskId.value, uuid, payload)
+  const fileId = entryFileId(uuid)
+  if (fileId === undefined) return {}
+  const response = await patchEntryTags(fileId, uuid, payload)
   return response.data
 }
 
-// 计算剩余时间（基于 review_expires_at 或 created）
+// 计算剩余时间（基于整体审核截止时间）
 const remainingTime = computed(() => {
-  if (!taskInfo.value) return null
+  if (!reviewExpiresAt.value) return null
 
-  if (parseResult.value?.review_expires_at) {
-    const expiryTime = parseResult.value.review_expires_at * 1000
-    const now = Date.now()
-    const remainingMs = expiryTime - now
-
-    if (remainingMs <= 0) {
-      return '已过期，等待自动写入'
-    }
-
-    const remainingHours = Math.floor(remainingMs / (3600 * 1000))
-    const remainingMinutes = Math.floor((remainingMs % (3600 * 1000)) / (60 * 1000))
-
-    if (remainingHours > 0) {
-      return `${remainingHours}小时${remainingMinutes}分钟`
-    } else {
-      return `${remainingMinutes}分钟`
-    }
-  }
-
-  if (taskInfo.value.review_expires_at) {
-    const expiryTime = taskInfo.value.review_expires_at * 1000
-    const now = Date.now()
-    const remainingMs = expiryTime - now
-
-    if (remainingMs <= 0) {
-      return '已过期，等待自动写入'
-    }
-
-    const remainingHours = Math.floor(remainingMs / (3600 * 1000))
-    const remainingMinutes = Math.floor((remainingMs % (3600 * 1000)) / (60 * 1000))
-
-    if (remainingHours > 0) {
-      return `${remainingHours}小时${remainingMinutes}分钟`
-    } else {
-      return `${remainingMinutes}分钟`
-    }
-  }
-
-  const createdTime = new Date(taskInfo.value.created).getTime()
-  const now = Date.now()
-  const elapsed = now - createdTime
-  const totalHours = 24
-  const remainingMs = totalHours * 3600 * 1000 - elapsed
+  const expiryTime = reviewExpiresAt.value * 1000
+  const remainingMs = expiryTime - Date.now()
 
   if (remainingMs <= 0) {
     return '已过期，等待自动写入'
@@ -266,49 +266,45 @@ const remainingTime = computed(() => {
 })
 
 const reviewExpired = computed(() => {
-  if (parseResult.value?.review_expires_at) {
-    return Date.now() >= parseResult.value.review_expires_at * 1000
-  }
-  if (taskInfo.value) {
-    return isReviewExpired(taskInfo.value)
+  if (reviewExpiresAt.value) {
+    return Date.now() >= reviewExpiresAt.value * 1000
   }
   return false
 })
 
-// 加载待办任务信息和解析结果
+// 加载统一条目审核结果（跨账单扁平列表）
 const loadResults = async () => {
   loading.value.results = true
   try {
-    // 先获取待办任务信息（包含文件名）
-    const taskResponse = await getTask(taskId.value)
-    taskInfo.value = taskResponse.data
-    fileName.value = taskInfo.value.file_name || `文件 #${taskInfo.value.file_id || taskId.value}`
+    const response = await getEntryReviewResults()
+    const result = response.data
 
-    // 再获取解析结果
-    const response = await getParseResults(taskId.value)
-    const result: ParseResult = response.data
-    parseResult.value = result  // 保存解析结果，用于计算剩余时间
+    entryCount.value = result.entry_count
+    reviewExpiresAt.value = result.review_expires_at
 
-    // 确保每条记录都有 edited_formatted，并去除末尾的换行符
-    formattedEntries.value = result.formatted_data.map(entry => ({
+    // 确保每条记录都有 edited_formatted，并去除末尾的换行符；保留来源账单信息
+    formattedEntries.value = result.entries.map((entry) => ({
       ...entry,
       edited_formatted: (entry.edited_formatted || entry.formatted || '').replace(/\n+$/, ''),
       tag_details: entry.tag_details ?? [],
       tag_overrides: entry.tag_overrides ?? { removed_paths: [], added_paths: [] }
     }))
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.error || '加载解析结果失败')
+    ElMessage.error(error.response?.data?.error || '加载条目审核结果失败')
   } finally {
     loading.value.results = false
   }
 }
 
 async function persistEntryEdit(uuid: string, editedFormatted: string, options?: { silent?: boolean }) {
+  const fileId = entryFileId(uuid)
+  if (fileId === undefined) return
+
   if (errorEntries.value[uuid]) {
     delete errorEntries.value[uuid]
   }
 
-  const response = await updateEntryEdit(taskId.value, uuid, {
+  const response = await updateEntryEdit(fileId, uuid, {
     edited_formatted: editedFormatted
   })
 
@@ -326,11 +322,17 @@ async function persistEntryEdit(uuid: string, editedFormatted: string, options?:
 /** 确认写入前将本地 edited_formatted 静默同步至 Redis。 */
 async function flushEditedEntries(): Promise<boolean> {
   const updatePromises: Promise<void>[] = []
+  let hasMissingFileId = false
 
   for (const entry of formattedEntries.value) {
+    if (entry.file_id == null) {
+      hasMissingFileId = true
+      continue
+    }
+    const fileId = entry.file_id
     const editedContent = entry.edited_formatted.replace(/\n+$/, '')
     updatePromises.push(
-      updateEntryEdit(taskId.value, entry.uuid, {
+      updateEntryEdit(fileId, entry.uuid, {
         edited_formatted: editedContent,
       }).then((response) => {
         entry.edited_formatted = editedContent
@@ -344,6 +346,10 @@ async function flushEditedEntries(): Promise<boolean> {
         }
       }),
     )
+  }
+
+  if (hasMissingFileId) {
+    ElMessage.error('部分条目缺少来源账单信息，已跳过同步')
   }
 
   if (!updatePromises.length) {
@@ -369,19 +375,24 @@ function buildSyncEntriesPayload(entries: FormattedEntry[] = formattedEntries.va
     }))
 }
 
-function applySyncResponse(data: PreviewSyncResponse) {
-  formattedEntries.value = data.formatted_data.map((entry) => ({
-    ...entry,
-    edited_formatted: (entry.edited_formatted || entry.formatted || '').replace(/\n+$/, ''),
-    tag_details: entry.tag_details ?? [],
-    tag_overrides: entry.tag_overrides ?? { removed_paths: [], added_paths: [] }
-  }))
+/** 清除指定账单文件内所有条目的本地校验提示（合并前调用） */
+function clearValidationWarningsForFiles(fileIds: number[]) {
+  const target = new Set(fileIds)
+  for (const entry of formattedEntries.value) {
+    if (entry.file_id != null && target.has(entry.file_id)) {
+      delete validationWarnings.value[entry.uuid]
+    }
+  }
+}
 
-  validationWarnings.value = {}
-  for (const [uuid, message] of Object.entries(data.validation_warnings ?? {})) {
+function applyValidationWarnings(warnings?: Record<string, string>) {
+  for (const [uuid, message] of Object.entries(warnings ?? {})) {
     validationWarnings.value[uuid] = message
   }
+}
 
+/** 清理已不存在条目的写入错误记录 */
+function pruneErrorEntries() {
   const keptUuidSet = new Set(formattedEntries.value.map((entry) => entry.uuid))
   for (const uuid of Object.keys(errorEntries.value)) {
     if (!keptUuidSet.has(uuid)) {
@@ -390,16 +401,65 @@ function applySyncResponse(data: PreviewSyncResponse) {
   }
 }
 
+/**
+ * 文件级合并：用某账单文件同步后的条目替换该文件原有条目，保持整体来源顺序。
+ */
+function mergeFileSyncResult(fileId: number, formattedData: FormattedEntry[]) {
+  const fileOrder = sourceFiles.value.map((file) => file.file_id)
+  const fileNameForFile =
+    sourceFiles.value.find((file) => file.file_id === fileId)?.file_name ?? `文件 #${fileId}`
+
+  const normalized = formattedData.map((entry) => ({
+    ...entry,
+    file_id: fileId,
+    file_name: fileNameForFile,
+    edited_formatted: (entry.edited_formatted || entry.formatted || '').replace(/\n+$/, ''),
+    tag_details: entry.tag_details ?? [],
+    tag_overrides: entry.tag_overrides ?? { removed_paths: [], added_paths: [] }
+  }))
+
+  const result: FormattedEntry[] = []
+  for (const fid of fileOrder) {
+    if (fid === fileId) {
+      result.push(...normalized)
+    } else {
+      result.push(...formattedEntries.value.filter((entry) => entry.file_id === fid))
+    }
+  }
+  // 无来源账单信息的条目无法参与文件级合并，保留以避免丢失
+  result.push(...formattedEntries.value.filter((entry) => entry.file_id == null))
+
+  formattedEntries.value = result
+  entryCount.value = result.length
+}
+
 async function removeEntryFromReview(uuid: string) {
-  const remaining = formattedEntries.value.filter((entry) => entry.uuid !== uuid)
-  if (remaining.length === formattedEntries.value.length) {
+  const target = formattedEntries.value.find((entry) => entry.uuid === uuid)
+  if (!target) {
+    return
+  }
+  if (target.file_id == null) {
+    ElMessage.error('条目缺少来源账单信息，请刷新页面')
+    return
+  }
+  const fileId = target.file_id
+
+  // 该文件剩余的全部条目（未提交的条目会被从该账单移除）
+  const remaining = formattedEntries.value.filter(
+    (entry) => entry.file_id === fileId && entry.uuid !== uuid
+  )
+  const fileEntryCount = formattedEntries.value.filter((entry) => entry.file_id === fileId).length
+  if (remaining.length === fileEntryCount) {
     return
   }
 
-  const response = await syncPreviewEntries(taskId.value, {
+  const response = await syncPreviewEntries(fileId, {
     entries: buildSyncEntriesPayload(remaining)
   })
-  applySyncResponse(response.data)
+  clearValidationWarningsForFiles([fileId])
+  mergeFileSyncResult(fileId, response.data.formatted_data)
+  applyValidationWarnings(response.data.validation_warnings)
+  pruneErrorEntries()
   ElMessage.success('条目已移除')
 }
 
@@ -412,7 +472,7 @@ const handlePreview = () => {
   showPreviewDialog.value = true
 }
 
-// 保存预览框中的编辑内容（预览文本为真源）
+// 保存预览框中的编辑内容（预览文本为真源，按来源账单分别同步）
 const handleSavePreview = async () => {
   if (!previewContent.value.trim()) {
     ElMessage.warning('预览内容不能为空')
@@ -440,8 +500,50 @@ const handleSavePreview = async () => {
       return
     }
 
-    const response = await syncPreviewEntries(taskId.value, { entries: kept })
-    applySyncResponse(response.data)
+    const fileIdByUuid = new Map<string, number>()
+    for (const entry of formattedEntries.value) {
+      if (entry.file_id != null) {
+        fileIdByUuid.set(entry.uuid, entry.file_id)
+      }
+    }
+
+    // 按来源账单分组
+    const grouped = new Map<number, PreviewSyncEntry[]>()
+    for (const item of kept) {
+      const fileId = fileIdByUuid.get(item.uuid)
+      if (fileId == null) {
+        ElMessage.error('条目缺少来源账单信息，请刷新页面')
+        return
+      }
+      const bucket = grouped.get(fileId)
+      if (bucket) {
+        bucket.push(item)
+      } else {
+        grouped.set(fileId, [item])
+      }
+    }
+
+    // 原本有条目、但预览中已被全部删除的账单，需提交空数组以移除
+    for (const file of sourceFiles.value) {
+      if (!grouped.has(file.file_id)) {
+        grouped.set(file.file_id, [])
+      }
+    }
+
+    const syncResults: Array<{ fileId: number; data: PreviewSyncResponse }> = []
+    for (const [fileId, entries] of grouped) {
+      const response = await syncPreviewEntries(fileId, { entries })
+      syncResults.push({ fileId, data: response.data })
+    }
+
+    clearValidationWarningsForFiles(syncResults.map((item) => item.fileId))
+    for (const item of syncResults) {
+      mergeFileSyncResult(item.fileId, item.data.formatted_data)
+    }
+    for (const item of syncResults) {
+      applyValidationWarnings(item.data.validation_warnings)
+    }
+    pruneErrorEntries()
 
     if (removedCount > 0) {
       ElMessage.success(`预览内容已保存，并移除 ${removedCount} 条已删除条目`)
@@ -471,12 +573,12 @@ const handleConfirmWrite = async () => {
       return
     }
 
-    await confirmWrite(taskId.value)
+    await confirmWrite()
     ElMessage.success('确认写入成功')
-    
+
     // 返回待办列表
     router.push('/reconciliation')
-    
+
     // 延迟触发横幅更新，确保页面跳转完成后再更新
     // 这样横幅组件可以正确检测到任务数量变化并触发导览步骤5
     setTimeout(() => {
@@ -495,7 +597,7 @@ const handleConfirmWrite = async () => {
         errorEntries.value[entry.uuid] = entry.error_message
       })
       ElMessage.error(error.response?.data?.error || '确认写入失败，请修正错误')
-      
+
       // 自动滚动到第一个错误
       setTimeout(() => {
         const firstErrorEl = document.querySelector('.has-error')
@@ -511,7 +613,7 @@ const handleConfirmWrite = async () => {
   }
 }
 
-// 重新解析
+// 重新解析指定账单
 const pollReparseAllTask = async (celeryTaskId: string) => {
   ElMessage.info('正在重新解析，完成后将自动刷新')
 
@@ -521,7 +623,7 @@ const pollReparseAllTask = async (celeryTaskId: string) => {
     const statusRes = await getParseTaskStatus(celeryTaskId)
     const status = statusRes.data.status
 
-    if (status === 'pending_review') {
+    if (status === 'pending_review' || status === 'parsed') {
       await loadResults()
       ElMessage.success('重新解析完成')
       reparsePasswordDialogVisible.value = false
@@ -542,13 +644,16 @@ const pollReparseAllTask = async (celeryTaskId: string) => {
   ElMessage.warning('解析耗时较长，请稍后手动刷新页面')
 }
 
-const submitReparseAll = async (password?: string) => {
+const submitReparseAll = async (fileId: number, password?: string) => {
+  const file = sourceFiles.value.find((item) => item.file_id === fileId)
+  const fileName = file?.file_name ?? `文件 #${fileId}`
+
   loading.value.reparseAll = true
   reparsePollAborted = false
   try {
     try {
       await ElMessageBox.confirm(
-        '全部重新解析会覆盖本批手改内容，是否继续？',
+        `全部重新解析「${fileName}」会覆盖该账单的手改内容，是否继续？`,
         '重新解析',
         {
           confirmButtonText: '继续',
@@ -560,8 +665,10 @@ const submitReparseAll = async (password?: string) => {
       return
     }
 
+    reparseTargetFileId.value = fileId
+
     const response = await reparseAll(
-      taskId.value,
+      fileId,
       password ? { password } : undefined
     )
     const celeryTaskId = response.data.celery_task_id
@@ -578,13 +685,22 @@ const submitReparseAll = async (password?: string) => {
   }
 }
 
-const handleReparseAll = async () => {
-  await submitReparseAll()
+const handleReparseAll = async (command: number | string | object) => {
+  const fileId = Number(command)
+  if (!Number.isFinite(fileId)) {
+    return
+  }
+  await submitReparseAll(fileId)
 }
 
 const confirmReparseAllWithPassword = async () => {
+  const fileId = reparseTargetFileId.value
+  if (fileId == null) {
+    ElMessage.warning('未找到目标账单，请重新选择账单')
+    return
+  }
   const password = reparsePassword.value.trim()
-  await submitReparseAll(password || undefined)
+  await submitReparseAll(fileId, password || undefined)
 }
 
 // 返回

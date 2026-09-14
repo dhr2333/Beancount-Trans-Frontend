@@ -60,6 +60,7 @@ export interface ScheduledTask {
   file_name?: string | null  // 解析待办的文件名
   file_id?: number | null  // 解析待办的文件ID
   review_expires_at?: number | null  // 解析待办的用户审核截止时间（Unix 时间戳，秒）
+  entry_count?: number | null  // 条目审核待办的待审核条目数
   created: string
   modified: string
 }

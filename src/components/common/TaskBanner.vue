@@ -48,13 +48,13 @@ const route = useRoute()
 const visible = ref(true)
 const pendingTaskCount = ref(0)
 const overdueCount = ref(0)
-const previousParseReviewCount = ref(0) // 保存之前的解析审核任务数量
+const previousEntryReviewCount = ref(0) // 保存之前的条目审核任务数量
 const tourStep4Triggered = ref(false) // 标记是否已经触发过导览步骤4
 const tourStep5Triggered = ref(false) // 标记是否已经触发过导览步骤5
 
-// 检查是否在待办列表、对账表单或解析审核页面
+// 检查是否在待办列表、对账表单或条目审核页面
 const isReconciliationPage = computed(() => {
-  return route.path.startsWith('/reconciliation') || route.path.startsWith('/parse-review')
+  return route.path.startsWith('/reconciliation') || route.path.startsWith('/entry-review')
 })
 
 // 检查是否已关闭（存储在 localStorage）
@@ -81,20 +81,20 @@ async function loadPendingTasks() {
     // 保存旧值用于检测变化
     const oldCount = pendingTaskCount.value
 
-    // 获取所有待办任务（对账 + 解析审核）
+    // 获取所有待办任务（对账 + 条目审核）
     const reconciliationResponse = await getTasks({
       due: true,
       status: 'pending',
       task_type: 'reconciliation'
     })
 
-    const parseReviewResponse = await getTasks({
+    const entryReviewResponse = await getTasks({
       status: 'pending',
-      task_type: 'parse_review'
+      task_type: 'entry_review'
     })
 
     let reconciliationTasks: ScheduledTask[] = []
-    let parseReviewTasks: ScheduledTask[] = []
+    let entryReviewTasks: ScheduledTask[] = []
 
     // 处理对账待办
     const reconciliationData = reconciliationResponse.data
@@ -104,45 +104,45 @@ async function loadPendingTasks() {
       reconciliationTasks = (reconciliationData as { results: ScheduledTask[], count: number }).results || []
     }
 
-    // 处理解析审核待办
-    const parseReviewData = parseReviewResponse.data
-    if (Array.isArray(parseReviewData)) {
-      parseReviewTasks = parseReviewData as ScheduledTask[]
-    } else if (parseReviewData && typeof parseReviewData === 'object' && 'results' in parseReviewData) {
-      parseReviewTasks = (parseReviewData as { results: ScheduledTask[], count: number }).results || []
+    // 处理条目审核待办
+    const entryReviewData = entryReviewResponse.data
+    if (Array.isArray(entryReviewData)) {
+      entryReviewTasks = entryReviewData as ScheduledTask[]
+    } else if (entryReviewData && typeof entryReviewData === 'object' && 'results' in entryReviewData) {
+      entryReviewTasks = (entryReviewData as { results: ScheduledTask[], count: number }).results || []
     }
 
     // 合并所有待办任务
-    const allTasks = [...reconciliationTasks, ...parseReviewTasks]
+    const allTasks = [...reconciliationTasks, ...entryReviewTasks]
     const newCount = allTasks.length
-    const newParseReviewCount = parseReviewTasks.length
+    const newEntryReviewCount = entryReviewTasks.length
 
     // 保存旧值用于比较（在更新之前）
-    const oldParseReviewCount = previousParseReviewCount.value
+    const oldEntryReviewCount = previousEntryReviewCount.value
 
     // 检查导览状态（使用新的状态管理）
     const isInTour = shouldResumeTour()
     const tourProgress = getTourProgress()
     const currentStep = tourProgress?.currentStep ?? -1
     
-    // 检查是否有新的解析审核任务（用于导览触发步骤4）
-    // 条件：1) 在导览中 2) 之前没有解析审核任务(0) 3) 现在有解析审核任务(>0) 4) 还没有触发过步骤4
+    // 检查是否有新的条目审核任务（用于导览触发步骤4）
+    // 条件：1) 在导览中 2) 之前没有条目审核任务(0) 3) 现在有条目审核任务(>0) 4) 还没有触发过步骤4
     // 或者：需要恢复导览且当前步骤为3（步骤4）
-    const hasNewParseReviewTask = (isInTour &&
+    const hasNewEntryReviewTask = (isInTour &&
       !tourStep4Triggered.value &&
-      oldParseReviewCount === 0 &&
-      newParseReviewCount > 0) ||
-      (isInTour && currentStep === 3 && newParseReviewCount > 0 && !tourStep4Triggered.value)
+      oldEntryReviewCount === 0 &&
+      newEntryReviewCount > 0) ||
+      (isInTour && currentStep === 3 && newEntryReviewCount > 0 && !tourStep4Triggered.value)
 
-    // 检查是否有解析审核任务完成（用于导览触发步骤5）
-    // 条件：1) 在导览中 2) 之前有解析审核任务(>0) 3) 现在减少了 4) 已经触发过步骤4 5) 还没有触发过步骤5
+    // 检查是否有条目审核任务完成（用于导览触发步骤5）
+    // 条件：1) 在导览中 2) 之前有条目审核任务(>0) 3) 现在减少了 4) 已经触发过步骤4 5) 还没有触发过步骤5
     // 或者：需要恢复导览且当前步骤为4（步骤5）且任务已完成
-    const hasCompletedParseReviewTask = (isInTour &&
+    const hasCompletedEntryReviewTask = (isInTour &&
       !tourStep5Triggered.value &&
       tourStep4Triggered.value &&
-      oldParseReviewCount > 0 &&
-      newParseReviewCount < oldParseReviewCount) ||
-      (isInTour && currentStep === 4 && newParseReviewCount === 0 && !tourStep5Triggered.value)
+      oldEntryReviewCount > 0 &&
+      newEntryReviewCount < oldEntryReviewCount) ||
+      (isInTour && currentStep === 4 && newEntryReviewCount === 0 && !tourStep5Triggered.value)
 
     // 调试日志
     if (isInTour) {
@@ -150,15 +150,15 @@ async function loadPendingTasks() {
         isInTour,
         tourStep4Triggered: tourStep4Triggered.value,
         tourStep5Triggered: tourStep5Triggered.value,
-        oldParseReviewCount,
-        newParseReviewCount,
-        hasCompletedParseReviewTask
+        oldEntryReviewCount,
+        newEntryReviewCount,
+        hasCompletedEntryReviewTask
       })
     }
 
     // 更新计数（在检查之后）
     pendingTaskCount.value = newCount
-    previousParseReviewCount.value = newParseReviewCount
+    previousEntryReviewCount.value = newEntryReviewCount
 
     // 计算逾期数量（仅对账待办）
     const today = new Date()
@@ -175,11 +175,11 @@ async function loadPendingTasks() {
       visible.value = false
     }
 
-    // 检查是否在导览中，且有新的解析审核任务（触发步骤4）
-    if (hasNewParseReviewTask) {
-      console.log('检测到新的解析审核任务，准备触发导览步骤4', {
-        oldCount: oldParseReviewCount,
-        newCount: newParseReviewCount,
+    // 检查是否在导览中，且有新的条目审核任务（触发步骤4）
+    if (hasNewEntryReviewTask) {
+      console.log('检测到新的条目审核任务，准备触发导览步骤4', {
+        oldCount: oldEntryReviewCount,
+        newCount: newEntryReviewCount,
         isInTour,
         currentStep
       })
@@ -203,11 +203,11 @@ async function loadPendingTasks() {
       }, 1000)
     }
 
-    // 检查是否在导览中，且有解析审核任务完成（触发步骤5）
-    if (hasCompletedParseReviewTask) {
-      console.log('检测到解析审核任务完成，准备触发导览步骤5', {
-        oldCount: oldParseReviewCount,
-        newCount: newParseReviewCount,
+    // 检查是否在导览中，且有条目审核任务完成（触发步骤5）
+    if (hasCompletedEntryReviewTask) {
+      console.log('检测到条目审核任务完成，准备触发导览步骤5', {
+        oldCount: oldEntryReviewCount,
+        newCount: newEntryReviewCount,
         isInTour,
         currentStep
       })
@@ -289,7 +289,7 @@ onMounted(async () => {
         // 检查任务是否已完成（数量为0）
         await loadPendingTasks()
         // 如果任务已完成，立即恢复步骤5
-        if (previousParseReviewCount.value === 0) {
+        if (previousEntryReviewCount.value === 0) {
           setTimeout(() => {
             continueUserTourToStep5()
           }, 1000)
@@ -307,7 +307,7 @@ onMounted(async () => {
     }
   }, 30000)
 
-  // 监听待办任务刷新事件（账户开启对账周期时触发，或解析待办完成时触发）
+  // 监听待办任务刷新事件（账户开启对账周期时触发，或条目审核待办完成时触发）
   unsubscribeTaskBannerRefresh = subscribeTaskBannerRefresh(() => {
     console.log('收到横幅刷新事件，准备加载待办任务')
     loadPendingTasks()
@@ -324,7 +324,7 @@ onMounted(async () => {
       // 如果不在导览中，重置标记
       tourStep4Triggered.value = false
       tourStep5Triggered.value = false
-      previousParseReviewCount.value = 0
+      previousEntryReviewCount.value = 0
     }
   }
 

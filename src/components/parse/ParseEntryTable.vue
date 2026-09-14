@@ -1,6 +1,16 @@
 <template>
   <el-table v-if="entries.length > 0" :data="entries" row-key="uuid" style="width: 100%" border
     highlight-current-row>
+    <el-table-column
+      v-if="props.showSourceFile"
+      label="来源账单"
+      width="180"
+      show-overflow-tooltip
+    >
+      <template #default="scope">
+        {{ scope.row.file_name || (scope.row.file_id ? `文件 #${scope.row.file_id}` : '-') }}
+      </template>
+    </el-table-column>
     <el-table-column label="Beancount 条目预览" min-width="400">
       <template #default="scope">
         <div
@@ -353,6 +363,8 @@ const props = defineProps<{
   onRemoveEntry?: (uuid: string) => Promise<void>
   /** 新增/编辑映射前的登录检查（首页匿名试用需要） */
   requireAuth?: () => boolean
+  /** 是否展示「来源账单」列（统一条目审核场景） */
+  showSourceFile?: boolean
 }>()
 
 const entries = toRef(props, 'entries')

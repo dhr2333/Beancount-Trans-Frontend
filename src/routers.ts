@@ -17,7 +17,7 @@ import MappingTemplates from "./components/template/MappingTemplates.vue"
 // 对账功能
 import ReconciliationList from "./views/reconciliation/ReconciliationList.vue"
 import ReconciliationForm from "./views/reconciliation/ReconciliationForm.vue"
-// 解析审核功能
+// 条目审核功能
 import ParseReviewForm from "./views/parse-review/ParseReviewForm.vue"
 // Copilot
 import AssistantView from "./views/assistant/AssistantView.vue"
@@ -45,8 +45,8 @@ const router = createRouter({
     // 对账功能
     { path: '/reconciliation', name: "reconciliationList", component: ReconciliationList },
     { path: '/reconciliation/:id', name: "reconciliationForm", component: ReconciliationForm },
-    // 解析审核功能
-    { path: '/parse-review/:taskId', name: "parseReviewForm", component: ParseReviewForm },
+    // 条目审核功能
+    { path: '/entry-review', name: "entryReviewForm", component: ParseReviewForm },
     // Copilot
     { path: '/assistant/:sessionId?', name: 'assistant', component: AssistantView },
     { path: '/login', name: "login", component: Login },

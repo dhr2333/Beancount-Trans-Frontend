@@ -1,5 +1,5 @@
 /**
- * 解析待办审核相关类型定义
+ * 条目审核（统一待办）相关类型定义
  */
 
 export interface OriginalRow {
@@ -48,27 +48,31 @@ export interface FormattedEntry {
   tag_overrides?: TagOverrides
   installment_role?: 'purchase' | 'installment' | null
   installment_period?: number | null
-}
-
-/**
- * 解析结果
- */
-export interface ParseResult {
-  file_id: number
-  formatted_data: FormattedEntry[]
-  created_at: number
-  review_expires_at: number
-}
-
-/**
- * 解析待办任务
- */
-export interface ParseReviewTask {
-  id: number
-  task_type: 'parse_review'
-  status: 'inactive' | 'pending' | 'completed' | 'cancelled'
-  file_id: number
+  /** 来源账单文件 ID（统一条目审核接口返回） */
+  file_id?: number
+  /** 来源账单文件名（统一条目审核接口返回） */
   file_name?: string
+}
+
+/**
+ * 统一条目审核结果（跨账单扁平条目列表）
+ */
+export interface EntryReviewResults {
+  entries: FormattedEntry[]
+  entry_count: number
+  /** 整体审核截止时间（Unix 时间戳，秒），无有效条目时为 null */
+  review_expires_at: number | null
+}
+
+/**
+ * 条目审核待办任务（每个用户全局唯一）
+ */
+export interface EntryReviewTask {
+  id: number
+  task_type: 'entry_review'
+  status: 'inactive' | 'pending' | 'completed' | 'cancelled'
+  entry_count?: number | null
+  review_expires_at?: number | null
   created: string
   modified: string
 }
@@ -77,6 +81,8 @@ export interface ParseReviewTask {
  * 重解析请求
  */
 export interface ReparseRequest {
+  /** 条目所属账单文件 ID */
+  file_id: number
   entry_uuid: string
   selected_key: string
   mapping_type?: 'expense' | 'income' | 'asset'
@@ -152,14 +158,25 @@ export interface UpdateTagsResponse {
  * 确认写入错误条目
  */
 export interface ErrorEntry {
+  /** 条目所属账单文件 ID */
+  file_id?: number
   uuid: string
   index: number
   error_message: string
 }
 
 /**
- * 确认写入错误响应
+ * 确认写入成功响应
  */
+export interface ConfirmWriteResponse {
+  message: string
+  /** 已写入的账单文件列表 */
+  files: Array<{
+    file_id: number
+    entry_count: number
+  }>
+}
+
 export interface ReparseAllRequest {
   password?: string
 }

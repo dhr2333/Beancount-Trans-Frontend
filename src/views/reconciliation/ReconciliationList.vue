@@ -13,11 +13,11 @@
           <el-badge v-if="reconciliationCount > 0" :value="formatBadgeValue(reconciliationCount)"
             :type="filterType === 'reconciliation' ? 'danger' : 'info'" class="filter-badge" />
         </el-button>
-        <el-button :type="filterType === 'parse_review' ? 'primary' : 'default'" @click="filterType = 'parse_review'"
+        <el-button :type="filterType === 'entry_review' ? 'primary' : 'default'" @click="filterType = 'entry_review'"
           class="filter-button">
-          <span class="button-text">解析</span>
-          <el-badge v-if="parseReviewCount > 0" :value="formatBadgeValue(parseReviewCount)"
-            :type="filterType === 'parse_review' ? 'danger' : 'info'" class="filter-badge" />
+          <span class="button-text">审核</span>
+          <el-badge v-if="entryReviewCount > 0" :value="formatBadgeValue(entryReviewCount)"
+            :type="filterType === 'entry_review' ? 'danger' : 'info'" class="filter-badge" />
         </el-button>
       </div>
     </div>
@@ -34,10 +34,10 @@
           </template>
           <template #description>
             <p class="empty-text" v-if="filterType === 'reconciliation'">所有账户都已对账完成</p>
-            <p class="empty-text" v-else-if="filterType === 'parse_review'">暂无解析待办任务</p>
+            <p class="empty-text" v-else-if="filterType === 'entry_review'">暂无条目审核待办</p>
             <p class="empty-text" v-else>暂无待办任务</p>
             <p class="empty-hint" v-if="filterType === 'reconciliation'">在「账户管理」中设置对账周期，系统会自动创建待办任务</p>
-            <p class="empty-hint" v-else-if="filterType === 'parse_review'">在「文件管理」中上传并解析文件，系统会自动创建解析待办任务</p>
+            <p class="empty-hint" v-else-if="filterType === 'entry_review'">在「文件管理」中上传并解析文件，解析完成后条目会进入统一的条目审核待办</p>
           </template>
         </el-empty>
       </div>
@@ -89,10 +89,13 @@
               </div>
             </template>
 
-            <!-- 解析审核待办：显示文件名和剩余时间 -->
-            <template v-else-if="task.task_type === 'parse_review'">
+            <!-- 条目审核待办：显示条目数和剩余时间 -->
+            <template v-else-if="task.task_type === 'entry_review'">
               <div class="file-name">
-                {{ task.file_name || `文件 #${task.file_id || task.id}` }}
+                条目审核
+              </div>
+              <div class="entry-count">
+                共 {{ task.entry_count ?? 0 }} 条待审核条目
               </div>
               <div class="parse-review-footer">
                 <div class="remaining-time">
@@ -134,8 +137,8 @@ const loading = ref(false)
 const tasks = ref<ScheduledTask[]>([])
 const total = ref(0)
 const reconciliationCount = ref(0)
-const parseReviewCount = ref(0)
-const filterType = ref<'reconciliation' | 'parse_review'>('parse_review')
+const entryReviewCount = ref(0)
+const filterType = ref<'reconciliation' | 'entry_review'>('entry_review')
 const writingTaskIds = ref<Set<number>>(new Set())
 
 onMounted(async () => {
@@ -143,14 +146,14 @@ onMounted(async () => {
   injectDatePickerStyles()
   // 先加载数量，然后根据数量决定默认显示哪个分类
   await loadCounts()
-  // 如果解析待办不存在，则显示对账待办
-  if (parseReviewCount.value === 0 && reconciliationCount.value > 0) {
+  // 如果条目审核待办不存在，则显示对账待办
+  if (entryReviewCount.value === 0 && reconciliationCount.value > 0) {
     filterType.value = 'reconciliation'
   }
   await loadTasks()
 })
 
-// 页面激活时刷新列表（从对账表单或解析审核详情返回时）
+// 页面激活时刷新列表（从对账表单或条目审核详情返回时）
 onActivated(async () => {
   await loadCounts()
   await loadTasks()
@@ -221,17 +224,17 @@ async function loadCounts() {
       reconciliationCount.value = (reconciliationData as { count: number }).count || 0
     }
 
-    // 加载解析待办数量
-    const parseReviewParams = {
+    // 加载条目审核待办数量
+    const entryReviewParams = {
       status: 'pending',
-      task_type: 'parse_review'
+      task_type: 'entry_review'
     }
-    const parseReviewResponse = await getTasks(parseReviewParams)
-    const parseReviewData = parseReviewResponse.data
-    if (Array.isArray(parseReviewData)) {
-      parseReviewCount.value = parseReviewData.length
-    } else if (parseReviewData && typeof parseReviewData === 'object' && 'count' in parseReviewData) {
-      parseReviewCount.value = (parseReviewData as { count: number }).count || 0
+    const entryReviewResponse = await getTasks(entryReviewParams)
+    const entryReviewData = entryReviewResponse.data
+    if (Array.isArray(entryReviewData)) {
+      entryReviewCount.value = entryReviewData.length
+    } else if (entryReviewData && typeof entryReviewData === 'object' && 'count' in entryReviewData) {
+      entryReviewCount.value = (entryReviewData as { count: number }).count || 0
     }
   } catch (error: unknown) {
     console.error('加载待办数量错误:', error)
@@ -252,7 +255,7 @@ async function loadTasks() {
       task_type: filterType.value
     }
 
-    // 解析审核待办不需要 due 筛选；对账待办使用 due=true
+    // 条目审核待办不需要 due 筛选；对账待办使用 due=true
     if (filterType.value === 'reconciliation') {
       params.due = true
     }
@@ -275,8 +278,8 @@ async function loadTasks() {
     // 更新对应分类的数量
     if (filterType.value === 'reconciliation') {
       reconciliationCount.value = total.value
-    } else if (filterType.value === 'parse_review') {
-      parseReviewCount.value = total.value
+    } else if (filterType.value === 'entry_review') {
+      entryReviewCount.value = total.value
     }
   } catch (error: unknown) {
     console.error('加载待办列表错误:', error)
@@ -308,12 +311,12 @@ function isOverdue(dateString: string | null): boolean {
 }
 
 function handleStart(task: ScheduledTask) {
-  if (task.task_type === 'parse_review') {
+  if (task.task_type === 'entry_review') {
     if (isReviewExpired(task)) {
-      ElMessage.warning('解析待办已过期，系统将自动写入')
+      ElMessage.warning('条目审核待办已过期，系统将自动写入')
       return
     }
-    router.push(`/parse-review/${task.id}`)
+    router.push('/entry-review')
   } else {
     router.push(`/reconciliation/${task.id}`)
   }
@@ -398,15 +401,15 @@ async function handleDateChange(taskId: number, newDate: string) {
 
 // 跳过审核直接写入
 async function handleDirectWrite(task: ScheduledTask) {
-  if (task.task_type !== 'parse_review') return
+  if (task.task_type !== 'entry_review') return
   if (isReviewExpired(task)) {
-    ElMessage.warning('解析待办已过期，系统将自动写入')
+    ElMessage.warning('条目审核待办已过期，系统将自动写入')
     return
   }
 
   try {
     await ElMessageBox.confirm(
-      `确定要跳过审核，直接将解析结果写入账本吗？`,
+      `确定要跳过审核，直接将全部待审核条目写入账本吗？`,
       '确认直接写入',
       {
         confirmButtonText: '确定',
@@ -418,7 +421,7 @@ async function handleDirectWrite(task: ScheduledTask) {
     writingTaskIds.value.add(task.id)
 
     try {
-      await confirmWrite(task.id)
+      await confirmWrite()
       ElMessage.success('已直接写入账本')
 
       // 刷新列表
@@ -643,6 +646,12 @@ async function handleDirectWrite(task: ScheduledTask) {
     .remaining-time {
       font-size: 14px;
       color: var(--ep-text-color-regular);
+      margin-top: 4px;
+    }
+
+    .entry-count {
+      font-size: 14px;
+      color: var(--ep-text-color-secondary);
       margin-top: 4px;
     }
 
