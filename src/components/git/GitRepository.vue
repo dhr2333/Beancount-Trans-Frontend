@@ -13,14 +13,20 @@
             <el-text type="info" size="small" class="subtitle">管理您的 Git 仓库和同步设置</el-text>
           </div>
           <div class="header-right">
-            <el-tag :type="SyncStatusType[repository.sync_status]" :icon="getSyncIcon(repository.sync_status)"
-              effect="plain">
-              {{ SyncStatusText[repository.sync_status] }}
+            <el-tag
+              :type="repository.sync_paused ? SyncStatusType.paused : SyncStatusType[repository.sync_status]"
+              :icon="getSyncIcon(repository.sync_paused ? 'paused' : repository.sync_status)" effect="plain">
+              {{ repository.sync_paused ? SyncStatusText.paused : SyncStatusText[repository.sync_status] }}
             </el-tag>
             <el-button type="primary" link :loading="syncing" :disabled="repository.sync_status === 'syncing'"
               @click="triggerSync">
               <el-icon class="el-icon--left"><i-ep-refresh /></el-icon>
-              {{ syncing ? '同步中...' : '立即同步' }}
+              {{ syncing ? '同步中...' : (repository.sync_paused ? '恢复同步' : '立即同步') }}
+            </el-button>
+            <el-button v-if="!repository.sync_paused" type="warning" link :loading="cancellingSync"
+              @click="handleCancelSync">
+              <el-icon class="el-icon--left"><i-ep-circle-close /></el-icon>
+              {{ cancellingSync ? '清理中...' : '取消同步' }}
             </el-button>
           </div>
         </div>
@@ -311,13 +317,14 @@ git push origin {{ defaultBranch }}</code></pre>
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   triggerSync as apiTriggerSync,
   handleDeployKeyDownload,
   handleTransDownload,
   pollSyncStatus,
-  deleteGitRepository as apiDeleteGitRepository
+  deleteGitRepository as apiDeleteGitRepository,
+  cancelSync as apiCancelSync
 } from '../../api/git'
 import {
   SyncStatusText,
@@ -342,6 +349,7 @@ const downloadingKey = ref(false)
 const regeneratingKey = ref(false)
 const downloadingTrans = ref(false)
 const deletingRepository = ref(false)
+const cancellingSync = ref(false)
 
 // 计算属性
 const username = computed(() => localStorage.getItem('username') || 'user')
@@ -468,7 +476,8 @@ const getSyncIcon = (status: string) => {
     'pending': 'Clock',
     'syncing': 'Loading',
     'success': 'Check',
-    'failed': 'Close'
+    'failed': 'Close',
+    'paused': 'VideoPause'
   }
   return iconMap[status as keyof typeof iconMap]
 }
@@ -508,7 +517,9 @@ const triggerSync = async () => {
         ...props.repository,
         sync_status: status.status,
         last_sync_at: status.last_sync_at,
-        sync_error: status.error || ''
+        sync_error: status.error || '',
+        // 手动同步会解除「取消同步」，需同步回填以恢复按钮文案
+        sync_paused: status.paused
       }
       emit('updated', updatedRepo)
     })
@@ -523,6 +534,43 @@ const triggerSync = async () => {
     }
   } finally {
     syncing.value = false
+  }
+}
+
+/**
+ * 取消同步：清除服务器本地账本副本并暂停自动拉取
+ */
+const handleCancelSync = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '将删除服务器本地由 Git 同步引入的账本内容（模板账本与您推送的账本），' +
+      '保留平台解析结果 trans/。Git 同步配置保持不变，取消后远端推送不再自动拉取，' +
+      '点击「恢复同步」可重新拉取。',
+      '确认取消同步',
+      { confirmButtonText: '取消同步', cancelButtonText: '返回', type: 'warning' }
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  cancellingSync.value = true
+  try {
+    const result = await apiCancelSync()
+    ElMessage.success(
+      result.trans_preserved
+        ? `${result.message}（已保留 trans/ 解析结果）`
+        : result.message
+    )
+    emit('updated', { ...props.repository, sync_paused: true })
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { data?: { error?: string } } }
+      ElMessage.error(axiosError.response?.data?.error || '取消同步失败，请稍后重试')
+    } else {
+      ElMessage.error('网络错误，请稍后重试')
+    }
+  } finally {
+    cancellingSync.value = false
   }
 }
 

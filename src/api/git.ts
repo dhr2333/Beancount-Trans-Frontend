@@ -6,7 +6,8 @@ import type {
   SyncStatusInfo,
   SyncResponse,
   DeployKeyResponse,
-  DeleteRepositoryResponse
+  DeleteRepositoryResponse,
+  ClearSyncedLedgerResponse
 } from '../types/git'
 
 /**
@@ -77,6 +78,15 @@ export const regenerateDeployKey = async (): Promise<Blob> => {
  */
 export const triggerSync = async (): Promise<SyncResponse> => {
   const response = await axios.post(`/git/sync/`)
+  return response.data
+}
+
+/**
+ * 取消同步：清除服务器本地账本副本并暂停自动拉取
+ * POST /api/git/sync/cancel/
+ */
+export const cancelSync = async (): Promise<ClearSyncedLedgerResponse> => {
+  const response = await axios.post(`/git/sync/cancel/`)
   return response.data
 }
 

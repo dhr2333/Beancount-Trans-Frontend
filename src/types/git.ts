@@ -29,20 +29,23 @@ export interface GitRepository {
   last_sync_at: string | null
   sync_status: SyncStatus
   sync_error: string | null
+  /** 是否已取消同步（暂停自动拉取） */
+  sync_paused: boolean
   deploy_key_download_url: string
   created: string
   modified: string
 }
 
-// 同步状态枚举
-export type SyncStatus = 'pending' | 'syncing' | 'success' | 'failed'
+// 同步状态枚举（paused 表示已取消同步，仅在展示时根据 sync_paused 取用）
+export type SyncStatus = 'pending' | 'syncing' | 'success' | 'failed' | 'paused'
 
 // 同步状态显示文本映射
 export const SyncStatusText: Record<SyncStatus, string> = {
   pending: '待同步',
   syncing: '同步中',
   success: '成功',
-  failed: '失败'
+  failed: '失败',
+  paused: '已取消同步'
 }
 
 // 同步状态图标映射
@@ -50,7 +53,8 @@ export const SyncStatusIcon: Record<SyncStatus, string> = {
   pending: 'Clock',
   syncing: 'Loading',
   success: 'Check',
-  failed: 'Close'
+  failed: 'Close',
+  paused: 'VideoPause'
 }
 
 // 同步状态颜色类型映射 (Element Plus)
@@ -58,7 +62,8 @@ export const SyncStatusType: Record<SyncStatus, 'info' | 'warning' | 'success' |
   pending: 'info',
   syncing: 'warning', 
   success: 'success',
-  failed: 'danger'
+  failed: 'danger',
+  paused: 'warning'
 }
 
 // 创建仓库请求（仅平台托管 Gitea）
@@ -88,11 +93,12 @@ export interface SyncStatusInfo {
   status: SyncStatus
   last_sync_at: string | null
   error: string | null
+  paused: boolean
 }
 
 // 同步响应
 export interface SyncResponse {
-  status: 'success' | 'failed'
+  status: 'success' | 'failed' | 'paused'
   message: string
   synced_at?: string | null
   error?: string
@@ -110,6 +116,14 @@ export interface DeployKeyResponse {
 export interface DeleteRepositoryResponse {
   message: string
   cleaned_files: string[]
+}
+
+// 取消同步响应
+export interface ClearSyncedLedgerResponse {
+  message: string
+  cleaned_files: string[]
+  trans_preserved: boolean
+  repo_name: string
 }
 
 // API 错误响应
