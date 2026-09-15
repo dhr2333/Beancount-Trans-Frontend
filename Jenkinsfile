@@ -87,8 +87,8 @@ pipeline {
                     echo "📝 运行 semantic-release，生成前端版本与发布记录..."
                     withCredentials([string(credentialsId: '1b709f07-d907-4000-8a8a-2adafa6fc658', variable: 'GITHUB_TOKEN')]) {
                         sh '''
-                            npm install
-                            npm ci
+                            npm install --registry=https://registry.npmmirror.com --fetch-timeout=600000
+                            npm ci --registry=https://registry.npmmirror.com --fetch-timeout=600000
                             npm run release
                         '''
                     }
