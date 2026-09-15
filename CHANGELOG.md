@@ -1,3 +1,11 @@
+## [5.12.2](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.12.1...5.12.2) (2026-09-15)
+
+### Bug Fixes
+
+* **git_repository:** 完善各托管平台支持 ([da718af](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/da718af167bb056b2f5a9c9fb56e0d1629ac3082))
+* **git:** 新增取消同步 ([93d5782](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/93d5782339cfb40978642dbc26869c94ab8723f3))
+* 账单完成解析后，不再以账单进行分组，而是统一为条目审核待办，重复条目自动去重 ([7e0a147](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/7e0a14765502959f26468850b7a8d606a7eb1c7a))
+
 ## [5.12.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.12.0...5.12.1) (2026-09-08)
 
 ### Bug Fixes
