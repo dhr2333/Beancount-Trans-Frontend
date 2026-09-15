@@ -142,9 +142,7 @@
             <div class="instruction-content link-step-panel">
               <p>平台通过 Deploy Key 公钥从您的远程仓库拉取账本，与您在本地执行 <code>git push</code> 时使用的账户或 SSH
                 密钥<strong>无关</strong>。</p>
-              <p>在 <strong>GitHub</strong> 打开该仓库 → <strong>Settings</strong> → <strong>Deploy
-                  keys</strong> →
-                粘贴下方公钥，并勾选<strong>只读</strong>。</p>
+              <p>在远程仓库（{{ providerLabel }}）的 <strong>{{ providerDeployKeyHint }}</strong> 中粘贴下方公钥，并勾选<strong>只读</strong>。</p>
               <template v-if="repository.deploy_key_public">
                 <el-input type="textarea" :rows="4" :model-value="repository.deploy_key_public" readonly
                   class="ssh-url-input" />
@@ -161,9 +159,10 @@
           <el-collapse-item v-if="isLinkedRemote" title="步骤 2：配置 Webhook（推送后自动拉取）" name="link-webhook">
             <div class="instruction-content link-step-panel">
               <p>
-                在 GitHub 仓库的 <strong>Settings → Webhooks</strong> 中新增一条：<strong>Payload URL</strong> 使用下方地址；<strong>Content type</strong>
+                在远程仓库（{{ providerLabel }}）的 Webhooks 设置中新增一条 push 事件：<strong>Payload URL</strong> 使用下方地址；<strong>Content type</strong>
                 选择
-                <code>application/json</code>；事件勾选 <strong>Just the push event</strong>。将平台提供的 Secret 填入 GitHub 的 <strong>Secret</strong> 字段。
+                <code>application/json</code>；事件勾选 push。将平台提供的 Secret 填入 Secret / Token 字段（GitLab 为
+                <strong>Secret token</strong>，GitHub / Gitea / Gogs 为 <strong>Secret</strong>）。
               </p>
               <p>
                 仅当推送分支为默认分支 <code>{{ defaultBranch }}</code> 时，平台才会执行拉取；也可随时使用页头的 <strong>立即同步</strong> 手动拉取。
@@ -191,7 +190,7 @@
                 </el-button>
               </template>
               <p v-else-if="repository.webhook_callback_url" class="secret-missing-hint">
-                若此处未显示 Secret，可能已刷新过页面；请在 GitHub 中按文档更新密钥，或删除仓库后重新关联以获取新 Secret。
+                若此处未显示 Secret，可能已刷新过页面；请在远程仓库中按文档更新密钥，或删除仓库后重新关联以获取新 Secret。
               </p>
             </div>
           </el-collapse-item>
@@ -374,6 +373,31 @@ const creationMethodTagType = computed<'success' | 'warning' | 'info'>(() => {
   if (isLinkedRemote.value) return 'warning'
   if (props.repository.created_with_template) return 'success'
   return 'info'
+})
+
+/** provider 显示名，用于关联远程的引导文案 */
+const providerLabel = computed(() => {
+  const map: Record<string, string> = {
+    gitea_hosted: '平台 Gitea',
+    github: 'GitHub',
+    gitlab: 'GitLab',
+    gitea: 'Gitea',
+    gogs: 'Gogs',
+    other: '自建 Git'
+  }
+  return map[props.repository.provider] || map.other
+})
+
+/** 各平台 Deploy Key 的位置提示 */
+const providerDeployKeyHint = computed(() => {
+  const map: Record<string, string> = {
+    github: 'Settings → Deploy keys',
+    gitlab: 'Settings → Repository → Deploy keys',
+    gitea: 'Settings → Deploy Keys',
+    gogs: 'Settings → Deploy Keys',
+    other: '仓库设置中的 Deploy Keys / 部署公钥'
+  }
+  return map[props.repository.provider] || map.other
 })
 
 const instructionActivePanels = ref<string[]>([])

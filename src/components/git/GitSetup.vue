@@ -60,7 +60,7 @@
         <el-alert title="注意事项" type="info" :closable="false" show-icon class="notice-alert">
           <ul class="notice-list">
             <li><strong>平台创建</strong>：仅在集成的 Gitea 上新建仓库（模板或空库）</li>
-            <li><strong>关联远程</strong>：仅支持关联 GitHub SSH 仓库；平台会生成<strong>只读拉取</strong>用的 Deploy Key（公钥加到远程）并给出 Webhook 配置，本地推送仍使用您自己的 Git 凭据</li>
+            <li><strong>关联远程</strong>：支持关联任意可公网访问的 SSH 仓库（GitHub / GitLab / Gitea / Gogs / 自建）；平台会生成<strong>只读拉取</strong>用的 Deploy Key（公钥加到远程）并给出 Webhook 配置，本地推送仍使用您自己的 Git 凭据</li>
             <li>仓库体积建议控制在约 20MB 以内，适合个人账本</li>
           </ul>
         </el-alert>
@@ -82,7 +82,7 @@
         <div class="card-header">
           <div>
             <h3>关联或创建仓库</h3>
-            <el-text type="info" size="small">关联已有 GitHub 远程，或由平台在 Gitea 上新建仓库</el-text>
+            <el-text type="info" size="small">关联已有远程，或由平台在 Gitea 上新建仓库</el-text>
           </div>
         </div>
       </template>
@@ -99,7 +99,7 @@
                 <el-tag type="warning" size="small">已有 SSH 仓库</el-tag>
               </div>
             </div>
-            <p class="path-desc">仓库已在 GitHub 上：填写 SSH 克隆地址。关联成功后在本页仓库卡片中配置 Webhook，并将平台公钥以只读 Deploy Key 加入远程。</p>
+            <p class="path-desc">仓库已在远程平台上：填写 SSH 克隆地址。关联成功后在本页仓库卡片中配置 Webhook，并将平台公钥以只读 Deploy Key 加入远程。</p>
           </el-card>
 
           <el-card class="option-card path-card" :body-style="{ padding: '20px' }" shadow="hover"
@@ -129,7 +129,7 @@
         <div class="card-header">
           <div>
             <h3>关联远程仓库</h3>
-            <el-text type="info" size="small">请使用 GitHub SSH 克隆地址（git@… 或 ssh://…）</el-text>
+            <el-text type="info" size="small">请使用 SSH 克隆地址（git@… 或 ssh://…），支持 GitHub / GitLab / Gitea / Gogs 及自建 Git</el-text>
           </div>
         </div>
       </template>
@@ -138,6 +138,19 @@
         <el-form label-position="top" class="external-form">
           <el-form-item label="SSH 地址" required>
             <el-input v-model="linkForm.remote_ssh_url" placeholder="git@github.com:owner/repo.git" clearable />
+          </el-form-item>
+          <el-form-item label="平台">
+            <el-select v-model="linkForm.provider" placeholder="自动识别" clearable>
+              <el-option label="自动识别（推荐）" value="" />
+              <el-option label="GitHub" value="github" />
+              <el-option label="GitLab" value="gitlab" />
+              <el-option label="Gitea" value="gitea" />
+              <el-option label="Gogs" value="gogs" />
+              <el-option label="其他 / 自建" value="other" />
+            </el-select>
+            <el-text type="info" size="small" class="field-hint">
+              留空则由平台从 SSH 地址自动识别；仅在识别不准时手动指定。
+            </el-text>
           </el-form-item>
           <el-collapse class="link-advanced-collapse">
             <el-collapse-item title="高级选项（一般无需填写）" name="advanced">
@@ -236,7 +249,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createGitRepository, linkGitRepository } from '../../api/git'
-import type { GitRepository } from '../../types/git'
+import type { GitProvider, GitRepository } from '../../types/git'
 
 defineProps<{}>()
 
@@ -254,9 +267,16 @@ const step = ref<Step>('intro')
 const loading = ref(false)
 const selectedOption = ref<boolean | undefined>(undefined)
 
-const linkForm = ref({
+interface LinkForm {
+  remote_ssh_url: string
+  provider: GitProvider | ''
+  default_branch: string
+  external_full_name: string
+}
+
+const linkForm = ref<LinkForm>({
   remote_ssh_url: '',
-  provider: 'github' as const,
+  provider: '',
   default_branch: 'main',
   external_full_name: ''
 })
@@ -299,7 +319,7 @@ const resetForms = () => {
   selectedOption.value = undefined
   linkForm.value = {
     remote_ssh_url: '',
-    provider: 'github',
+    provider: '',
     default_branch: 'main',
     external_full_name: ''
   }
@@ -311,9 +331,19 @@ const selectOption = (option: boolean) => {
 
 const pickErrorMessage = (error: unknown, fallback: string) => {
   if (error && typeof error === 'object' && 'response' in error) {
-    const r = error as { response?: { data?: { error?: string } } }
-    const msg = r.response?.data?.error
-    if (typeof msg === 'string' && msg) return msg
+    const r = error as {
+      response?: { data?: { error?: string; [field: string]: unknown } }
+    }
+    const data = r.response?.data
+    if (data) {
+      const msg = data.error
+      if (typeof msg === 'string' && msg) return msg
+      // DRF 字段级校验错误，如 { remote_ssh_url: ["请填写 SSH 格式的仓库地址..."] }
+      for (const value of Object.values(data)) {
+        if (Array.isArray(value) && typeof value[0] === 'string' && value[0]) return value[0]
+        if (typeof value === 'string' && value) return value
+      }
+    }
   }
   return fallback
 }
@@ -333,7 +363,7 @@ const submitLink = async () => {
       external_full_name: linkForm.value.external_full_name.trim()
     })
     ElMessage.success(
-      '关联成功。请在下方「Git 仓库管理」中复制 Webhook 与公钥，并完成 GitHub 配置；Webhook Secret 仅首次展示，请立即保存。'
+      '关联成功。请在下方「Git 仓库管理」中复制 Webhook 与公钥，并完成远程仓库配置；Webhook Secret 仅首次展示，请立即保存。'
     )
     emit('created', repository)
   } catch (error: unknown) {

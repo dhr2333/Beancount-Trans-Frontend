@@ -7,6 +7,7 @@ export type GitProvider =
   | 'github'
   | 'gitlab'
   | 'gitea'
+  | 'gogs'
   | 'other'
 
 // Git 仓库信息
@@ -67,7 +68,8 @@ export interface CreateRepositoryRequest {
 
 export interface LinkRepositoryRequest {
   remote_ssh_url: string
-  provider?: 'github'
+  /** 留空则由后端从 SSH 地址自动识别 */
+  provider?: GitProvider | ''
   default_branch?: string
   external_full_name?: string
 }
