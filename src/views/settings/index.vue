@@ -116,6 +116,67 @@
                         </el-card>
                     </el-tab-pane>
 
+                    <!-- 访问令牌（MCP 客户端接入） -->
+                    <el-tab-pane label="访问令牌" name="tokens">
+                        <el-card shadow="never" class="section-card">
+                            <template #header>
+                                <div class="section-header">
+                                    <h3>访问令牌</h3>
+                                    <el-button type="primary" @click="showCreateTokenDialog = true">
+                                        新建令牌
+                                    </el-button>
+                                </div>
+                            </template>
+
+                            <el-alert type="info" :closable="false" class="token-tip">
+                                <template #default>
+                                    访问令牌用于 Claude Code、Cursor 等 MCP 客户端接入您的账本数据。令牌等同于账户凭证，
+                                    请妥善保管；服务端只保存摘要，<strong>明文仅在创建时显示一次</strong>。
+                                </template>
+                            </el-alert>
+
+                            <el-table v-loading="tokensLoading" :data="tokens" empty-text="暂无访问令牌"
+                                class="token-table">
+                                <el-table-column prop="name" label="用途" min-width="140" show-overflow-tooltip />
+                                <el-table-column label="令牌前缀" min-width="140">
+                                    <template #default="{ row }">
+                                        <code class="token-prefix">{{ row.prefix }}…</code>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="状态" width="100">
+                                    <template #default="{ row }">
+                                        <el-tag :type="getTokenStatus(row).type" size="small">
+                                            {{ getTokenStatus(row).text }}
+                                        </el-tag>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="过期时间" min-width="160">
+                                    <template #default="{ row }">
+                                        {{ formatTokenTime(row.expires_at, '长期有效') }}
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="最后使用" min-width="160">
+                                    <template #default="{ row }">
+                                        {{ formatTokenTime(row.last_used_at, '从未使用') }}
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="创建时间" min-width="160">
+                                    <template #default="{ row }">
+                                        {{ formatTokenTime(row.created) }}
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="操作" width="90" fixed="right">
+                                    <template #default="{ row }">
+                                        <el-button link type="danger" :disabled="!!row.revoked_at"
+                                            @click="handleRevokeToken(row)">
+                                            撤销
+                                        </el-button>
+                                    </template>
+                                </el-table-column>
+                            </el-table>
+                        </el-card>
+                    </el-tab-pane>
+
                     <!-- 安全设置 -->
                     <el-tab-pane label="安全设置" name="security">
                         <!-- 用户名和密码 -->
@@ -220,6 +281,52 @@
                     </el-tab-pane>
                 </el-tabs>
             </el-card>
+
+            <!-- 新建访问令牌对话框 -->
+            <el-dialog v-model="showCreateTokenDialog" title="新建访问令牌" width="480px"
+                @closed="resetCreateTokenForm">
+                <el-form ref="createTokenFormRef" :model="createTokenForm" :rules="createTokenRules"
+                    label-width="90px">
+                    <el-form-item label="用途" prop="name">
+                        <el-input v-model="createTokenForm.name" maxlength="64" show-word-limit
+                            placeholder="例如：Claude Code" />
+                    </el-form-item>
+                    <el-form-item label="有效期" prop="expires_in_days">
+                        <el-input-number v-model="createTokenForm.expires_in_days" :min="1" :max="3650" :step="30"
+                            controls-position="right" placeholder="留空表示长期有效" style="width: 100%" />
+                        <el-text type="info" size="small">留空表示长期有效，最长 3650 天</el-text>
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <el-button @click="showCreateTokenDialog = false">取消</el-button>
+                    <el-button type="primary" :loading="createTokenLoading" @click="handleCreateToken">
+                        创建
+                    </el-button>
+                </template>
+            </el-dialog>
+
+            <!-- 明文令牌（仅显示一次） -->
+            <el-dialog v-model="showCreatedTokenDialog" title="访问令牌已创建" width="560px" @closed="createdToken = ''">
+                <el-alert type="warning" :closable="false" title="请立即复制并妥善保存" class="token-tip">
+                    <template #default>
+                        出于安全考虑，明文令牌<strong>仅在此处显示一次</strong>，关闭后无法再次查看。
+                        请将下方令牌填入 MCP 客户端的 Authorization 请求头。
+                    </template>
+                </el-alert>
+                <el-input v-model="createdToken" readonly class="token-plain">
+                    <template #append>
+                        <el-button @click="copyToken">
+                            <el-icon>
+                                <DocumentCopy />
+                            </el-icon>
+                            复制
+                        </el-button>
+                    </template>
+                </el-input>
+                <template #footer>
+                    <el-button type="primary" @click="showCreatedTokenDialog = false">我已保存</el-button>
+                </template>
+            </el-dialog>
 
             <!-- 绑定手机号对话框 -->
             <el-dialog v-model="showBindPhoneDialog" title="绑定手机号" width="400px">
@@ -394,6 +501,13 @@ import { hasAuthTokens } from '../../utils/auth'
 import router from '~/routers'
 import { getGitRepository } from '../../api/git'
 import type { GitRepository } from '../../types/git'
+import {
+    listPersonalAccessTokens,
+    createPersonalAccessToken,
+    revokePersonalAccessToken
+} from '../../api/token'
+import type { PersonalAccessToken, CreateTokenRequest } from '../../types/token'
+import { copyText } from '../../utils/clipboard'
 import GitSetup from '../../components/git/GitSetup.vue'
 import GitRepositoryComponent from '../../components/git/GitRepository.vue'
 
@@ -402,6 +516,26 @@ const unauthorizedNotified = ref(false)
 
 // Git 仓库状态
 const gitRepository = ref<GitRepository | null>(null)
+
+// 访问令牌状态
+const tokens = ref<PersonalAccessToken[]>([])
+const tokensLoading = ref(false)
+const showCreateTokenDialog = ref(false)
+const showCreatedTokenDialog = ref(false)
+const createTokenLoading = ref(false)
+const createTokenFormRef = ref<FormInstance>()
+const createTokenForm = reactive({
+    name: '',
+    expires_in_days: undefined as number | undefined
+})
+const createTokenRules: FormRules = {
+    name: [
+        { required: true, message: '请输入用途说明', trigger: 'blur' },
+        { max: 64, message: '用途说明不能超过 64 个字符', trigger: 'blur' }
+    ]
+}
+// 明文令牌仅在创建响应中返回一次，关闭对话框即清空
+const createdToken = ref('')
 
 const handleUnauthorized = () => {
     if (!unauthorizedNotified.value) {
@@ -1027,6 +1161,99 @@ const onGitRepositoryDeleted = () => {
     gitRepository.value = null
 }
 
+// 访问令牌相关
+const fetchTokens = async () => {
+    tokensLoading.value = true
+    try {
+        tokens.value = await listPersonalAccessTokens()
+    } catch (error: any) {
+        if (error?.response?.status === 401) {
+            handleUnauthorized()
+        } else {
+            ElMessage.error('获取访问令牌失败')
+        }
+    } finally {
+        tokensLoading.value = false
+    }
+}
+
+const getTokenStatus = (token: PersonalAccessToken) => {
+    if (token.revoked_at) {
+        return { text: '已撤销', type: 'info' as const }
+    }
+    if (token.expires_at && new Date(token.expires_at).getTime() <= Date.now()) {
+        return { text: '已过期', type: 'danger' as const }
+    }
+    return { text: '有效', type: 'success' as const }
+}
+
+const formatTokenTime = (value: string | null, fallback = '—') => {
+    if (!value) return fallback
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return fallback
+    return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+const resetCreateTokenForm = () => {
+    createTokenFormRef.value?.resetFields()
+}
+
+const handleCreateToken = async () => {
+    if (!createTokenFormRef.value) return
+    await createTokenFormRef.value.validate()
+
+    createTokenLoading.value = true
+    try {
+        const payload: CreateTokenRequest = { name: createTokenForm.name.trim() }
+        if (typeof createTokenForm.expires_in_days === 'number') {
+            payload.expires_in_days = createTokenForm.expires_in_days
+        }
+        const created = await createPersonalAccessToken(payload)
+        createdToken.value = created.token
+        showCreateTokenDialog.value = false
+        showCreatedTokenDialog.value = true
+        ElMessage.success('访问令牌已创建')
+        await fetchTokens()
+    } catch (error: any) {
+        const detail = error.response?.data?.name?.[0] || error.response?.data?.detail
+        ElMessage.error(detail || '创建访问令牌失败')
+    } finally {
+        createTokenLoading.value = false
+    }
+}
+
+const copyToken = async () => {
+    try {
+        await copyText(createdToken.value)
+        ElMessage.success('令牌已复制到剪贴板')
+    } catch {
+        ElMessage.error('复制失败，请手动复制')
+    }
+}
+
+const handleRevokeToken = async (token: PersonalAccessToken) => {
+    try {
+        await ElMessageBox.confirm(
+            `撤销后，使用「${token.name}」的 MCP 客户端将立即失去访问权限，此操作不可恢复。`,
+            '撤销访问令牌',
+            {
+                ...defaultConfirmOptions,
+                confirmButtonClass: 'settings-confirm-danger'
+            }
+        )
+    } catch {
+        return
+    }
+
+    try {
+        await revokePersonalAccessToken(token.id)
+        ElMessage.success('访问令牌已撤销')
+        await fetchTokens()
+    } catch (error: any) {
+        ElMessage.error(error.response?.data?.detail || '撤销访问令牌失败')
+    }
+}
+
 onMounted(() => {
     if (!isAuthenticated.value) {
         handleUnauthorized()
@@ -1035,6 +1262,7 @@ onMounted(() => {
     fetchBindings()
     fetch2FAStatus()
     fetchGitRepository()
+    fetchTokens()
 })
 </script>
 
@@ -1186,6 +1414,33 @@ onMounted(() => {
 .code-input-group {
     display: flex;
     gap: 8px;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.section-header h3 {
+    margin: 0;
+}
+
+.token-tip {
+    margin-bottom: 16px;
+}
+
+.token-table {
+    width: 100%;
+}
+
+.token-prefix {
+    font-family: monospace;
+    color: var(--ep-text-color-regular);
+}
+
+.token-plain {
+    margin-top: 16px;
 }
 
 .code-input-group :deep(.el-input) {
