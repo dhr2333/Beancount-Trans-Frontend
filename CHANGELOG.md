@@ -1,3 +1,9 @@
+## [5.13.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.13.0...5.13.1) (2026-09-16)
+
+### Bug Fixes
+
+* **mcp:** OAuth 元数据 scheme ([ddd42e6](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/ddd42e63d8254a80acdb2702dac2f6f06f93ecf7))
+
 ## [5.13.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.12.2...5.13.0) (2026-09-16)
 
 ### Features
