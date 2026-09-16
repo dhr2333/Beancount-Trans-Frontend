@@ -129,14 +129,13 @@
                             </template>
 
                             <el-alert type="info" :closable="false" class="token-tip">
-                                <template #default>
+                                <!-- <template #default>
                                     访问令牌用于 Claude Code、Cursor 等 MCP 客户端接入您的账本数据。令牌等同于账户凭证，
                                     请妥善保管；服务端只保存摘要，<strong>明文仅在创建时显示一次</strong>。
-                                </template>
+                                </template> -->
                             </el-alert>
 
-                            <el-table v-loading="tokensLoading" :data="tokens" empty-text="暂无访问令牌"
-                                class="token-table">
+                            <el-table v-loading="tokensLoading" :data="tokens" empty-text="暂无访问令牌" class="token-table">
                                 <el-table-column prop="name" label="用途" min-width="140" show-overflow-tooltip />
                                 <el-table-column label="令牌前缀" min-width="140">
                                     <template #default="{ row }">
@@ -283,10 +282,8 @@
             </el-card>
 
             <!-- 新建访问令牌对话框 -->
-            <el-dialog v-model="showCreateTokenDialog" title="新建访问令牌" width="480px"
-                @closed="resetCreateTokenForm">
-                <el-form ref="createTokenFormRef" :model="createTokenForm" :rules="createTokenRules"
-                    label-width="90px">
+            <el-dialog v-model="showCreateTokenDialog" title="新建访问令牌" width="480px" @closed="resetCreateTokenForm">
+                <el-form ref="createTokenFormRef" :model="createTokenForm" :rules="createTokenRules" label-width="90px">
                     <el-form-item label="用途" prop="name">
                         <el-input v-model="createTokenForm.name" maxlength="64" show-word-limit
                             placeholder="例如：Claude Code" />
@@ -294,7 +291,7 @@
                     <el-form-item label="有效期" prop="expires_in_days">
                         <el-input-number v-model="createTokenForm.expires_in_days" :min="1" :max="3650" :step="30"
                             controls-position="right" placeholder="留空表示长期有效" style="width: 100%" />
-                        <el-text type="info" size="small">留空表示长期有效，最长 3650 天</el-text>
+                        <!-- <el-text type="info" size="small">留空表示长期有效，最长 3650 天</el-text> -->
                     </el-form-item>
                 </el-form>
                 <template #footer>
@@ -307,7 +304,8 @@
 
             <!-- 明文令牌（仅显示一次） -->
             <el-dialog v-model="showCreatedTokenDialog" title="访问令牌已创建" width="560px" @closed="createdToken = ''">
-                <el-alert type="warning" :closable="false" title="请立即复制并妥善保存" class="token-tip">
+                <!-- <el-alert type="warning" :closable="false" title="请立即复制并妥善保存" class="token-tip"> -->
+                <el-alert type="warning" :closable="false" class="token-tip">
                     <template #default>
                         出于安全考虑，明文令牌<strong>仅在此处显示一次</strong>，关闭后无法再次查看。
                         请将下方令牌填入 MCP 客户端的 Authorization 请求头。
