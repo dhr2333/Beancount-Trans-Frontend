@@ -1,3 +1,9 @@
+## [5.13.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.12.2...5.13.0) (2026-09-16)
+
+### Features
+
+* 新增MCP客户端接入用的个人访问令牌管理功能 ([3fd4b76](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/3fd4b760feacaf152c36055842728df96ddd9238))
+
 ## [5.12.2](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.12.1...5.12.2) (2026-09-15)
 
 ### Bug Fixes
