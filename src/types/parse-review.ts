@@ -32,13 +32,26 @@ export interface TagOverrides {
 }
 
 /**
+ * 条目来源：账单文件解析 / Copilot 记账
+ */
+export type EntrySource = 'file' | 'copilot'
+
+/**
+ * 写操作来源定位信息：账单来源带 file_id，Copilot 来源 file_id 为 null
+ */
+export interface EntrySourceLocator {
+  source: EntrySource
+  fileId: number | null
+}
+
+/**
  * 格式化条目
  */
 export interface FormattedEntry {
   uuid: string
   formatted: string
   edited_formatted: string
-  selected_expense_key: string
+  selected_expense_key: string | null
   expense_candidates_with_score: Array<{
     key: string
     score: number
@@ -48,9 +61,11 @@ export interface FormattedEntry {
   tag_overrides?: TagOverrides
   installment_role?: 'purchase' | 'installment' | null
   installment_period?: number | null
-  /** 来源账单文件 ID（统一条目审核接口返回） */
-  file_id?: number
-  /** 来源账单文件名（统一条目审核接口返回） */
+  /** 条目来源（缺省按 'file' 处理，兼容旧数据） */
+  source?: EntrySource
+  /** 来源账单文件 ID（统一条目审核接口返回）；Copilot 条目为 null */
+  file_id?: number | null
+  /** 来源账单文件名（统一条目审核接口返回）；Copilot 条目为 'Copilot 记账' */
   file_name?: string
 }
 
@@ -110,6 +125,8 @@ export interface ReparseResponse {
  */
 export interface UpdateEditRequest {
   edited_formatted: string
+  /** 条目来源（缺省 'file'） */
+  source?: EntrySource
 }
 
 /**
@@ -128,6 +145,8 @@ export interface PreviewSyncEntry {
 
 export interface PreviewSyncRequest {
   entries: PreviewSyncEntry[]
+  /** 条目来源（缺省 'file'） */
+  source?: EntrySource
 }
 
 export interface PreviewSyncResponse {
@@ -142,6 +161,8 @@ export interface PreviewSyncResponse {
 export interface UpdateTagsRequest {
   action: 'add' | 'remove'
   tag_path: string
+  /** 条目来源（缺省 'file'） */
+  source?: EntrySource
 }
 
 /**
@@ -158,8 +179,10 @@ export interface UpdateTagsResponse {
  * 确认写入错误条目
  */
 export interface ErrorEntry {
-  /** 条目所属账单文件 ID */
-  file_id?: number
+  /** 条目所属账单文件 ID（Copilot 条目为 null） */
+  file_id?: number | null
+  /** 条目来源（缺省 'file'） */
+  source?: EntrySource
   uuid: string
   index: number
   error_message: string

@@ -2,11 +2,13 @@
  * 条目审核（统一待办）API
  *
  * 后端不再按账单分组创建待办，而是每个用户全局唯一一个条目审核待办。
- * 所有条目操作均以 `file_id` + 条目 `uuid` 定位到对应账单的缓存。
+ * 写操作以「来源 + file_id + 条目 uuid」定位：账单来源为 file_id，
+ * Copilot 记账来源的 file_id 为 null（以其用户暂存区为操作对象）。
  */
 import axios from '../utils/request'
 import type {
   EntryReviewResults,
+  EntrySourceLocator,
   ReparseRequest,
   ReparseResponse,
   ReparseAllRequest,
@@ -29,7 +31,7 @@ export function getEntryReviewResults(): Promise<{ data: EntryReviewResults }> {
 }
 
 /**
- * 重解析条目
+ * 重解析条目（Copilot 来源不支持，后端会返回 400）
  */
 export function reparseEntry(request: ReparseRequest): Promise<{ data: ReparseResponse }> {
   return axios.post('/translate/entry-review/reparse', request)
@@ -39,13 +41,13 @@ export function reparseEntry(request: ReparseRequest): Promise<{ data: ReparseRe
  * 更新编辑内容
  */
 export function updateEntryEdit(
-  fileId: number,
+  locator: EntrySourceLocator,
   entryUuid: string,
   request: UpdateEditRequest
 ): Promise<{ data: UpdateEditResponse }> {
   return axios.put(
     `/translate/entry-review/entries/${encodeURIComponent(entryUuid)}/edit`,
-    { file_id: fileId, ...request }
+    { file_id: locator.fileId, ...request, source: locator.source }
   )
 }
 
@@ -53,13 +55,13 @@ export function updateEntryEdit(
  * 更新条目标签（添加/移除）
  */
 export function patchEntryTags(
-  fileId: number,
+  locator: EntrySourceLocator,
   entryUuid: string,
   request: UpdateTagsRequest
 ): Promise<{ data: UpdateTagsResponse }> {
   return axios.patch(
     `/translate/entry-review/entries/${encodeURIComponent(entryUuid)}/tags`,
-    { file_id: fileId, ...request }
+    { file_id: locator.fileId, ...request, source: locator.source }
   )
 }
 
@@ -67,12 +69,13 @@ export function patchEntryTags(
  * 预览批量同步（以预览文本为真源，支持删条）
  */
 export function syncPreviewEntries(
-  fileId: number,
+  locator: EntrySourceLocator,
   request: PreviewSyncRequest
 ): Promise<{ data: PreviewSyncResponse }> {
   return axios.put('/translate/entry-review/preview-sync', {
-    file_id: fileId,
-    ...request
+    file_id: locator.fileId,
+    ...request,
+    source: locator.source
   })
 }
 

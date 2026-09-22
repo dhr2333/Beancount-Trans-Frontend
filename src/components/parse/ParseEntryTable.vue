@@ -8,7 +8,10 @@
       show-overflow-tooltip
     >
       <template #default="scope">
-        {{ scope.row.file_name || (scope.row.file_id ? `文件 #${scope.row.file_id}` : '-') }}
+        <el-tag v-if="scope.row.source === 'copilot'" type="info" size="small">Copilot 记账</el-tag>
+        <template v-else>
+          {{ scope.row.file_name || (scope.row.file_id != null ? `文件 #${scope.row.file_id}` : '-') }}
+        </template>
       </template>
     </el-table-column>
     <el-table-column label="Beancount 条目预览" min-width="400">
@@ -110,7 +113,13 @@
     </el-table-column>
     <el-table-column label="AI分类反馈" min-width="400">
       <template #default="scope">
-        <div v-if="isInstallmentRepaymentEntry(scope.row)" class="ai-classification-container">
+        <div v-if="scope.row.source === 'copilot'" class="ai-classification-container">
+          <div class="current-selection">
+            <span class="label">分类反馈：</span>
+            <span class="no-category-tip">Copilot 记账条目不支持重新解析，请直接编辑条目文本</span>
+          </div>
+        </div>
+        <div v-else-if="isInstallmentRepaymentEntry(scope.row)" class="ai-classification-container">
           <div class="current-selection">
             <span class="label">分期还款：</span>
             <span class="no-category-tip">不参与分类反馈</span>
@@ -456,7 +465,7 @@ const getParseReviewCreateDefaults = (row: FormattedEntry) => {
 const buildParseReviewMappingOptions = (row: FormattedEntry) => ({
   row,
   inferType: inferParseReviewMappingType,
-  getSelectedKey: (r: FormattedEntry) => r.selected_expense_key,
+  getSelectedKey: (r: FormattedEntry) => r.selected_expense_key ?? undefined,
   getCreateDefaults: getParseReviewCreateDefaults,
   requireAuth: props.requireAuth,
   onReparse: (key: string, type: 'expense' | 'income' | 'asset') =>

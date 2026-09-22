@@ -5,14 +5,14 @@
       <div class="header-left">
         <h2>条目审核</h2>
         <el-text type="info" size="small" style="display: block; margin-top: 4px;">
-          共 {{ entryCount }} 条 · {{ sourceFiles.length }} 个账单
+          共 {{ entryCount }} 条 · {{ fileSourceCount }} 个账单<template v-if="copilotEntryCount > 0"> · Copilot 记账 {{ copilotEntryCount }} 条</template>
         </el-text>
         <!-- <el-text v-if="remainingTime" type="info" size="small" style="display: block; margin-top: 4px;">
           剩余时间：{{ remainingTime }}
         </el-text> -->
       </div>
       <div class="header-right">
-        <el-dropdown :disabled="reviewExpired" @command="handleReparseAll">
+        <el-dropdown v-if="reparseSourceFiles.length > 0" :disabled="reviewExpired" @command="handleReparseAll">
           <el-button :loading="loading.reparseAll" :disabled="reviewExpired">
             重新解析
             <el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -20,8 +20,8 @@
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item
-                v-for="file in sourceFiles"
-                :key="file.file_id"
+                v-for="file in reparseSourceFiles"
+                :key="file.key"
                 :command="file.file_id"
               >
                 重新解析「{{ file.file_name }}」
@@ -128,6 +128,7 @@ import {
   parsePreviewContent
 } from '../../utils/parse-review-preview'
 import type {
+  EntrySourceLocator,
   ErrorEntry,
   FormattedEntry,
   PreviewSyncEntry,
@@ -170,27 +171,81 @@ onBeforeUnmount(() => {
   reparsePollAborted = true
 })
 
-/** 来源账单列表（按条目首次出现顺序去重） */
-const sourceFiles = computed(() => {
-  const seen = new Map<number, { file_id: number; file_name: string }>()
+/** 审核来源（账单文件 / Copilot 暂存区），按条目首次出现顺序去重 */
+interface ReviewSource {
+  /** 来源键：账单为 file_id 字符串，Copilot 为 'copilot' */
+  key: string
+  source: 'file' | 'copilot'
+  file_id: number | null
+  file_name: string
+}
+
+/** 来源键：Copilot 条目共用一个虚拟来源，其余按 file_id 区分 */
+const sourceKey = (entry: FormattedEntry): string =>
+  entry.source === 'copilot' ? 'copilot' : String(entry.file_id)
+
+const sourceFiles = computed<ReviewSource[]>(() => {
+  const seen = new Map<string, ReviewSource>()
   for (const entry of formattedEntries.value) {
-    if (entry.file_id == null || seen.has(entry.file_id)) continue
-    seen.set(entry.file_id, {
-      file_id: entry.file_id,
-      file_name: entry.file_name || `文件 #${entry.file_id}`
+    const key = sourceKey(entry)
+    if (seen.has(key)) continue
+    const isCopilot = entry.source === 'copilot'
+    seen.set(key, {
+      key,
+      source: isCopilot ? 'copilot' : 'file',
+      file_id: isCopilot ? null : entry.file_id ?? null,
+      file_name:
+        entry.file_name ||
+        (isCopilot
+          ? 'Copilot 记账'
+          : entry.file_id != null
+            ? `文件 #${entry.file_id}`
+            : '未知来源')
     })
   }
   return [...seen.values()]
 })
 
-/** 按条目 uuid 定位其来源账单文件 ID；缺失时提示并中断操作 */
-const entryFileId = (uuid: string): number | undefined => {
-  const entry = formattedEntries.value.find((item) => item.uuid === uuid)
-  if (!entry || entry.file_id == null) {
-    ElMessage.error('条目缺少来源账单信息，请刷新页面')
-    return undefined
+/** 仅账单来源可用于重新解析（Copilot 来源后端不支持） */
+const reparseSourceFiles = computed(() =>
+  sourceFiles.value.filter(
+    (item): item is ReviewSource & { file_id: number } =>
+      item.source === 'file' && item.file_id != null
+  )
+)
+
+const fileSourceCount = computed(() => reparseSourceFiles.value.length)
+
+const copilotEntryCount = computed(
+  () => formattedEntries.value.filter((entry) => entry.source === 'copilot').length
+)
+
+const findSourceByKey = (key: string): ReviewSource | undefined =>
+  sourceFiles.value.find((item) => item.key === key)
+
+/** 解析条目的来源定位信息（无提示） */
+const resolveEntrySource = (entry: FormattedEntry): EntrySourceLocator | null => {
+  if (entry.source === 'copilot') {
+    return { source: 'copilot', fileId: null }
   }
-  return entry.file_id
+  if (entry.file_id == null) {
+    return null
+  }
+  return { source: 'file', fileId: entry.file_id }
+}
+
+/** 按条目 uuid 定位其来源；缺失时提示并中断操作 */
+const entrySource = (uuid: string): EntrySourceLocator | null => {
+  const entry = formattedEntries.value.find((item) => item.uuid === uuid)
+  if (!entry) {
+    ElMessage.error('未找到条目信息，请刷新页面')
+    return null
+  }
+  const locator = resolveEntrySource(entry)
+  if (!locator) {
+    ElMessage.error('条目缺少来源账单信息，请刷新页面')
+  }
+  return locator
 }
 
 const applyReparsePayloadToEntry = (entryUuid: string, updated: ReparseResponse) => {
@@ -214,11 +269,17 @@ const handleTableReparse = async (
   selectedKey: string,
   mappingType?: 'expense' | 'income' | 'asset'
 ) => {
-  const fileId = entryFileId(entryUuid)
-  if (fileId === undefined) return
+  const entry = formattedEntries.value.find((item) => item.uuid === entryUuid)
+  if (entry?.source === 'copilot') {
+    ElMessage.warning('Copilot 记账条目请直接编辑条目文本')
+    return
+  }
+
+  const locator = entrySource(entryUuid)
+  if (!locator || locator.fileId == null) return
 
   const response = await reparseEntry({
-    file_id: fileId,
+    file_id: locator.fileId,
     entry_uuid: entryUuid,
     selected_key: selectedKey,
     ...(mappingType ? { mapping_type: mappingType } : {})
@@ -238,9 +299,9 @@ const handleTableReparse = async (
 
 /** 表格内标签增删，返回后端最新的 tag 字段供组件回写 */
 const handleTablePatchTags = async (uuid: string, payload: UpdateTagsRequest) => {
-  const fileId = entryFileId(uuid)
-  if (fileId === undefined) return {}
-  const response = await patchEntryTags(fileId, uuid, payload)
+  const locator = entrySource(uuid)
+  if (!locator) return {}
+  const response = await patchEntryTags(locator, uuid, payload)
   return response.data
 }
 
@@ -297,14 +358,14 @@ const loadResults = async () => {
 }
 
 async function persistEntryEdit(uuid: string, editedFormatted: string, options?: { silent?: boolean }) {
-  const fileId = entryFileId(uuid)
-  if (fileId === undefined) return
+  const locator = entrySource(uuid)
+  if (!locator) return
 
   if (errorEntries.value[uuid]) {
     delete errorEntries.value[uuid]
   }
 
-  const response = await updateEntryEdit(fileId, uuid, {
+  const response = await updateEntryEdit(locator, uuid, {
     edited_formatted: editedFormatted
   })
 
@@ -319,20 +380,20 @@ async function persistEntryEdit(uuid: string, editedFormatted: string, options?:
   }
 }
 
-/** 确认写入前将本地 edited_formatted 静默同步至 Redis。 */
+/** 确认写入前将本地 edited_formatted 静默同步至 Redis（含 Copilot 条目）。 */
 async function flushEditedEntries(): Promise<boolean> {
   const updatePromises: Promise<void>[] = []
-  let hasMissingFileId = false
+  let hasMissingSource = false
 
   for (const entry of formattedEntries.value) {
-    if (entry.file_id == null) {
-      hasMissingFileId = true
+    const locator = resolveEntrySource(entry)
+    if (!locator) {
+      hasMissingSource = true
       continue
     }
-    const fileId = entry.file_id
     const editedContent = entry.edited_formatted.replace(/\n+$/, '')
     updatePromises.push(
-      updateEntryEdit(fileId, entry.uuid, {
+      updateEntryEdit(locator, entry.uuid, {
         edited_formatted: editedContent,
       }).then((response) => {
         entry.edited_formatted = editedContent
@@ -348,8 +409,8 @@ async function flushEditedEntries(): Promise<boolean> {
     )
   }
 
-  if (hasMissingFileId) {
-    ElMessage.error('部分条目缺少来源账单信息，已跳过同步')
+  if (hasMissingSource) {
+    ElMessage.error('部分条目缺少来源信息，已跳过同步')
   }
 
   if (!updatePromises.length) {
@@ -375,11 +436,11 @@ function buildSyncEntriesPayload(entries: FormattedEntry[] = formattedEntries.va
     }))
 }
 
-/** 清除指定账单文件内所有条目的本地校验提示（合并前调用） */
-function clearValidationWarningsForFiles(fileIds: number[]) {
-  const target = new Set(fileIds)
+/** 清除指定来源内所有条目的本地校验提示（合并前调用） */
+function clearValidationWarningsForSources(keys: string[]) {
+  const target = new Set(keys)
   for (const entry of formattedEntries.value) {
-    if (entry.file_id != null && target.has(entry.file_id)) {
+    if (target.has(sourceKey(entry))) {
       delete validationWarnings.value[entry.uuid]
     }
   }
@@ -402,32 +463,30 @@ function pruneErrorEntries() {
 }
 
 /**
- * 文件级合并：用某账单文件同步后的条目替换该文件原有条目，保持整体来源顺序。
+ * 来源级合并：用某来源（账单文件 / Copilot 暂存区）同步后的条目替换其原有条目，
+ * 保持整体来源顺序。
  */
-function mergeFileSyncResult(fileId: number, formattedData: FormattedEntry[]) {
-  const fileOrder = sourceFiles.value.map((file) => file.file_id)
-  const fileNameForFile =
-    sourceFiles.value.find((file) => file.file_id === fileId)?.file_name ?? `文件 #${fileId}`
+function mergeSourceSyncResult(source: ReviewSource, formattedData: FormattedEntry[]) {
+  const sourceOrder = sourceFiles.value.map((item) => item.key)
 
   const normalized = formattedData.map((entry) => ({
     ...entry,
-    file_id: fileId,
-    file_name: fileNameForFile,
+    source: source.source,
+    file_id: source.source === 'copilot' ? null : source.file_id,
+    file_name: source.source === 'copilot' ? 'Copilot 记账' : source.file_name,
     edited_formatted: (entry.edited_formatted || entry.formatted || '').replace(/\n+$/, ''),
     tag_details: entry.tag_details ?? [],
     tag_overrides: entry.tag_overrides ?? { removed_paths: [], added_paths: [] }
   }))
 
   const result: FormattedEntry[] = []
-  for (const fid of fileOrder) {
-    if (fid === fileId) {
+  for (const key of sourceOrder) {
+    if (key === source.key) {
       result.push(...normalized)
     } else {
-      result.push(...formattedEntries.value.filter((entry) => entry.file_id === fid))
+      result.push(...formattedEntries.value.filter((entry) => sourceKey(entry) === key))
     }
   }
-  // 无来源账单信息的条目无法参与文件级合并，保留以避免丢失
-  result.push(...formattedEntries.value.filter((entry) => entry.file_id == null))
 
   formattedEntries.value = result
   entryCount.value = result.length
@@ -438,26 +497,33 @@ async function removeEntryFromReview(uuid: string) {
   if (!target) {
     return
   }
-  if (target.file_id == null) {
+  const locator = resolveEntrySource(target)
+  if (!locator) {
     ElMessage.error('条目缺少来源账单信息，请刷新页面')
     return
   }
-  const fileId = target.file_id
-
-  // 该文件剩余的全部条目（未提交的条目会被从该账单移除）
-  const remaining = formattedEntries.value.filter(
-    (entry) => entry.file_id === fileId && entry.uuid !== uuid
-  )
-  const fileEntryCount = formattedEntries.value.filter((entry) => entry.file_id === fileId).length
-  if (remaining.length === fileEntryCount) {
+  const targetKey = sourceKey(target)
+  const targetSource = findSourceByKey(targetKey)
+  if (!targetSource) {
     return
   }
 
-  const response = await syncPreviewEntries(fileId, {
+  // 该来源剩余的全部条目（未提交的条目会被从该来源移除）
+  const remaining = formattedEntries.value.filter(
+    (entry) => sourceKey(entry) === targetKey && entry.uuid !== uuid
+  )
+  const sourceEntryCount = formattedEntries.value.filter(
+    (entry) => sourceKey(entry) === targetKey
+  ).length
+  if (remaining.length === sourceEntryCount) {
+    return
+  }
+
+  const response = await syncPreviewEntries(locator, {
     entries: buildSyncEntriesPayload(remaining)
   })
-  clearValidationWarningsForFiles([fileId])
-  mergeFileSyncResult(fileId, response.data.formatted_data)
+  clearValidationWarningsForSources([targetKey])
+  mergeSourceSyncResult(targetSource, response.data.formatted_data)
   applyValidationWarnings(response.data.validation_warnings)
   pruneErrorEntries()
   ElMessage.success('条目已移除')
@@ -500,45 +566,50 @@ const handleSavePreview = async () => {
       return
     }
 
-    const fileIdByUuid = new Map<string, number>()
+    const sourceByUuid = new Map<string, ReviewSource>()
     for (const entry of formattedEntries.value) {
-      if (entry.file_id != null) {
-        fileIdByUuid.set(entry.uuid, entry.file_id)
+      const key = sourceKey(entry)
+      const source = findSourceByKey(key)
+      if (source) {
+        sourceByUuid.set(entry.uuid, source)
       }
     }
 
-    // 按来源账单分组
-    const grouped = new Map<number, PreviewSyncEntry[]>()
+    // 按来源（账单文件 / Copilot 暂存区）分组
+    const grouped = new Map<string, { source: ReviewSource; entries: PreviewSyncEntry[] }>()
     for (const item of kept) {
-      const fileId = fileIdByUuid.get(item.uuid)
-      if (fileId == null) {
-        ElMessage.error('条目缺少来源账单信息，请刷新页面')
+      const source = sourceByUuid.get(item.uuid)
+      if (!source) {
+        ElMessage.error('条目缺少来源信息，请刷新页面')
         return
       }
-      const bucket = grouped.get(fileId)
+      const bucket = grouped.get(source.key)
       if (bucket) {
-        bucket.push(item)
+        bucket.entries.push(item)
       } else {
-        grouped.set(fileId, [item])
+        grouped.set(source.key, { source, entries: [item] })
       }
     }
 
-    // 原本有条目、但预览中已被全部删除的账单，需提交空数组以移除
-    for (const file of sourceFiles.value) {
-      if (!grouped.has(file.file_id)) {
-        grouped.set(file.file_id, [])
+    // 原本有条目、但预览中已被全部删除的来源，需提交空数组以移除
+    for (const source of sourceFiles.value) {
+      if (!grouped.has(source.key)) {
+        grouped.set(source.key, { source, entries: [] })
       }
     }
 
-    const syncResults: Array<{ fileId: number; data: PreviewSyncResponse }> = []
-    for (const [fileId, entries] of grouped) {
-      const response = await syncPreviewEntries(fileId, { entries })
-      syncResults.push({ fileId, data: response.data })
+    const syncResults: Array<{ source: ReviewSource; data: PreviewSyncResponse }> = []
+    for (const { source, entries } of grouped.values()) {
+      const response = await syncPreviewEntries(
+        { source: source.source, fileId: source.file_id },
+        { entries }
+      )
+      syncResults.push({ source, data: response.data })
     }
 
-    clearValidationWarningsForFiles(syncResults.map((item) => item.fileId))
+    clearValidationWarningsForSources(syncResults.map((item) => item.source.key))
     for (const item of syncResults) {
-      mergeFileSyncResult(item.fileId, item.data.formatted_data)
+      mergeSourceSyncResult(item.source, item.data.formatted_data)
     }
     for (const item of syncResults) {
       applyValidationWarnings(item.data.validation_warnings)
@@ -573,8 +644,13 @@ const handleConfirmWrite = async () => {
       return
     }
 
+    const copilotCount = copilotEntryCount.value
     await confirmWrite()
-    ElMessage.success('确认写入成功')
+    ElMessage.success(
+      copilotCount > 0
+        ? `确认写入成功，其中 ${copilotCount} 条 Copilot 记账条目已追加写入 collect.bean`
+        : '确认写入成功'
+    )
 
     // 返回待办列表
     router.push('/reconciliation')
@@ -645,7 +721,7 @@ const pollReparseAllTask = async (celeryTaskId: string) => {
 }
 
 const submitReparseAll = async (fileId: number, password?: string) => {
-  const file = sourceFiles.value.find((item) => item.file_id === fileId)
+  const file = reparseSourceFiles.value.find((item) => item.file_id === fileId)
   const fileName = file?.file_name ?? `文件 #${fileId}`
 
   loading.value.reparseAll = true
