@@ -313,16 +313,6 @@
             </el-table>
         </div>
 
-        <!-- 分页 -->
-        <!-- <div class="pagination">
-            <el-pagination background layout="total, prev, pager, next" :total="items.length" :page-size="pageSize"
-                :current-page="currentPage" @current-change="handlePageChange" />
-        </div> -->
-        <div class="pagination" v-if="!isGlobalSearch">
-            <el-pagination background layout="total, prev, pager, next" :total="items.length" :page-size="pageSize"
-                :current-page="currentPage" @current-change="handlePageChange" />
-        </div>
-
         <el-dialog v-model="createFolderDialog" title="新建文件夹">
             <el-form @submit.prevent="createFolder">
                 <el-form-item label="文件夹名称">
@@ -433,8 +423,6 @@ const moveTreeData = ref<Array<{ id: number; name: string; children?: unknown[] 
 const moveTreeRef = ref<InstanceType<typeof import('element-plus').ElTree> | null>(null)
 const fileTableRef = ref<InstanceType<typeof import('element-plus').ElTable> | null>(null)
 const moveSingleItem = ref<FileItem | null>(null)
-const currentPage = ref(1)
-const pageSize = ref(20)
 const uploadProgress = ref(0)
 const isUploading = ref(false)
 const rootDirectoryId = ref<string | null>(null)
@@ -789,12 +777,6 @@ const filteredItems = computed(() => {
             // 文件需要匹配状态筛选
             return item.parse_status === selectedStatusFilter.value;
         });
-    }
-
-    // 分页处理（仅对本地搜索模式生效）
-    if (!isGlobalSearch.value || !searchQuery.value) {
-        const start = (currentPage.value - 1) * pageSize.value;
-        return result.slice(start, start + pageSize.value);
     }
 
     return result;
@@ -1330,11 +1312,6 @@ async function batchDelete() {
 }
 
 
-// 分页处理
-function handlePageChange(page: number) {
-    currentPage.value = page
-}
-
 async function performGlobalSearch(query: string) {
     try {
         const response = await axios.get('/files/search/', {
@@ -1859,12 +1836,6 @@ function getStatusColor(status: string | undefined): TagProps['type'] {
 
 .file-table:hover {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.pagination {
-    margin-top: 20px;
-    display: flex;
-    justify-content: flex-end;
 }
 
 .directory-tree {
