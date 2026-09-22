@@ -28,8 +28,8 @@
           placeholder="可选功能" style="width: 300px">
           <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
-        <el-input v-model="input" style="width: 250px" type="password" v-if="showPassword"
-          placeholder="PDF/ZIP 文件解密密码" show-password>
+        <el-input v-model="input" style="width: 250px" type="password" v-if="showPassword" placeholder="PDF/ZIP 文件解密密码"
+          show-password>
           <template #prefix>
             <el-icon>
               <Lock />
@@ -47,16 +47,13 @@
     <el-button @click="handlePreview" :disabled="!hasEntries">
       预览
     </el-button>
+    <el-button type="primary" :icon="DocumentChecked" @click="handleWriteCollect" :disabled="!hasEntries"
+      :loading="writing">
+      写入账本
+    </el-button>
   </div>
 
-  <el-input
-    v-if="!hasEntries"
-    class="result-textarea"
-    type="textarea"
-    :rows="30"
-    readonly
-    :value="''"
-    placeholder='解析结果如下：
+  <el-input v-if="!hasEntries" class="result-textarea" type="textarea" :rows="30" readonly :value="''" placeholder='解析结果如下：
 
 2022-06-19 * "温州市数据管理发展集团有限公司" "HIK-停车缴费-洞头人民路停车场(人民路区域共享)"
     time: "15:27:44"
@@ -64,30 +61,17 @@
     status: "ALiPay - 交易成功"
     Expenses:TransPort:Private:Park +5.00 CNY
     Liabilities:CreditCard:Bank:CITIC:C6428 -5.00 CNY
-'
-  />
+' />
 
   <div v-else class="table-container">
-    <ParseEntryTable
-      :entries="formattedEntries"
-      :error-entries="errorEntries"
-      :validation-warnings="validationWarnings"
-      :on-reparse="handleTableReparse"
-      :on-persist-edit="handlePersistEdit"
-      :on-patch-tags="handlePatchTags"
-      :on-remove-entry="handleRemoveEntry"
-      :require-auth="hasAuthTokens"
-    />
+    <ParseEntryTable :entries="formattedEntries" :error-entries="errorEntries" :validation-warnings="validationWarnings"
+      :on-reparse="handleTableReparse" :on-persist-edit="handlePersistEdit" :on-patch-tags="handlePatchTags"
+      :on-remove-entry="handleRemoveEntry" :require-auth="hasAuthTokens" />
   </div>
 
   <el-dialog v-model="showPreviewDialog" title="预览所有条目" width="80%">
-    <el-input
-      v-model="previewContent"
-      type="textarea"
-      :rows="20"
-      class="preview-textarea"
-      placeholder="可以在此处编辑所有条目，编辑后点击保存按钮将更新到列表中"
-    />
+    <el-input v-model="previewContent" type="textarea" :rows="20" class="preview-textarea"
+      placeholder="可以在此处编辑所有条目，编辑后点击保存按钮将更新到列表中" />
     <template #footer>
       <el-button @click="showPreviewDialog = false">取消</el-button>
       <el-button type="primary" @click="handleSavePreview" :loading="savingPreview">
@@ -98,18 +82,27 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElPopover } from 'element-plus'
-import { UploadFilled, DocumentCopy, Lock } from '@element-plus/icons-vue'
-import { ref, computed, watch } from 'vue'
+import { ElMessage, ElMessageBox, ElPopover } from 'element-plus'
+import { UploadFilled, DocumentCopy, DocumentChecked, Lock } from '@element-plus/icons-vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from '../../utils/request'
-import { hasAuthTokens } from '../../utils/auth'
+import { hasAuthTokens, setLoginRedirect } from '../../utils/auth'
 import ParseEntryTable from '../parse/ParseEntryTable.vue'
 import {
   alignPreviewBlocksToEntries,
   parsePreviewContent
 } from '../../utils/parse-review-preview'
 import { applyTagOverridesToHeader } from '../../utils/beancount-header-tags'
+import { writeCollectEntries } from '../../api/translate'
+import {
+  clearParseDraft,
+  loadParseDraft,
+  saveParseDraft
+} from '../../composables/useParseDraft'
 import type { FormattedEntry, TagDetail, OriginalRow } from '../../types/parse-review'
+
+const router = useRouter()
 
 const input = ref()
 const wechatUrl = ref('https://dl.dhr2333.cn/%E5%AE%8C%E6%95%B4%E6%B5%8B%E8%AF%95_%E5%BE%AE%E4%BF%A1.csv')
@@ -153,6 +146,8 @@ const validationWarnings = ref<Record<string, string>>({})
 const showPreviewDialog = ref(false)
 const previewContent = ref('')
 const savingPreview = ref(false)
+/** 写入账本中（写入期间禁用按钮，避免重复追加） */
+const writing = ref(false)
 
 const hasEntries = computed(() => formattedEntries.value.length > 0)
 
@@ -297,6 +292,8 @@ const handleUploadSuccess = (response: any, file: any) => {
   formattedEntries.value = normalized
   errorEntries.value = {}
   validationWarnings.value = {}
+  // 新解析结果取代旧结果，清掉可能存在的登录前草稿
+  clearParseDraft()
 }
 
 const handleUploadError = (err: any, _file: any) => {
@@ -328,6 +325,86 @@ const copyResponseData = async () => {
   } catch (err) {
     console.error('复制失败:', err)
     ElMessage.error('复制失败，请手动选择内容复制')
+  }
+}
+
+/** 挂载时恢复解析草稿（匿名用户「写入账本」引导登录后回跳继续） */
+onMounted(() => {
+  const draft = loadParseDraft()
+  if (!draft || formattedEntries.value.length > 0) return
+  formattedEntries.value = draft.entries
+  ElMessage.info(
+    '已恢复上次未写入的解析结果：该结果基于公共配置解析，可核对编辑后再写入账本'
+  )
+})
+
+/**
+ * 写入账本：把当前结果校验后追加写入 trans/collect.bean。
+ * 未登录时先引导登录，并把解析结果暂存为草稿，登录后回跳恢复。
+ */
+const handleWriteCollect = async () => {
+  if (!hasEntries.value || writing.value) return
+
+  if (!hasAuthTokens()) {
+    saveParseDraft(formattedEntries.value)
+    try {
+      await ElMessageBox.confirm(
+        '写入账本需要登录。当前解析结果已暂存在本页，登录成功后会自动恢复，' +
+        '可继续写入你的 trans/collect.bean。',
+        '写入账本需要登录',
+        { confirmButtonText: '去登录', cancelButtonText: '取消', type: 'warning' }
+      )
+    } catch {
+      return
+    }
+    setLoginRedirect('/trans')
+    router.push('/login')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `将把 ${formattedEntries.value.length} 条条目追加写入你的 trans/collect.bean` +
+      '（追加写入，不可自动撤销）。',
+      '确认写入账本',
+      { confirmButtonText: '写入', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return
+  }
+
+  writing.value = true
+  try {
+    const { data } = await writeCollectEntries(
+      formattedEntries.value.map((entry) => ({
+        uuid: entry.uuid,
+        directive: (entry.edited_formatted || entry.formatted || '').replace(/\n+$/, '')
+      }))
+    )
+    ElMessage.success(`已写入 trans/collect.bean（${data.entry_count} 条）`)
+    // 写入是追加语义：清空结果表，从根上避免重复点击重复入账
+    formattedEntries.value = []
+    errorEntries.value = {}
+    validationWarnings.value = {}
+    showPreviewDialog.value = false
+    previewContent.value = ''
+    clearParseDraft()
+  } catch (error: any) {
+    const payload = error?.response?.data
+    const failedEntries = Array.isArray(payload?.error_entries) ? payload.error_entries : []
+    if (failedEntries.length > 0) {
+      // 语法错误：不写入任何条目，按 uuid 定位到表格中的错误行
+      const nextErrors: Record<string, string> = { ...errorEntries.value }
+      failedEntries.forEach((item: { uuid?: string; error_message?: string }) => {
+        if (item?.uuid) nextErrors[item.uuid] = item.error_message || '格式有误'
+      })
+      errorEntries.value = nextErrors
+      ElMessage.error(payload?.error || '存在语法错误，未写入任何条目')
+    } else {
+      ElMessage.error(payload?.error || payload?.detail || '写入失败，请重试')
+    }
+  } finally {
+    writing.value = false
   }
 }
 

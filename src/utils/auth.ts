@@ -36,6 +36,21 @@ export const getUsername = () => {
   return localStorage.getItem('username')
 }
 
+// 登录后回跳路径（会话级：关闭标签即失效）
+const LOGIN_REDIRECT_KEY = 'redirectAfterLogin'
+
+// 记录登录成功后要跳转的页面（如解析页写入账本需要先登录）
+export const setLoginRedirect = (path: string) => {
+  sessionStorage.setItem(LOGIN_REDIRECT_KEY, path)
+}
+
+// 取出并清除回跳路径；无记录时返回 null
+export const consumeLoginRedirect = (): string | null => {
+  const path = sessionStorage.getItem(LOGIN_REDIRECT_KEY)
+  if (path) sessionStorage.removeItem(LOGIN_REDIRECT_KEY)
+  return path
+}
+
 // 检查令牌是否即将过期（提前5分钟刷新）
 export const isTokenExpiringSoon = () => {
   const token = getAccessToken()

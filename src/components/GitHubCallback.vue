@@ -11,6 +11,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { emitTaskBannerRefresh } from '../utils/accountEvents';
 import { initTourState } from '../utils/userTour';
+import { consumeLoginRedirect } from '../utils/auth';
 import axios from '../utils/request';
 
 const router = useRouter();
@@ -54,13 +55,14 @@ onMounted(async () => {
 
         ElMessage.success("GitHub 登录成功");
 
-        // 检查是否有待返回的路径
-        const redirectPath = sessionStorage.getItem('redirectAfterPhoneBinding');
+        // 检查是否有待返回的路径（登录前记录的目标页优先于手机号绑定前的路径）
+        const loginRedirect = consumeLoginRedirect()
+        const redirectPath = loginRedirect || sessionStorage.getItem('redirectAfterPhoneBinding')
         if (redirectPath) {
-            sessionStorage.removeItem('redirectAfterPhoneBinding');
-            router.push(redirectPath);
+            sessionStorage.removeItem('redirectAfterPhoneBinding')
+            router.push(redirectPath)
         } else {
-            router.push('/file');
+            router.push('/file')
         }
     } catch (error: any) {
         console.error('GitHub 登录失败', error);

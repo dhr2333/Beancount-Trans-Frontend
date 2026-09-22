@@ -154,8 +154,14 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { User, Lock, Phone, Message } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import router from '~/routers'
+import { consumeLoginRedirect } from '../../utils/auth'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 import { initTourState } from '../../utils/userTour'
+
+/** 登录成功后的跳转：优先回到登录前记录的目标页（如解析页要写入账本） */
+const goAfterLogin = () => {
+  router.push(consumeLoginRedirect() || '/file')
+}
 
 // 登录相关（默认手机号页；无短信时由 public-config 切到账密）
 const smsEnabled = ref(true)
@@ -378,7 +384,7 @@ const handleUsernameLogin = async () => {
         }, 2000) // 延迟2秒，确保后端完成账户和待办的创建
       }
 
-      router.push('/file')
+      goAfterLogin()
     } else {
       // 用户名/邮箱+密码登录（支持TOTP）
       const payload: any = {
@@ -414,7 +420,7 @@ const handleUsernameLogin = async () => {
         ElMessage.warning('请先绑定手机号')
         router.push('/phone-binding')
       } else {
-        router.push('/file')
+        goAfterLogin()
       }
     }
   } catch (error: any) {
@@ -469,7 +475,7 @@ const handlePhoneLoginByCode = async () => {
     //   // TODO: 跳转到2FA验证页面
     // }
 
-    router.push('/file')
+    goAfterLogin()
   } catch (error: any) {
     ElMessage.error(error.response?.data?.error || '登录失败')
   } finally {
@@ -510,7 +516,7 @@ const handleEmailLogin = async () => {
     //   // TODO: 跳转到2FA验证页面
     // }
 
-    router.push('/file')
+    goAfterLogin()
   } catch (error: any) {
     ElMessage.error(error.response?.data?.error || '登录失败')
   } finally {

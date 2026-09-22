@@ -53,6 +53,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Phone, Message } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
+import { consumeLoginRedirect } from '../../utils/auth'
 
 const router = useRouter()
 
@@ -126,8 +127,9 @@ const handleSubmit = async () => {
         if (resp.status === 200) {
             ElMessage.success('手机号绑定成功')
 
-            // 检查是否有待返回的路径
-            const redirectPath = sessionStorage.getItem('redirectAfterPhoneBinding')
+            // 检查是否有待返回的路径（登录前记录的目标页优先）
+            const redirectPath = consumeLoginRedirect()
+                || sessionStorage.getItem('redirectAfterPhoneBinding')
             if (redirectPath) {
                 sessionStorage.removeItem('redirectAfterPhoneBinding')
                 router.push(redirectPath)
