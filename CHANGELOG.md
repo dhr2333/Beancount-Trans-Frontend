@@ -1,3 +1,10 @@
+## [5.14.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.13.1...5.14.0) (2026-09-26)
+
+### Features
+
+* **parse-review:** 增加对Copilot记账条目的支持 ([8c91909](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/8c919099c3d787055fadae73cf5380b658c36cea))
+* **translate:** 添加写入解析条目到用户账本的功能 ([5c4eb33](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/5c4eb33014f5b4d9feae011e6d895279a455cda2))
+
 ## [5.13.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.13.0...5.13.1) (2026-09-16)
 
 ### Bug Fixes
