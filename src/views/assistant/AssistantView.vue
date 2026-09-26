@@ -1,266 +1,205 @@
 <template>
   <div class="assistant-layout">
-    <AssistantSessionSidebar
-      ref="sessionSidebarRef"
-      :sessions="sessions"
-      :sessions-loading="sessionsLoading"
-      v-model:search-query="searchQuery"
-      :active-session-id="sessionId"
-      :collapsed="!sidebarOpen"
-      @new-chat="handleNewChat"
-      @select="handleSelectSession"
-      @rename="handleRenameSession"
-      @delete="handleDeleteSession"
-      @search="fetchSessions"
-      @collapse="sidebarOpen = false"
-      @expand="sidebarOpen = true"
-    />
+    <AssistantSessionSidebar ref="sessionSidebarRef" :sessions="sessions" :sessions-loading="sessionsLoading"
+      v-model:search-query="searchQuery" :active-session-id="sessionId" :collapsed="!sidebarOpen"
+      @new-chat="handleNewChat" @select="handleSelectSession" @rename="handleRenameSession"
+      @delete="handleDeleteSession" @search="fetchSessions" @collapse="sidebarOpen = false"
+      @expand="sidebarOpen = true" />
 
     <div class="assistant-page" :class="{ 'assistant-page--share-select': shareSelectMode }">
-    <el-alert v-if="!statusLoading && status && !status.api_key_configured" type="warning" :closable="false" show-icon
-      class="setup-alert" title="尚未配置 Copilot">
-      <template #default>
-        请在
-        <router-link to="/format" class="alert-link">输出配置</router-link>
-        的「Copilot」中填写接口地址、模型与密钥。
-      </template>
-    </el-alert>
+      <el-alert v-if="!statusLoading && status && !status.api_key_configured" type="warning" :closable="false" show-icon
+        class="setup-alert" title="尚未配置 Copilot">
+        <template #default>
+          请在
+          <router-link to="/format" class="alert-link">输出配置</router-link>
+          的「Copilot」中填写接口地址、模型与密钥。
+        </template>
+      </el-alert>
 
-    <el-alert v-if="!statusLoading && status && !status.ledger_exists" type="info" :closable="false" show-icon
-      class="setup-alert" title="账本尚未就绪">
-      <template #default>
-        请先在
-        <router-link to="/file" class="alert-link">文件管理</router-link>
-        上传并解析账单，生成账本后再使用 Copilot。
-      </template>
-    </el-alert>
+      <el-alert v-if="!statusLoading && status && !status.ledger_exists" type="info" :closable="false" show-icon
+        class="setup-alert" title="账本尚未就绪">
+        <template #default>
+          请先在
+          <router-link to="/file" class="alert-link">文件管理</router-link>
+          上传并解析账单，生成账本后再使用 Copilot。
+        </template>
+      </el-alert>
 
-    <el-alert
-      v-if="error && !loading"
-      type="error"
-      :closable="false"
-      show-icon
-      class="setup-alert"
-      :title="error"
-    >
-      <template #default>
-        <el-button size="small" @click="fetchStatus">重试连接</el-button>
-      </template>
-    </el-alert>
+      <el-alert v-if="error && !loading" type="error" :closable="false" show-icon class="setup-alert" :title="error">
+        <template #default>
+          <el-button size="small" @click="fetchStatus">重试连接</el-button>
+        </template>
+      </el-alert>
 
-    <div
-      class="chat-container"
-      ref="chatContainerRef"
-      :class="{ 'chat-container--welcome': messages.length === 0 }"
-      v-loading="sessionLoading"
-      @scroll.passive="handleChatScroll"
-    >
-      <div v-if="messages.length === 0" class="welcome-panel">
-        <el-icon :size="48" color="var(--ep-color-primary)">
-          <ChatDotRound />
-        </el-icon>
-        <p class="welcome-text">你好，我可以帮你查询支出、收入、余额等账本信息。</p>
-        <p class="welcome-readonly">Copilot 只读查询账本，不会改账。</p>
-        <div class="example-chips">
-          <el-button v-for="q in exampleQuestions" :key="q" size="small" round :disabled="!canChat || loading"
-            @click="handleExample(q)">
-            {{ q }}
-          </el-button>
+      <div class="chat-container" ref="chatContainerRef" :class="{ 'chat-container--welcome': messages.length === 0 }"
+        v-loading="sessionLoading" @scroll.passive="handleChatScroll">
+        <div v-if="messages.length === 0" class="welcome-panel">
+          <el-icon :size="48" color="var(--ep-color-primary)">
+            <ChatDotRound />
+          </el-icon>
+          <p class="welcome-text">欢迎回来</p>
+          <p class="welcome-readonly">Copilot 只读查询账本，不会改账。</p>
+          <Transition name="example-chip" mode="out-in">
+            <div class="example-chips" :key="examplePage">
+              <el-button v-for="q in visibleExampleQuestions" :key="q" size="small" round
+                :disabled="!canChat || loading" @click="handleExample(q)">
+                {{ q }}
+              </el-button>
+            </div>
+          </Transition>
         </div>
-      </div>
 
-      <div v-for="(msg, index) in messages" :key="index" class="message-row" :class="{
-        [msg.role]: true,
-        'share-selectable': shareSelectMode && canShareAssistantMessage(msg),
-        'is-selected': shareSelectMode && selectedIndices.has(index),
-      }" @click="handleShareRowClick(index, msg)">
-        <el-checkbox v-if="shareSelectMode && canShareAssistantMessage(msg)" class="share-checkbox"
-          :model-value="selectedIndices.has(index)" :disabled="sharing" @click.stop
-          @change="(val: CheckboxValueType) => toggleShareSelection(index, val === true)" />
-        <div class="message-bubble">
-          <div class="message-role">{{ msg.role === 'user' ? '你' : 'Copilot' }}</div>
-          <div v-if="msg.role === 'user'" class="user-message">
-            <template v-if="editingIndex === index">
-              <el-input
-                v-model="editDraft"
-                type="textarea"
-                :autosize="{ minRows: 2, maxRows: 8 }"
-                :disabled="loading"
-                @click.stop
-                @keydown.enter.exact.prevent="confirmEdit"
-                @keydown.esc="cancelEdit"
-              />
-              <div class="user-edit-actions" @click.stop>
-                <el-button size="small" :disabled="loading" @click="cancelEdit">取消</el-button>
-                <el-button size="small" type="primary" :disabled="loading || !editDraft.trim()" @click="confirmEdit">
-                  重新发送
-                </el-button>
-              </div>
-            </template>
-            <template v-else>
-              <div class="message-content message-content--user">{{ msg.content }}</div>
-              <div v-if="!loading && !shareSelectMode && msg.id" class="user-message-actions" @click.stop>
-                <el-button size="small" text @click="startEdit(index)">
-                  <el-icon><EditPen /></el-icon>
-                  编辑
-                </el-button>
-              </div>
-            </template>
-          </div>
-          <template v-else>
-            <AssistantThinkingBlock v-if="msg.thinking?.trim()" v-model:expanded="msg.thinkingExpanded"
-              :thinking="msg.thinking" :streaming="!!msg.streaming && !msg.content" @click.stop />
-            <div v-if="msg.streaming && (msg.content || !msg.thinking?.trim())"
-              class="message-content message-content--assistant message-content--streaming">
-              <template v-if="!msg.content">
-                <span class="status-hint">{{ statusHint(msg.status) }}</span>
+        <div v-for="(msg, index) in messages" :key="index" class="message-row" :class="{
+          [msg.role]: true,
+          'share-selectable': shareSelectMode && canShareAssistantMessage(msg),
+          'is-selected': shareSelectMode && selectedIndices.has(index),
+        }" @click="handleShareRowClick(index, msg)">
+          <el-checkbox v-if="shareSelectMode && canShareAssistantMessage(msg)" class="share-checkbox"
+            :model-value="selectedIndices.has(index)" :disabled="sharing" @click.stop
+            @change="(val: CheckboxValueType) => toggleShareSelection(index, val === true)" />
+          <div class="message-bubble">
+            <div class="message-role">{{ msg.role === 'user' ? '你' : 'Copilot' }}</div>
+            <div v-if="msg.role === 'user'" class="user-message">
+              <template v-if="editingIndex === index">
+                <el-input v-model="editDraft" type="textarea" :autosize="{ minRows: 2, maxRows: 8 }" :disabled="loading"
+                  @click.stop @keydown.enter.exact.prevent="confirmEdit" @keydown.esc="cancelEdit" />
+                <div class="user-edit-actions" @click.stop>
+                  <el-button size="small" :disabled="loading" @click="cancelEdit">取消</el-button>
+                  <el-button size="small" type="primary" :disabled="loading || !editDraft.trim()" @click="confirmEdit">
+                    重新发送
+                  </el-button>
+                </div>
               </template>
               <template v-else>
-                <span class="streaming-text">{{ msg.content }}</span>
-                <span class="streaming-cursor">▍</span>
+                <div class="message-content message-content--user">{{ msg.content }}</div>
+                <div v-if="!loading && !shareSelectMode && msg.id" class="user-message-actions" @click.stop>
+                  <el-button size="small" text @click="startEdit(index)">
+                    <el-icon>
+                      <EditPen />
+                    </el-icon>
+                    编辑
+                  </el-button>
+                </div>
               </template>
             </div>
-            <MarkdownContent
-              v-else-if="!isInterruptedAssistant(msg)"
-              :content="msg.content"
-              class="message-content message-content--assistant"
-            />
-            <div
-              v-if="msg.role === 'assistant' && !msg.streaming && msg.content && !isInterruptedAssistant(msg)"
-              class="feedback-bar"
-              @click.stop
-            >
-              <el-button size="small" text @click="handleCopyMarkdown(index)">
-                <el-icon>
-                  <DocumentCopy />
-                </el-icon>
-                复制
-              </el-button>
-              <el-button v-if="!shareSelectMode" size="small" text :disabled="sharing" @click="handleShareClick(index)">
-                <el-icon>
-                  <Share />
-                </el-icon>
-                分享
-              </el-button>
-              <span class="feedback-divider" />
-              <el-button size="small" text :type="msg.feedback === 'like' ? 'primary' : 'default'"
-                :loading="msg.feedbackSubmitting" :disabled="msg.feedbackSubmitting || sharing"
-                @click="handleLike(index)">
-                <el-icon>
-                  <CircleCheck />
-                </el-icon>
-                喜欢
-              </el-button>
-              <el-button size="small" text :type="msg.feedback === 'dislike' ? 'danger' : 'default'"
-                :loading="msg.feedbackSubmitting" :disabled="msg.feedbackSubmitting || sharing"
-                @click="handleDislike(index)">
-                <el-icon>
-                  <CircleClose />
-                </el-icon>
-                不喜欢
-              </el-button>
-            </div>
-            <div
-              v-if="isInterruptedAssistant(msg) && !shareSelectMode"
-              class="interrupted-bar"
-              @click.stop
-            >
-              <span>生成已中断</span>
-              <el-button size="small" :disabled="loading" @click="handleRetryInterrupted(index)">
-                重新生成
-              </el-button>
-            </div>
-            <div
-              v-if="msg.role === 'assistant' && !msg.streaming && hasQuerySources(msg)"
-              class="query-sources"
-              @click.stop
-            >
-              <div class="query-sources-title">来源</div>
-              <div v-for="(q, qi) in msg.queries" :key="`source-${qi}`" class="query-source-group">
-                <template v-if="q.fava_path || q.report?.path">
-                  <el-button
-                    v-if="q.fava_path"
-                    size="small"
-                    text
-                    type="primary"
-                    :loading="openingFavaPath === q.fava_path"
-                    @click="handleOpenFavaPath(q.fava_path)"
-                  >
-                    打开本次查询{{ msg.queries!.length > 1 ? ` (${qi + 1})` : '' }}
-                  </el-button>
-                  <el-button
-                    v-if="q.report?.path"
-                    size="small"
-                    text
-                    type="primary"
-                    :loading="openingFavaPath === q.report.path"
-                    @click="handleOpenFavaPath(q.report.path)"
-                  >
-                    打开{{ q.report.label }}
-                  </el-button>
+            <template v-else>
+              <AssistantThinkingBlock v-if="msg.thinking?.trim()" v-model:expanded="msg.thinkingExpanded"
+                :thinking="msg.thinking" :streaming="!!msg.streaming && !msg.content" @click.stop />
+              <div v-if="msg.streaming && (msg.content || !msg.thinking?.trim())"
+                class="message-content message-content--assistant message-content--streaming">
+                <template v-if="!msg.content">
+                  <span class="status-hint">{{ statusHint(msg.status) }}</span>
+                </template>
+                <template v-else>
+                  <span class="streaming-text">{{ msg.content }}</span>
+                  <span class="streaming-cursor">▍</span>
                 </template>
               </div>
-            </div>
-          </template>
-          <el-collapse v-if="msg.role === 'assistant' && msg.queries?.length" class="query-collapse" @click.stop>
-            <el-collapse-item title="查看查询详情" name="queries">
-              <div v-for="(q, qi) in msg.queries" :key="qi" class="query-block">
-                <pre class="query-bql">{{ q.bql }}</pre>
-                <pre class="query-result">{{ q.result_preview }}</pre>
+              <MarkdownContent v-else-if="!isInterruptedAssistant(msg)" :content="msg.content"
+                class="message-content message-content--assistant" />
+              <div v-if="msg.role === 'assistant' && !msg.streaming && msg.content && !isInterruptedAssistant(msg)"
+                class="feedback-bar" @click.stop>
+                <el-button size="small" text @click="handleCopyMarkdown(index)">
+                  <el-icon>
+                    <DocumentCopy />
+                  </el-icon>
+                  复制
+                </el-button>
+                <el-button v-if="!shareSelectMode" size="small" text :disabled="sharing"
+                  @click="handleShareClick(index)">
+                  <el-icon>
+                    <Share />
+                  </el-icon>
+                  分享
+                </el-button>
+                <span class="feedback-divider" />
+                <el-button size="small" text :type="msg.feedback === 'like' ? 'primary' : 'default'"
+                  :loading="msg.feedbackSubmitting" :disabled="msg.feedbackSubmitting || sharing"
+                  @click="handleLike(index)">
+                  <el-icon>
+                    <CircleCheck />
+                  </el-icon>
+                  喜欢
+                </el-button>
+                <el-button size="small" text :type="msg.feedback === 'dislike' ? 'danger' : 'default'"
+                  :loading="msg.feedbackSubmitting" :disabled="msg.feedbackSubmitting || sharing"
+                  @click="handleDislike(index)">
+                  <el-icon>
+                    <CircleClose />
+                  </el-icon>
+                  不喜欢
+                </el-button>
               </div>
-            </el-collapse-item>
-          </el-collapse>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="!shareSelectMode" class="input-area">
-      <div class="composer">
-        <el-input
-          ref="composerInputRef"
-          v-model="inputText"
-          type="textarea"
-          :autosize="{ minRows: 1, maxRows: 8 }"
-          placeholder="给 Beancount-Trans Copilot 发送消息"
-          :disabled="!canChat || loading"
-          resize="none"
-          @keydown.enter.exact.prevent="handleSend"
-        />
-        <div class="composer-footer">
-          <span class="composer-meta">{{ modelLabel }}</span>
-          <div class="input-actions">
-            <el-switch
-              v-model="deepThink"
-              inline-prompt
-              active-text="DeepThink"
-              inactive-text="DeepThink"
-              :disabled="!canChat || loading || !deepThinkSupported"
-            />
-            <el-button v-if="loading" @click="stop">
-              停止
-            </el-button>
-            <el-button v-else type="primary" :disabled="!canChat || !inputText.trim()" @click="handleSend">
-              发送
-            </el-button>
+              <div v-if="isInterruptedAssistant(msg) && !shareSelectMode" class="interrupted-bar" @click.stop>
+                <span>生成已中断</span>
+                <el-button size="small" :disabled="loading" @click="handleRetryInterrupted(index)">
+                  重新生成
+                </el-button>
+              </div>
+              <div v-if="msg.role === 'assistant' && !msg.streaming && hasQuerySources(msg)" class="query-sources"
+                @click.stop>
+                <div class="query-sources-title">来源</div>
+                <div v-for="(q, qi) in msg.queries" :key="`source-${qi}`" class="query-source-group">
+                  <template v-if="q.fava_path || q.report?.path">
+                    <el-button v-if="q.fava_path" size="small" text type="primary"
+                      :loading="openingFavaPath === q.fava_path" @click="handleOpenFavaPath(q.fava_path)">
+                      打开本次查询{{ msg.queries!.length > 1 ? ` (${qi + 1})` : '' }}
+                    </el-button>
+                    <el-button v-if="q.report?.path" size="small" text type="primary"
+                      :loading="openingFavaPath === q.report.path" @click="handleOpenFavaPath(q.report.path)">
+                      打开{{ q.report.label }}
+                    </el-button>
+                  </template>
+                </div>
+              </div>
+            </template>
+            <el-collapse v-if="msg.role === 'assistant' && msg.queries?.length" class="query-collapse" @click.stop>
+              <el-collapse-item title="查看查询详情" name="queries">
+                <div v-for="(q, qi) in msg.queries" :key="qi" class="query-block">
+                  <pre class="query-bql">{{ q.bql }}</pre>
+                  <pre class="query-result">{{ q.result_preview }}</pre>
+                </div>
+              </el-collapse-item>
+            </el-collapse>
           </div>
         </div>
       </div>
-    </div>
 
-    <div v-if="shareSelectMode" class="share-select-bar">
-      <span class="share-select-count">已选 {{ selectedIndices.size }} 条对话</span>
-      <el-button :disabled="sharing" @click="exitShareSelectMode">取消</el-button>
-      <el-button type="primary" :loading="sharing" :disabled="selectedIndices.size === 0"
-        @click="handleGenerateShareImage">
-        生成分享图
-      </el-button>
-    </div>
-
-    <Teleport to="body">
-      <div v-if="sharePreview" ref="shareCardHostRef" class="share-card-host">
-        <AssistantShareCard :turns="sharePreview.turns" />
+      <div v-if="!shareSelectMode" class="input-area">
+        <div class="composer">
+          <el-input ref="composerInputRef" v-model="inputText" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }"
+            placeholder="给 Beancount-Trans Copilot 发送消息" :disabled="!canChat || loading" resize="none"
+            @keydown.enter.exact.prevent="handleSend" />
+          <div class="composer-footer">
+            <span class="composer-meta">{{ modelLabel }}</span>
+            <div class="input-actions">
+              <el-switch v-model="deepThink" inline-prompt active-text="DeepThink" inactive-text="DeepThink"
+                :disabled="!canChat || loading || !deepThinkSupported" />
+              <el-button v-if="loading" @click="stop">
+                停止
+              </el-button>
+              <el-button v-else type="primary" :disabled="!canChat || !inputText.trim()" @click="handleSend">
+                发送
+              </el-button>
+            </div>
+          </div>
+        </div>
       </div>
-    </Teleport>
+
+      <div v-if="shareSelectMode" class="share-select-bar">
+        <span class="share-select-count">已选 {{ selectedIndices.size }} 条对话</span>
+        <el-button :disabled="sharing" @click="exitShareSelectMode">取消</el-button>
+        <el-button type="primary" :loading="sharing" :disabled="selectedIndices.size === 0"
+          @click="handleGenerateShareImage">
+          生成分享图
+        </el-button>
+      </div>
+
+      <Teleport to="body">
+        <div v-if="sharePreview" ref="shareCardHostRef" class="share-card-host">
+          <AssistantShareCard :turns="sharePreview.turns" />
+        </div>
+      </Teleport>
     </div>
   </div>
 </template>
@@ -348,6 +287,24 @@ const openingFavaPath = ref<string | null>(null)
 const STICK_THRESHOLD_PX = 80
 
 const modelLabel = computed(() => status.value?.assistant_model?.trim() || '')
+
+/** 首页示例问句一次展示的条数（与移动端一致）。 */
+const EXAMPLE_WINDOW = 4
+/** 首页示例问句当前展示的分组下标（点击示例或开启新会话时前进一组）。 */
+const examplePage = ref(0)
+const examplePageCount = computed(() => Math.ceil(exampleQuestions.length / EXAMPLE_WINDOW))
+const visibleExampleQuestions = computed(() => {
+  const start = examplePage.value * EXAMPLE_WINDOW
+  return exampleQuestions.slice(start, start + EXAMPLE_WINDOW)
+})
+
+/** 首页示例问句前进一组（重新回到欢迎区时才可见）。 */
+function advanceExamplePage() {
+  if (examplePageCount.value <= 1) {
+    return
+  }
+  examplePage.value = (examplePage.value + 1) % examplePageCount.value
+}
 
 function statusHint(phase?: AssistantPhase): string {
   if (phase === 'querying') return '正在查询账本...'
@@ -507,6 +464,8 @@ async function handleGenerateShareImage() {
 function handleNewChat() {
   cancelEdit()
   exitShareSelectMode()
+  // 开启新会话时换一组示例问句
+  advanceExamplePage()
   startNewChat()
 }
 
@@ -604,6 +563,8 @@ async function handleSend() {
 async function handleExample(question: string) {
   cancelEdit()
   stickToBottom.value = true
+  // 点击示例问句：换一组并直接发送
+  advanceExamplePage()
   await send(question)
   await scrollToBottom()
 }
@@ -766,6 +727,17 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: center;
+}
+
+// 示例问句换组时淡入淡出
+.example-chip-enter-active,
+.example-chip-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.example-chip-enter-from,
+.example-chip-leave-to {
+  opacity: 0;
 }
 
 .message-row {
