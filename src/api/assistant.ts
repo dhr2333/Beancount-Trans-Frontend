@@ -9,6 +9,8 @@ import type {
   AssistantSessionSummary,
   AssistantStatus,
   AssistantStreamEvent,
+  BindSharedLedgerRequest,
+  SharedLedgerBinding,
 } from '../types/assistant'
 
 export function getAssistantStatus(): Promise<{ data: AssistantStatus }> {
@@ -50,6 +52,20 @@ export function submitAssistantFeedback(
   request: AssistantFeedbackRequest
 ): Promise<{ data: AssistantFeedbackResponse }> {
   return axios.post('/assistant/feedback/', request)
+}
+
+export function listSharedLedgers(): Promise<{ data: SharedLedgerBinding[] }> {
+  return axios.get('/assistant/shared-ledgers/')
+}
+
+export function bindSharedLedger(
+  request: BindSharedLedgerRequest
+): Promise<{ data: SharedLedgerBinding }> {
+  return axios.post('/assistant/shared-ledgers/', request)
+}
+
+export function unbindSharedLedger(id: number): Promise<void> {
+  return axios.delete(`/assistant/shared-ledgers/${id}/`)
 }
 
 /** SSE 空闲超时：超过该时间未收到任何帧则中止请求。 */

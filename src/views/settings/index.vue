@@ -135,6 +135,13 @@
                                 </template> -->
                             </el-alert>
 
+                            <el-alert type="warning" :closable="false" class="token-tip">
+                                <template #default>
+                                    把令牌交给他人等于把该账本的<strong>只读权限</strong>分享给他；建议为每次分享单独创建令牌，
+                                    需要收回时直接撤销。
+                                </template>
+                            </el-alert>
+
                             <el-table v-loading="tokensLoading" :data="tokens" empty-text="暂无访问令牌" class="token-table">
                                 <el-table-column prop="name" label="用途" min-width="140" show-overflow-tooltip />
                                 <el-table-column label="令牌前缀" min-width="140">
@@ -169,6 +176,58 @@
                                         <el-button link type="danger" :disabled="!!row.revoked_at"
                                             @click="handleRevokeToken(row)">
                                             撤销
+                                        </el-button>
+                                    </template>
+                                </el-table-column>
+                            </el-table>
+                        </el-card>
+                    </el-tab-pane>
+
+                    <!-- 共享账本（他人分享给我的只读账本） -->
+                    <el-tab-pane label="共享账本" name="shared-ledgers">
+                        <el-card shadow="never" class="section-card">
+                            <template #header>
+                                <div class="section-header">
+                                    <h3>共享账本</h3>
+                                    <el-button type="primary" @click="showBindSharedDialog = true">
+                                        添加共享账本
+                                    </el-button>
+                                </div>
+                            </template>
+
+                            <el-alert type="info" :closable="false" class="token-tip">
+                                <template #default>
+                                    粘贴他人提供的访问令牌，即可在自己的 Copilot 中把对方账本作为<strong>只读来源</strong>一并分析。
+                                </template>
+                            </el-alert>
+
+                            <el-table v-loading="sharedLedgersLoading" :data="sharedLedgerList"
+                                empty-text="暂无共享账本" class="token-table">
+                                <el-table-column prop="label" label="备注" min-width="140" show-overflow-tooltip />
+                                <el-table-column label="来源用户" min-width="140">
+                                    <template #default="{ row }">{{ row.owner_username }}</template>
+                                </el-table-column>
+                                <el-table-column label="状态" width="100">
+                                    <template #default="{ row }">
+                                        <el-tag :type="row.usable ? 'success' : 'info'" size="small">
+                                            {{ row.usable ? '有效' : '已失效' }}
+                                        </el-tag>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="令牌有效期" min-width="160">
+                                    <template #default="{ row }">
+                                        {{ formatTokenTime(row.expires_at, '长期有效') }}
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="最后使用" min-width="160">
+                                    <template #default="{ row }">
+                                        {{ formatTokenTime(row.last_used_at, '从未使用') }}
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="操作" width="110" fixed="right">
+                                    <template #default="{ row }">
+                                        <el-button link type="danger" @click="handleUnbindSharedLedger(row)">
+                                            解除绑定
                                         </el-button>
                                     </template>
                                 </el-table-column>
@@ -323,6 +382,32 @@
                 </el-input>
                 <template #footer>
                     <el-button type="primary" @click="showCreatedTokenDialog = false">我已保存</el-button>
+                </template>
+            </el-dialog>
+
+            <!-- 添加共享账本对话框 -->
+            <el-dialog v-model="showBindSharedDialog" title="添加共享账本" width="520px"
+                @closed="resetBindSharedForm">
+                <el-form :model="bindSharedForm" label-width="80px">
+                    <el-form-item label="访问令牌">
+                        <el-input v-model="bindSharedForm.token" type="textarea" :rows="3"
+                            placeholder="粘贴对方提供的 bct_ 访问令牌" />
+                    </el-form-item>
+                    <el-form-item label="备注">
+                        <el-input v-model="bindSharedForm.label" maxlength="64" show-word-limit
+                            placeholder="可选，如：老婆的账本" />
+                    </el-form-item>
+                </el-form>
+                <el-alert type="warning" :closable="false" class="token-tip">
+                    <template #default>
+                        令牌具备该账本的只读权限；建议对方为本次分享<strong>单独创建令牌</strong>，需要收回时直接撤销。
+                    </template>
+                </el-alert>
+                <template #footer>
+                    <el-button @click="showBindSharedDialog = false">取消</el-button>
+                    <el-button type="primary" :loading="bindingShared" @click="handleBindSharedLedger">
+                        确定
+                    </el-button>
                 </template>
             </el-dialog>
 
@@ -504,7 +589,13 @@ import {
     createPersonalAccessToken,
     revokePersonalAccessToken
 } from '../../api/token'
+import {
+    listSharedLedgers,
+    bindSharedLedger,
+    unbindSharedLedger
+} from '../../api/assistant'
 import type { PersonalAccessToken, CreateTokenRequest } from '../../types/token'
+import type { SharedLedgerBinding } from '../../types/assistant'
 import { copyText } from '../../utils/clipboard'
 import GitSetup from '../../components/git/GitSetup.vue'
 import GitRepositoryComponent from '../../components/git/GitRepository.vue'
@@ -534,6 +625,16 @@ const createTokenRules: FormRules = {
 }
 // 明文令牌仅在创建响应中返回一次，关闭对话框即清空
 const createdToken = ref('')
+
+// 共享账本状态（他人分享给我的只读账本）
+const sharedLedgerList = ref<SharedLedgerBinding[]>([])
+const sharedLedgersLoading = ref(false)
+const showBindSharedDialog = ref(false)
+const bindingShared = ref(false)
+const bindSharedForm = reactive({
+    token: '',
+    label: ''
+})
 
 const handleUnauthorized = () => {
     if (!unauthorizedNotified.value) {
@@ -1252,6 +1353,74 @@ const handleRevokeToken = async (token: PersonalAccessToken) => {
     }
 }
 
+const fetchSharedLedgers = async () => {
+    sharedLedgersLoading.value = true
+    try {
+        const { data } = await listSharedLedgers()
+        sharedLedgerList.value = data
+    } catch (error: any) {
+        if (error?.response?.status === 401) {
+            handleUnauthorized()
+        } else {
+            ElMessage.error('获取共享账本失败')
+        }
+    } finally {
+        sharedLedgersLoading.value = false
+    }
+}
+
+const resetBindSharedForm = () => {
+    bindSharedForm.token = ''
+    bindSharedForm.label = ''
+}
+
+const handleBindSharedLedger = async () => {
+    const token = bindSharedForm.token.trim()
+    if (!token) {
+        ElMessage.warning('请粘贴访问令牌')
+        return
+    }
+
+    bindingShared.value = true
+    try {
+        await bindSharedLedger({
+            token,
+            label: bindSharedForm.label.trim() || undefined
+        })
+        showBindSharedDialog.value = false
+        ElMessage.success('共享账本已添加')
+        await fetchSharedLedgers()
+    } catch (error: any) {
+        ElMessage.error(error.response?.data?.detail || '添加共享账本失败')
+    } finally {
+        bindingShared.value = false
+    }
+}
+
+const handleUnbindSharedLedger = async (binding: SharedLedgerBinding) => {
+    const name = binding.label || binding.owner_username
+    try {
+        await ElMessageBox.confirm(
+            `解除绑定后，将无法再用 Copilot 查询「${name}」的账本，此操作不可恢复。`,
+            '解除共享账本绑定',
+            {
+                ...defaultConfirmOptions,
+                confirmButtonClass: 'settings-confirm-danger'
+            }
+        )
+    } catch {
+        return
+    }
+
+    try {
+        await unbindSharedLedger(binding.id)
+        ElMessage.success('已解除绑定')
+        await fetchSharedLedgers()
+    } catch (error: any) {
+        ElMessage.error(error.response?.data?.detail || '解除绑定失败')
+    }
+}
+
 onMounted(() => {
     if (!isAuthenticated.value) {
         handleUnauthorized()
@@ -1261,6 +1430,7 @@ onMounted(() => {
     fetch2FAStatus()
     fetchGitRepository()
     fetchTokens()
+    fetchSharedLedgers()
 })
 </script>
 

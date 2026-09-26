@@ -31,6 +31,7 @@ export interface QueryRecord {
   result_preview: string
   fava_path?: string
   report?: QueryReportLink | null
+  ledger?: string
 }
 
 export interface AssistantChatRequest {
@@ -40,6 +41,7 @@ export interface AssistantChatRequest {
   edit_message_id?: string
   show_bql?: boolean
   deep_think?: boolean
+  shared_binding_ids?: number[]
 }
 
 export interface AssistantChatResponse {
@@ -118,4 +120,20 @@ export interface AssistantFeedbackResponse {
 export interface AssistantShareTurn {
   userMessage: string
   assistantContent: string
+}
+
+/** 共享账本绑定（用他人访问令牌绑定的只读账本来源） */
+export interface SharedLedgerBinding {
+  id: number
+  owner_username: string
+  label: string
+  usable: boolean
+  expires_at: string | null
+  last_used_at: string | null
+  created: string
+}
+
+export interface BindSharedLedgerRequest {
+  token: string
+  label?: string
 }

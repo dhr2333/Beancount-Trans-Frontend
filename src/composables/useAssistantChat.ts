@@ -4,6 +4,7 @@ import type { Router } from 'vue-router'
 import {
   getAssistantSession,
   getAssistantStatus,
+  listSharedLedgers,
   reconnectAssistantStream,
   stopAssistantMessage,
   streamAssistantChat,
@@ -16,6 +17,7 @@ import {
   type AssistantStreamEvent,
   type ChatMessage,
   type QueryRecord,
+  type SharedLedgerBinding,
   type StoredChatMessage,
 } from '../types/assistant'
 
@@ -60,14 +62,23 @@ export function useAssistantChat(options: {
   const status = ref<AssistantStatus | null>(null)
   const statusLoading = ref(false)
   const error = ref<string | null>(null)
+  const sharedLedgers = ref<SharedLedgerBinding[]>([])
+  const sharedBindingIds = ref<number[]>([])
   let abortController: AbortController | null = null
   let activeRequestId = 0
   let userStopRequested = false
 
+  const usableSharedLedgers = computed(() =>
+    sharedLedgers.value.filter((binding) => binding.usable),
+  )
+
   const canChat = computed(() => {
     if (statusLoading.value) return false
     if (!status.value) return false
-    return status.value.api_key_configured && status.value.ledger_exists
+    return (
+      status.value.api_key_configured &&
+      (status.value.ledger_exists || sharedBindingIds.value.length > 0)
+    )
   })
 
   const deepThinkSupported = computed(() => status.value?.deep_think_supported ?? false)
@@ -222,6 +233,18 @@ export function useAssistantChat(options: {
       error.value = err.response?.data?.detail || '获取助手状态失败'
     } finally {
       statusLoading.value = false
+    }
+  }
+
+  async function fetchSharedLedgers() {
+    try {
+      const { data } = await listSharedLedgers()
+      sharedLedgers.value = data
+      const usableIds = new Set(data.filter((item) => item.usable).map((item) => item.id))
+      sharedBindingIds.value = sharedBindingIds.value.filter((id) => usableIds.has(id))
+    } catch {
+      sharedLedgers.value = []
+      sharedBindingIds.value = []
     }
   }
 
@@ -414,6 +437,7 @@ export function useAssistantChat(options: {
         content: text,
         show_bql: false,
         deep_think: deepThink.value,
+        shared_binding_ids: sharedBindingIds.value,
         ...(editMessageId ? { edit_message_id: editMessageId } : {}),
       }
 
@@ -560,7 +584,11 @@ export function useAssistantChat(options: {
     canChat,
     deepThinkSupported,
     exampleQuestions: EXAMPLE_QUESTIONS,
+    sharedLedgers,
+    usableSharedLedgers,
+    sharedBindingIds,
     fetchStatus,
+    fetchSharedLedgers,
     send,
     stop,
     abortSubscription,

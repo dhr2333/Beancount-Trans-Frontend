@@ -26,7 +26,7 @@
       </template>
     </el-alert>
 
-    <el-alert v-if="!statusLoading && status && !status.ledger_exists" type="info" :closable="false" show-icon
+    <el-alert v-if="!statusLoading && status && !status.ledger_exists && !usableSharedLedgers.length" type="info" :closable="false" show-icon
       class="setup-alert" title="账本尚未就绪">
       <template #default>
         请先在
@@ -205,6 +205,9 @@
           <el-collapse v-if="msg.role === 'assistant' && msg.queries?.length" class="query-collapse" @click.stop>
             <el-collapse-item title="查看查询详情" name="queries">
               <div v-for="(q, qi) in msg.queries" :key="qi" class="query-block">
+                <div v-if="q.ledger && q.ledger !== 'self'" class="query-ledger">
+                  来源：{{ ledgerLabel(q.ledger) }}
+                </div>
                 <pre class="query-bql">{{ q.bql }}</pre>
                 <pre class="query-result">{{ q.result_preview }}</pre>
               </div>
@@ -227,7 +230,27 @@
           @keydown.enter.exact.prevent="handleSend"
         />
         <div class="composer-footer">
-          <span class="composer-meta">{{ modelLabel }}</span>
+          <div class="composer-scope">
+            <span class="composer-meta">{{ modelLabel }}</span>
+            <el-select
+              v-if="usableSharedLedgers.length"
+              v-model="ledgerScope"
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              size="small"
+              class="ledger-scope-select"
+              placeholder="账本范围：我的账本"
+              :disabled="loading"
+            >
+              <el-option
+                v-for="binding in usableSharedLedgers"
+                :key="binding.id"
+                :label="binding.label || `${binding.owner_username} 的账本`"
+                :value="binding.id"
+              />
+            </el-select>
+          </div>
           <div class="input-actions">
             <el-switch
               v-model="deepThink"
@@ -316,7 +339,11 @@ const {
   canChat,
   deepThinkSupported,
   exampleQuestions,
+  sharedLedgers,
+  usableSharedLedgers,
+  sharedBindingIds,
   fetchStatus,
+  fetchSharedLedgers,
   send,
   stop,
   abortSubscription,
@@ -329,6 +356,21 @@ const {
   router,
   onSessionsChanged: fetchSessions,
 })
+
+const ledgerScope = computed({
+  get: () => sharedBindingIds.value,
+  set: (value: number[]) => {
+    sharedBindingIds.value = value
+  },
+})
+
+function ledgerLabel(ledger?: string): string {
+  if (!ledger || ledger === 'self') {
+    return '我的账本'
+  }
+  const binding = sharedLedgers.value.find((item) => item.owner_username === ledger)
+  return binding?.label || `${ledger} 的账本`
+}
 
 const SIDEBAR_OPEN_KEY = 'assistant-sidebar-open'
 const sidebarOpen = ref(localStorage.getItem(SIDEBAR_OPEN_KEY) !== '0')
@@ -679,6 +721,7 @@ watch(deepThinkSupported, (supported) => {
 
 onMounted(() => {
   fetchStatus()
+  fetchSharedLedgers()
   fetchSessions()
   window.addEventListener('keydown', handleShortcut)
 })
@@ -986,6 +1029,13 @@ onUnmounted(() => {
   color: var(--ep-text-color-regular);
 }
 
+.query-ledger {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ep-color-primary);
+}
+
 .input-area {
   flex-shrink: 0;
   padding: 12px 24px 20px;
@@ -1024,6 +1074,17 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.composer-scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ledger-scope-select {
+  width: 220px;
 }
 
 .input-actions {
