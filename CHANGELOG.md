@@ -1,3 +1,12 @@
+## [5.15.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.14.0...5.15.0) (2026-09-27)
+
+### Features
+
+* **assistant:** 优化助手首页空白会话的示例问句展示 ([09bb5df](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/09bb5df3a9cd1e8734d4fe49acaa6969f9ed4aa0))
+* **assistant:** 支持共享账本用于助手对话 ([b086650](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/b0866502580f443244160fe53754708649ecafbd))
+* **共享账本:** 将共享账本的单个备注替换为多别名支持 ([fab855e](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/fab855e367af9622bc9630f0215df8440acc36ff))
+* 新增共享账本绑定、管理及跨账本聊天支持 ([c2c3c96](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/c2c3c96bf651f6a0f0e2d1ff780accd12d4d387e))
+
 ## [5.14.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.13.1...5.14.0) (2026-09-26)
 
 ### Features
