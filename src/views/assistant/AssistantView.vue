@@ -174,7 +174,7 @@
           <div v-if="usableSharedLedgers.length" class="composer-scope">
             <span class="composer-scope__label">账本范围</span>
             <el-select v-model="ledgerScope" multiple collapse-tags collapse-tags-tooltip size="small"
-              class="composer-scope__select" placeholder="选择参与对比的账本" :disabled="!canChat || loading">
+              class="composer-scope__select" placeholder="选择参与分析的账本" :disabled="!canChat || loading">
               <el-option :value="SELF_LEDGER" label="我的账本" disabled />
               <el-option v-for="binding in usableSharedLedgers" :key="binding.id" :value="binding.id"
                 :label="binding.aliases?.[0] || binding.owner_username" />
@@ -358,7 +358,7 @@ async function fetchSharedLedgers() {
   try {
     const { data } = await listSharedLedgers()
     sharedLedgers.value = data
-    // 默认选中全部可用的共享账本，便于开箱即用地进行对比
+    // 默认选中全部可用的共享账本，便于开箱即用地综合分析
     sharedBindingIds.value = data
       .filter((binding) => binding.usable)
       .map((binding) => binding.id)

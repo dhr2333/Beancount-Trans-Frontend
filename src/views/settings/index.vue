@@ -175,7 +175,7 @@
                         </el-card>
                     </el-tab-pane>
 
-                    <!-- 共享账本（绑定他人的账本，供 Copilot 对比） -->
+                    <!-- 共享账本（把他人共享的账本作为 Copilot 的额外数据来源） -->
                     <el-tab-pane label="共享账本" name="shared-ledgers">
                         <el-card shadow="never" class="section-card">
                             <template #header>
@@ -189,7 +189,7 @@
 
                             <el-alert type="info" :closable="false" class="token-tip">
                                 <template #default>
-                                    在此绑定他人分享给你的账本，Copilot 对话中即可把你的账本与共享账本放在一起对比。
+                                    在此绑定他人分享给你的账本，Copilot 对话中即可把你的账本与共享账本作为同一批数据来源综合分析与合计。
                                 </template>
                             </el-alert>
 

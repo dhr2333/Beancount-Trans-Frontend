@@ -42,7 +42,7 @@ export interface AssistantChatRequest {
   edit_message_id?: string
   show_bql?: boolean
   deep_think?: boolean
-  /** 参与对比的共享账本绑定 id 列表 */
+  /** 参与分析的共享账本绑定 id 列表 */
   shared_binding_ids?: number[]
 }
 
