@@ -190,15 +190,14 @@
                             <el-alert type="info" :closable="false" class="token-tip">
                                 <template #default>
                                     在此绑定他人分享给你的账本，Copilot 对话中即可把你的账本与共享账本放在一起对比。
-                                    绑定使用对方提供的个人访问令牌，只具备该账本的只读权限。
                                 </template>
                             </el-alert>
 
                             <el-table v-loading="sharedLedgersLoading" :data="sharedLedgers" empty-text="暂无共享账本"
                                 class="token-table">
-                                <el-table-column label="备注" min-width="140" show-overflow-tooltip>
+                                <el-table-column label="别名" min-width="140" show-overflow-tooltip>
                                     <template #default="{ row }">
-                                        {{ row.label || '—' }}
+                                        {{ row.aliases?.length ? row.aliases.join('、') : '—' }}
                                     </template>
                                 </el-table-column>
                                 <el-table-column prop="owner_username" label="来源用户" min-width="140"
@@ -384,20 +383,25 @@
             <!-- 添加共享账本对话框 -->
             <el-dialog v-model="showBindSharedLedgerDialog" title="添加共享账本" width="520px"
                 @closed="resetBindSharedLedgerForm">
-                <el-alert type="info" :closable="false" class="shared-ledger-dialog-tip">
+                <!-- <el-alert type="info" :closable="false" class="shared-ledger-dialog-tip">
                     <template #default>
-                        令牌由对方在『个人设置 → 访问令牌』生成，具备该账本只读权限；建议对方为本次分享单独创建令牌，需要收回时直接撤销。
+                        别名是 Copilot 用来识别、查找该共享账本的名称，可留空、也可填写多个；Copilot 命中其中任意一个即可识别该账本，留空时将使用来源用户名。令牌由对方在『个人设置 →
+                        访问令牌』生成。
                     </template>
-                </el-alert>
+                </el-alert> -->
                 <el-form ref="bindSharedLedgerFormRef" :model="bindSharedLedgerForm" :rules="bindSharedLedgerRules"
                     label-width="70px">
                     <el-form-item label="令牌" prop="token">
                         <el-input v-model="bindSharedLedgerForm.token" type="textarea"
                             :autosize="{ minRows: 2, maxRows: 4 }" placeholder="bct_…" />
                     </el-form-item>
-                    <el-form-item label="备注" prop="label">
-                        <el-input v-model="bindSharedLedgerForm.label" maxlength="64" show-word-limit
-                            placeholder="可选，例如：家庭共享账本" />
+                    <el-form-item label="别名" prop="aliases">
+                        <el-select v-model="bindSharedLedgerForm.aliases" multiple filterable allow-create
+                            default-first-option :reserve-keyword="false" class="shared-ledger-alias-select"
+                            placeholder="留空时使用来源用户名" />
+                        <div class="shared-ledger-alias-hint">
+                            Copilot 命中其中任意一个即可识别该账本。
+                        </div>
                     </el-form-item>
                 </el-form>
                 <template #footer>
@@ -631,11 +635,10 @@ const bindSharedLedgerLoading = ref(false)
 const bindSharedLedgerFormRef = ref<FormInstance>()
 const bindSharedLedgerForm = reactive({
     token: '',
-    label: ''
+    aliases: [] as string[]
 })
 const bindSharedLedgerRules: FormRules = {
-    token: [{ required: true, message: '请输入对方的访问令牌', trigger: 'blur' }],
-    label: [{ max: 64, message: '备注不能超过 64 个字符', trigger: 'blur' }]
+    token: [{ required: true, message: '请输入对方的访问令牌', trigger: 'blur' }]
 }
 
 const handleUnauthorized = () => {
@@ -1374,18 +1377,34 @@ const fetchSharedLedgers = async () => {
 
 const resetBindSharedLedgerForm = () => {
     bindSharedLedgerFormRef.value?.resetFields()
+    bindSharedLedgerForm.aliases = []
 }
 
 const handleBindSharedLedger = async () => {
     if (!bindSharedLedgerFormRef.value) return
     await bindSharedLedgerFormRef.value.validate()
 
+    // 客户端归一化：去首尾空白、丢弃空项、按不区分大小写去重；任一项超长则中止提交
+    const normalized: string[] = []
+    const seen = new Set<string>()
+    for (const raw of bindSharedLedgerForm.aliases) {
+        const value = raw.trim()
+        if (!value) continue
+        if (value.length > 64) {
+            ElMessage.warning('别名不能超过 64 个字符')
+            return
+        }
+        const key = value.toLowerCase()
+        if (seen.has(key)) continue
+        seen.add(key)
+        normalized.push(value)
+    }
+
     bindSharedLedgerLoading.value = true
     try {
-        const payload: BindSharedLedgerRequest = { token: bindSharedLedgerForm.token.trim() }
-        const label = bindSharedLedgerForm.label.trim()
-        if (label) {
-            payload.label = label
+        const payload: BindSharedLedgerRequest = {
+            token: bindSharedLedgerForm.token.trim(),
+            aliases: normalized
         }
         await bindSharedLedger(payload)
         ElMessage.success('共享账本已添加')
@@ -1606,6 +1625,17 @@ onMounted(() => {
 
 .shared-ledger-dialog-tip {
     margin-bottom: 16px;
+}
+
+.shared-ledger-alias-select {
+    width: 100%;
+}
+
+.shared-ledger-alias-hint {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ep-text-color-secondary);
 }
 
 .token-table {

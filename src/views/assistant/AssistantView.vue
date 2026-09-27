@@ -177,7 +177,7 @@
               class="composer-scope__select" placeholder="选择参与对比的账本" :disabled="!canChat || loading">
               <el-option :value="SELF_LEDGER" label="我的账本" disabled />
               <el-option v-for="binding in usableSharedLedgers" :key="binding.id" :value="binding.id"
-                :label="binding.label || binding.owner_username" />
+                :label="binding.aliases?.[0] || binding.owner_username" />
             </el-select>
           </div>
           <div class="composer-footer">
@@ -344,8 +344,14 @@ function sharedLedgerLabel(query: QueryRecord): string {
   if (!query.ledger || query.ledger === 'self') {
     return ''
   }
-  const binding = sharedLedgers.value.find((item) => item.owner_username === query.ledger)
-  return binding ? binding.label || binding.owner_username : query.ledger
+  // query.ledger 为共享账本的某个别名；无别名时为来源用户名，命中别名时附带来源用户名便于区分
+  const binding = sharedLedgers.value.find(
+    (item) => item.aliases?.includes(query.ledger!) || item.owner_username === query.ledger,
+  )
+  if (binding && query.ledger !== binding.owner_username) {
+    return `${query.ledger}（${binding.owner_username}）`
+  }
+  return query.ledger
 }
 
 async function fetchSharedLedgers() {

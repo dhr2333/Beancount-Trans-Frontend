@@ -31,7 +31,7 @@ export interface QueryRecord {
   result_preview: string
   fava_path?: string
   report?: QueryReportLink | null
-  /** 查询所属账本；'self' 或省略表示「我的账本」，其他值为共享账本所有者的用户名 */
+  /** 查询所属账本；'self' 或省略表示「我的账本」；其他值为共享账本的某个别名（无别名时为来源用户名） */
   ledger?: string
 }
 
@@ -129,8 +129,8 @@ export interface SharedLedgerBinding {
   id: number
   /** 共享账本所有者的用户名 */
   owner_username: string
-  /** 备注 */
-  label: string
+  /** 别名列表（可为空；Copilot 可用其中任意一个别名识别该账本，为空时使用 owner_username） */
+  aliases: string[]
   /** 令牌当前是否可用（未撤销且未过期） */
   usable: boolean
   /** 令牌过期时间；null 表示长期有效 */
@@ -145,6 +145,6 @@ export interface SharedLedgerBinding {
 export interface BindSharedLedgerRequest {
   /** 对方提供的 bct_… 个人访问令牌 */
   token: string
-  /** 备注（可选，≤64） */
-  label?: string
+  /** 别名列表（可选；每项 ≤64，不能为保留值 self，不能与其他绑定重复） */
+  aliases?: string[]
 }
