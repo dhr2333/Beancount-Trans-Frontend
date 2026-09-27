@@ -63,6 +63,8 @@ export interface AssistantStatus {
   deep_think_supported: boolean
   ledger_exists: boolean
   ledger_path: string
+  /** 是否已绑定至少一个可用的共享账本（本人账本缺失时仍可使用 Copilot） */
+  has_usable_shared_ledger?: boolean
   reference_date?: string
 }
 

@@ -103,7 +103,8 @@ export function useAssistantChat(options: {
   const canChat = computed(() => {
     if (statusLoading.value) return false
     if (!status.value) return false
-    return status.value.api_key_configured && status.value.ledger_exists
+    const hasAccessibleLedger = status.value.ledger_exists || Boolean(status.value.has_usable_shared_ledger)
+    return status.value.api_key_configured && hasAccessibleLedger
   })
 
   const deepThinkSupported = computed(() => status.value?.deep_think_supported ?? false)

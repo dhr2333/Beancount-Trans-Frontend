@@ -16,12 +16,14 @@
         </template>
       </el-alert>
 
-      <el-alert v-if="!statusLoading && status && !status.ledger_exists" type="info" :closable="false" show-icon
-        class="setup-alert" title="账本尚未就绪">
+      <el-alert v-if="!statusLoading && status && !status.ledger_exists && !status.has_usable_shared_ledger" type="info"
+        :closable="false" show-icon class="setup-alert" title="账本尚未就绪">
         <template #default>
           请先在
           <router-link to="/file" class="alert-link">文件管理</router-link>
-          上传并解析账单，生成账本后再使用 Copilot。
+          上传并解析账单生成自己的账本，或到
+          <router-link to="/settings" class="alert-link">个人设置 → 共享账本</router-link>
+          绑定他人共享的账本后再使用 Copilot。
         </template>
       </el-alert>
 
@@ -175,7 +177,7 @@
             <span class="composer-scope__label">账本范围</span>
             <el-select v-model="ledgerScope" multiple collapse-tags collapse-tags-tooltip size="small"
               class="composer-scope__select" placeholder="选择参与分析的账本" :disabled="!canChat || loading">
-              <el-option :value="SELF_LEDGER" label="我的账本" disabled />
+              <el-option :value="SELF_LEDGER" :label="status?.ledger_exists ? '我的账本' : '我的账本（未创建）'" disabled />
               <el-option v-for="binding in usableSharedLedgers" :key="binding.id" :value="binding.id"
                 :label="binding.aliases?.[0] || binding.owner_username" />
             </el-select>
