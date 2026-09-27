@@ -173,15 +173,6 @@
           <el-input ref="composerInputRef" v-model="inputText" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }"
             placeholder="给 Beancount-Trans Copilot 发送消息" :disabled="!canChat || loading" resize="none"
             @keydown.enter.exact.prevent="handleSend" />
-          <div v-if="usableSharedLedgers.length" class="composer-scope">
-            <span class="composer-scope__label">账本范围</span>
-            <el-select v-model="ledgerScope" multiple collapse-tags collapse-tags-tooltip size="small"
-              class="composer-scope__select" placeholder="选择参与分析的账本" :disabled="!canChat || loading">
-              <el-option :value="SELF_LEDGER" :label="status?.ledger_exists ? '我的账本' : '我的账本（未创建）'" disabled />
-              <el-option v-for="binding in usableSharedLedgers" :key="binding.id" :value="binding.id"
-                :label="binding.aliases?.[0] || binding.owner_username" />
-            </el-select>
-          </div>
           <div class="composer-footer">
             <span class="composer-meta">{{ modelLabel }}</span>
             <div class="input-actions">
@@ -262,7 +253,6 @@ const {
   loading,
   sessionLoading,
   deepThink,
-  sharedBindingIds,
   status,
   statusLoading,
   error,
@@ -326,20 +316,7 @@ function statusHint(phase?: AssistantPhase): string {
   return '正在思考...'
 }
 
-/** 「我的账本」在账本范围选择器中的固定哨兵值（始终隐式包含，不作为 id 发送）。 */
-const SELF_LEDGER = 'self'
-
 const sharedLedgers = ref<SharedLedgerBinding[]>([])
-/** 仅可用的共享账本会出现在账本范围选择器中。 */
-const usableSharedLedgers = computed(() => sharedLedgers.value.filter((binding) => binding.usable))
-
-/** 账本范围选择器：固定包含「我的账本」，其余为共享账本绑定 id。 */
-const ledgerScope = computed<(string | number)[]>({
-  get: () => [SELF_LEDGER, ...sharedBindingIds.value],
-  set: (value) => {
-    sharedBindingIds.value = value.filter((item): item is number => item !== SELF_LEDGER)
-  },
-})
 
 /** 将查询记录中的 ledger 解析为共享账本的展示名称（self 或未设置时返回空字符串）。 */
 function sharedLedgerLabel(query: QueryRecord): string {
@@ -360,10 +337,6 @@ async function fetchSharedLedgers() {
   try {
     const { data } = await listSharedLedgers()
     sharedLedgers.value = data
-    // 默认选中全部可用的共享账本，便于开箱即用地综合分析
-    sharedBindingIds.value = data
-      .filter((binding) => binding.usable)
-      .map((binding) => binding.id)
   } catch {
     sharedLedgers.value = []
   }
@@ -1047,24 +1020,6 @@ onUnmounted(() => {
     padding: 8px 4px;
     overflow-y: hidden;
   }
-}
-
-.composer-scope {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 4px 0;
-}
-
-.composer-scope__label {
-  flex-shrink: 0;
-  font-size: 12px;
-  color: var(--ep-text-color-secondary);
-}
-
-.composer-scope__select {
-  flex: 1;
-  min-width: 0;
 }
 
 .composer-footer {
