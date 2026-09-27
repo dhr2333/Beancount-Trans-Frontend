@@ -92,6 +92,7 @@ export function useAssistantChat(options: {
   const loading = ref(false)
   const sessionLoading = ref(false)
   const deepThink = ref(false)
+  const sharedBindingIds = ref<number[]>([])
   const status = ref<AssistantStatus | null>(null)
   const statusLoading = ref(false)
   const error = ref<string | null>(null)
@@ -196,6 +197,7 @@ export function useAssistantChat(options: {
             result_preview: event.data.result_preview,
             fava_path: event.data.fava_path,
             report: event.data.report,
+            ledger: event.data.ledger,
           })
         }
         break
@@ -449,6 +451,7 @@ export function useAssistantChat(options: {
         content: text,
         show_bql: false,
         deep_think: deepThink.value,
+        shared_binding_ids: sharedBindingIds.value,
         ...(editMessageId ? { edit_message_id: editMessageId } : {}),
       }
 
@@ -589,6 +592,7 @@ export function useAssistantChat(options: {
     loading,
     sessionLoading,
     deepThink,
+    sharedBindingIds,
     status,
     statusLoading,
     error,

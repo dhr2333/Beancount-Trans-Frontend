@@ -9,6 +9,8 @@ import type {
   AssistantSessionSummary,
   AssistantStatus,
   AssistantStreamEvent,
+  BindSharedLedgerRequest,
+  SharedLedgerBinding,
 } from '../types/assistant'
 
 export function getAssistantStatus(): Promise<{ data: AssistantStatus }> {
@@ -50,6 +52,26 @@ export function submitAssistantFeedback(
   request: AssistantFeedbackRequest
 ): Promise<{ data: AssistantFeedbackResponse }> {
   return axios.post('/assistant/feedback/', request)
+}
+
+/**
+ * 列出当前用户已绑定的共享账本。
+ * 后端为不带分页的 ListModelMixin，直接返回 JSON 数组。
+ */
+export function listSharedLedgers(): Promise<{ data: SharedLedgerBinding[] }> {
+  return axios.get('/assistant/shared-ledgers/')
+}
+
+/** 通过对方的个人访问令牌绑定一个共享账本 */
+export function bindSharedLedger(
+  payload: BindSharedLedgerRequest
+): Promise<{ data: SharedLedgerBinding }> {
+  return axios.post('/assistant/shared-ledgers/', payload)
+}
+
+/** 解除共享账本绑定 */
+export function unbindSharedLedger(id: number): Promise<void> {
+  return axios.delete(`/assistant/shared-ledgers/${id}/`)
 }
 
 /** SSE 空闲超时：超过该时间未收到任何帧则中止请求。 */
