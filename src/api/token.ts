@@ -30,10 +30,9 @@ export const createPersonalAccessToken = async (
 }
 
 /**
- * 撤销访问令牌（幂等，重复撤销不报错）
- * POST /api/auth/tokens/{id}/revoke/
+ * 删除访问令牌（删除后使用该令牌的客户端立即失去访问权限）
+ * DELETE /api/auth/tokens/{id}/
  */
-export const revokePersonalAccessToken = async (id: number): Promise<PersonalAccessToken> => {
-  const response = await axios.post<PersonalAccessToken>(`/auth/tokens/${id}/revoke/`)
-  return response.data
+export const deletePersonalAccessToken = async (id: number): Promise<void> => {
+  await axios.delete(`/auth/tokens/${id}/`)
 }

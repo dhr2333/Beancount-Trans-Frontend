@@ -130,7 +130,7 @@
 
                             <el-alert type="info" :closable="false" class="token-tip">
                                 <template #default>
-                                    把令牌交给他人等于把该账本的只读权限分享给他；建议为每次分享单独创建令牌，需要收回时直接撤销。
+                                    把令牌交给他人等于把该账本的只读权限分享给他；建议为每次分享单独创建令牌，需要收回时直接删除。
                                 </template>
                             </el-alert>
 
@@ -165,9 +165,8 @@
                                 </el-table-column>
                                 <el-table-column label="操作" width="90" fixed="right">
                                     <template #default="{ row }">
-                                        <el-button link type="danger" :disabled="!!row.revoked_at"
-                                            @click="handleRevokeToken(row)">
-                                            撤销
+                                        <el-button link type="danger" @click="handleDeleteToken(row)">
+                                            删除
                                         </el-button>
                                     </template>
                                 </el-table-column>
@@ -616,7 +615,7 @@ import type { GitRepository } from '../../types/git'
 import {
     listPersonalAccessTokens,
     createPersonalAccessToken,
-    revokePersonalAccessToken
+    deletePersonalAccessToken
 } from '../../api/token'
 import type { PersonalAccessToken, CreateTokenRequest } from '../../types/token'
 import {
@@ -1378,11 +1377,11 @@ const copyToken = async () => {
     }
 }
 
-const handleRevokeToken = async (token: PersonalAccessToken) => {
+const handleDeleteToken = async (token: PersonalAccessToken) => {
     try {
         await ElMessageBox.confirm(
-            `撤销后，使用「${token.name}」的 MCP 客户端将立即失去访问权限，此操作不可恢复。`,
-            '撤销访问令牌',
+            `删除后，使用「${token.name}」的 MCP 客户端将立即失去访问权限，此操作不可恢复。`,
+            '删除访问令牌',
             {
                 ...defaultConfirmOptions,
                 confirmButtonClass: 'settings-confirm-danger'
@@ -1393,11 +1392,11 @@ const handleRevokeToken = async (token: PersonalAccessToken) => {
     }
 
     try {
-        await revokePersonalAccessToken(token.id)
-        ElMessage.success('访问令牌已撤销')
+        await deletePersonalAccessToken(token.id)
+        ElMessage.success('访问令牌已删除')
         await fetchTokens()
     } catch (error: any) {
-        ElMessage.error(error.response?.data?.detail || '撤销访问令牌失败')
+        ElMessage.error(error.response?.data?.detail || '删除访问令牌失败')
     }
 }
 
