@@ -198,7 +198,7 @@
                                     <template #default="{ row }">
                                         <span class="shared-ledger-alias-cell"
                                             @click="openEditSharedLedgerAliasesDialog(row)">
-                                            {{ row.aliases?.length ? row.aliases.join('、') : '—' }}
+                                            {{ row.aliases?.length ? row.aliases.join('、') : '/' }}
                                         </span>
                                     </template>
                                 </el-table-column>
@@ -213,12 +213,12 @@
                                 </el-table-column>
                                 <el-table-column label="令牌有效期" min-width="160">
                                     <template #default="{ row }">
-                                        {{ formatTokenTime(row.expires_at) }}
+                                        {{ formatTokenTime(row.expires_at, '/') }}
                                     </template>
                                 </el-table-column>
                                 <el-table-column label="最后使用时间" min-width="160">
                                     <template #default="{ row }">
-                                        {{ formatTokenTime(row.last_used_at) }}
+                                        {{ formatTokenTime(row.last_used_at, '/') }}
                                     </template>
                                 </el-table-column>
                                 <el-table-column label="操作" width="110" fixed="right">
