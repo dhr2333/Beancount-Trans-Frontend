@@ -11,6 +11,7 @@ import type {
   AssistantStreamEvent,
   BindSharedLedgerRequest,
   SharedLedgerBinding,
+  UpdateSharedLedgerAliasesRequest,
 } from '../types/assistant'
 
 export function getAssistantStatus(): Promise<{ data: AssistantStatus }> {
@@ -72,6 +73,14 @@ export function bindSharedLedger(
 /** 解除共享账本绑定 */
 export function unbindSharedLedger(id: number): Promise<void> {
   return axios.delete(`/assistant/shared-ledgers/${id}/`)
+}
+
+/** 更新共享账本别名（整体覆盖） */
+export function updateSharedLedgerAliases(
+  id: number,
+  payload: UpdateSharedLedgerAliasesRequest
+): Promise<{ data: SharedLedgerBinding }> {
+  return axios.patch(`/assistant/shared-ledgers/${id}/`, payload)
 }
 
 /** SSE 空闲超时：超过该时间未收到任何帧则中止请求。 */

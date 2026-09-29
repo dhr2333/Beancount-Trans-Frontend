@@ -197,7 +197,10 @@
                                 class="token-table">
                                 <el-table-column label="别名" min-width="140" show-overflow-tooltip>
                                     <template #default="{ row }">
-                                        {{ row.aliases?.length ? row.aliases.join('、') : '—' }}
+                                        <span class="shared-ledger-alias-cell"
+                                            @click="openEditSharedLedgerAliasesDialog(row)">
+                                            {{ row.aliases?.length ? row.aliases.join('、') : '—' }}
+                                        </span>
                                     </template>
                                 </el-table-column>
                                 <el-table-column prop="owner_username" label="来源用户" min-width="140"
@@ -412,6 +415,31 @@
                 </template>
             </el-dialog>
 
+            <!-- 编辑共享账本别名对话框 -->
+            <el-dialog v-model="showEditSharedLedgerAliasesDialog" title="编辑别名" width="520px"
+                @closed="resetEditSharedLedgerAliasesForm">
+                <el-form ref="editSharedLedgerAliasesFormRef" :model="editSharedLedgerAliasesForm" label-width="70px">
+                    <el-form-item label="来源用户">
+                        <span>{{ editSharedLedgerAliasesForm.ownerUsername }}</span>
+                    </el-form-item>
+                    <el-form-item label="别名" prop="aliases">
+                        <el-select v-model="editSharedLedgerAliasesForm.aliases" multiple filterable allow-create
+                            default-first-option :reserve-keyword="false" class="shared-ledger-alias-select"
+                            placeholder="留空时使用来源用户名" />
+                        <div class="shared-ledger-alias-hint">
+                            Copilot 命中其中任意一个即可识别该账本。
+                        </div>
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <el-button @click="showEditSharedLedgerAliasesDialog = false">取消</el-button>
+                    <el-button type="primary" :loading="editSharedLedgerAliasesLoading"
+                        @click="handleUpdateSharedLedgerAliases">
+                        保存
+                    </el-button>
+                </template>
+            </el-dialog>
+
             <!-- 绑定手机号对话框 -->
             <el-dialog v-model="showBindPhoneDialog" title="绑定手机号" width="400px">
                 <el-form ref="bindPhoneFormRef" :model="bindPhoneForm" :rules="bindPhoneRules">
@@ -594,9 +622,14 @@ import type { PersonalAccessToken, CreateTokenRequest } from '../../types/token'
 import {
     listSharedLedgers,
     bindSharedLedger,
-    unbindSharedLedger
+    unbindSharedLedger,
+    updateSharedLedgerAliases
 } from '../../api/assistant'
-import type { SharedLedgerBinding, BindSharedLedgerRequest } from '../../types/assistant'
+import type {
+    SharedLedgerBinding,
+    BindSharedLedgerRequest,
+    UpdateSharedLedgerAliasesRequest
+} from '../../types/assistant'
 import { copyText } from '../../utils/clipboard'
 import GitSetup from '../../components/git/GitSetup.vue'
 import GitRepositoryComponent from '../../components/git/GitRepository.vue'
@@ -640,6 +673,16 @@ const bindSharedLedgerForm = reactive({
 const bindSharedLedgerRules: FormRules = {
     token: [{ required: true, message: '请输入对方的访问令牌', trigger: 'blur' }]
 }
+
+// 编辑共享账本别名状态
+const showEditSharedLedgerAliasesDialog = ref(false)
+const editSharedLedgerAliasesLoading = ref(false)
+const editSharedLedgerAliasesFormRef = ref<FormInstance>()
+const editSharedLedgerAliasesForm = reactive({
+    id: 0,
+    ownerUsername: '',
+    aliases: [] as string[]
+})
 
 const handleUnauthorized = () => {
     if (!unauthorizedNotified.value) {
@@ -1380,25 +1423,34 @@ const resetBindSharedLedgerForm = () => {
     bindSharedLedgerForm.aliases = []
 }
 
-const handleBindSharedLedger = async () => {
-    if (!bindSharedLedgerFormRef.value) return
-    await bindSharedLedgerFormRef.value.validate()
-
-    // 客户端归一化：去首尾空白、丢弃空项、按不区分大小写去重；任一项超长则中止提交
+/**
+ * 归一化别名输入：去首尾空白、丢弃空项、按不区分大小写去重。
+ * 任一项超过 64 个字符时提示并返回 null，调用方据此中止提交。
+ */
+const normalizeSharedLedgerAliases = (raw: string[]): string[] | null => {
     const normalized: string[] = []
     const seen = new Set<string>()
-    for (const raw of bindSharedLedgerForm.aliases) {
-        const value = raw.trim()
+    for (const item of raw) {
+        const value = item.trim()
         if (!value) continue
         if (value.length > 64) {
             ElMessage.warning('别名不能超过 64 个字符')
-            return
+            return null
         }
         const key = value.toLowerCase()
         if (seen.has(key)) continue
         seen.add(key)
         normalized.push(value)
     }
+    return normalized
+}
+
+const handleBindSharedLedger = async () => {
+    if (!bindSharedLedgerFormRef.value) return
+    await bindSharedLedgerFormRef.value.validate()
+
+    const normalized = normalizeSharedLedgerAliases(bindSharedLedgerForm.aliases)
+    if (!normalized) return
 
     bindSharedLedgerLoading.value = true
     try {
@@ -1414,6 +1466,38 @@ const handleBindSharedLedger = async () => {
         ElMessage.error(error.response?.data?.detail || '添加共享账本失败')
     } finally {
         bindSharedLedgerLoading.value = false
+    }
+}
+
+const openEditSharedLedgerAliasesDialog = (binding: SharedLedgerBinding) => {
+    editSharedLedgerAliasesForm.id = binding.id
+    editSharedLedgerAliasesForm.ownerUsername = binding.owner_username
+    editSharedLedgerAliasesForm.aliases = [...binding.aliases]
+    showEditSharedLedgerAliasesDialog.value = true
+}
+
+const resetEditSharedLedgerAliasesForm = () => {
+    editSharedLedgerAliasesFormRef.value?.resetFields()
+    editSharedLedgerAliasesForm.id = 0
+    editSharedLedgerAliasesForm.ownerUsername = ''
+    editSharedLedgerAliasesForm.aliases = []
+}
+
+const handleUpdateSharedLedgerAliases = async () => {
+    const normalized = normalizeSharedLedgerAliases(editSharedLedgerAliasesForm.aliases)
+    if (!normalized) return
+
+    editSharedLedgerAliasesLoading.value = true
+    try {
+        const payload: UpdateSharedLedgerAliasesRequest = { aliases: normalized }
+        await updateSharedLedgerAliases(editSharedLedgerAliasesForm.id, payload)
+        ElMessage.success('别名已更新')
+        showEditSharedLedgerAliasesDialog.value = false
+        await fetchSharedLedgers()
+    } catch (error: any) {
+        ElMessage.error(error.response?.data?.detail || '更新别名失败')
+    } finally {
+        editSharedLedgerAliasesLoading.value = false
     }
 }
 
@@ -1636,6 +1720,16 @@ onMounted(() => {
     font-size: 12px;
     line-height: 1.5;
     color: var(--ep-text-color-secondary);
+}
+
+/* 点击别名即可编辑：用可点击文本替代单独的操作按钮 */
+.shared-ledger-alias-cell {
+    cursor: pointer;
+    color: var(--ep-color-primary);
+}
+
+.shared-ledger-alias-cell:hover {
+    text-decoration: underline;
 }
 
 .token-table {

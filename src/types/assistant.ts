@@ -148,3 +148,9 @@ export interface BindSharedLedgerRequest {
   /** 别名列表（可选；每项 ≤64，不能为保留值 self，不能与其他绑定重复） */
   aliases?: string[]
 }
+
+/** 更新共享账本别名请求参数（整体覆盖） */
+export interface UpdateSharedLedgerAliasesRequest {
+  /** 新的别名列表；传空数组表示清除别名（每项 ≤64，不能为保留值 self，不能与其他绑定重复） */
+  aliases: string[]
+}
