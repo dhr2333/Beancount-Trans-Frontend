@@ -1,7 +1,7 @@
 <template>
   <div class="assistant-layout">
     <AssistantSessionSidebar ref="sessionSidebarRef" :sessions="sessions" :sessions-loading="sessionsLoading"
-      v-model:search-query="searchQuery" :active-session-id="sessionId" :collapsed="!sidebarOpen"
+      v-model:search-query="searchQuery" :active-session-id="activeSessionId" :collapsed="!sidebarOpen"
       @new-chat="handleNewChat" @select="handleSelectSession" @rename="handleRenameSession"
       @delete="handleDeleteSession" @search="fetchSessions" @collapse="sidebarOpen = false"
       @expand="sidebarOpen = true" />
@@ -259,6 +259,7 @@ const {
   messages,
   loading,
   sessionLoading,
+  activeSessionId,
   deepThink,
   status,
   statusLoading,
@@ -511,12 +512,14 @@ function handleNewChat() {
 }
 
 function handleSelectSession(id: string) {
-  if (id === sessionId.value) {
+  if (id === activeSessionId.value) {
     return
   }
   cancelEdit()
   exitShareSelectMode()
   stickToBottom.value = true
+  // 立即切换当前会话，避免路由参数延迟更新时把消息发到上一个会话
+  activeSessionId.value = id
   router.push(`/assistant/${id}`)
 }
 
@@ -545,8 +548,8 @@ async function handleDeleteSession(id: string) {
       type: 'warning',
     })
     await removeSession(id)
-    if (sessionId.value === id) {
-      router.push('/assistant')
+    if (activeSessionId.value === id) {
+      startNewChat()
     }
   } catch {
     // 用户取消
@@ -676,7 +679,7 @@ watch(messages, () => {
   }
 }, { deep: true })
 
-watch(sessionId, () => {
+watch(activeSessionId, () => {
   cancelEdit()
 })
 

@@ -86,7 +86,12 @@ export function useAssistantChat(options: {
   router: Router
   onSessionsChanged?: () => void
 }) {
-  const { sessionId, router, onSessionsChanged } = options
+  const { sessionId: routedSessionId, router, onSessionsChanged } = options
+
+  // 当前会话 id：以「用户意图」为准（新对话/切换会话时立即生效），不直接依赖路由参数。
+  // 路由守卫是异步的（会 await /auth/profile/me/），router.push 之后一段时间内
+  // route.params.sessionId 仍是旧值，若此时发送消息就会落到上一个会话。
+  const activeSessionId = ref<string | undefined>(routedSessionId.value)
 
   const messages = ref<ChatMessage[]>([])
   const loading = ref(false)
@@ -98,6 +103,8 @@ export function useAssistantChat(options: {
   let abortController: AbortController | null = null
   let activeRequestId = 0
   let userStopRequested = false
+  // 首条消息创建会话后会 replace 到新地址；该地址变化不应触发重新从服务端加载
+  let skipNextLoadId: string | undefined
 
   const canChat = computed(() => {
     if (statusLoading.value) return false
@@ -162,7 +169,9 @@ export function useAssistantChat(options: {
         if (assistant && event.data.assistant_message_id) {
           assistant.id = event.data.assistant_message_id
         }
-        if (!sessionId.value) {
+        activeSessionId.value = event.data.id
+        if (routedSessionId.value !== event.data.id) {
+          skipNextLoadId = event.data.id
           router.replace(`/assistant/${event.data.id}`)
         }
         onSessionsChanged?.()
@@ -328,6 +337,7 @@ export function useAssistantChat(options: {
       const err = e as { response?: { status?: number; data?: { detail?: string } } }
       if (err.response?.status === 404) {
         ElMessage.warning('会话不存在或无权访问')
+        activeSessionId.value = undefined
         router.replace('/assistant')
       } else {
         error.value = err.response?.data?.detail || '加载会话失败'
@@ -339,14 +349,16 @@ export function useAssistantChat(options: {
   }
 
   watch(
-    sessionId,
+    routedSessionId,
     async (id, previousId) => {
       if (id === previousId) {
         return
       }
 
-      // 首条消息创建会话并 replace URL 时，保持本地流式状态，不从服务端覆盖
-      if (loading.value && !previousId && id) {
+      // 消费一次「首条消息创建会话」标记：该次地址变化时本地已持有该会话的流式状态，无需加载
+      const skipLoadId = skipNextLoadId
+      skipNextLoadId = undefined
+      if (id && id === skipLoadId) {
         return
       }
 
@@ -354,11 +366,13 @@ export function useAssistantChat(options: {
         abortSubscription()
       }
       if (!id) {
-        if (previousId) {
+        // 仅当之后没有再创建新会话时才清空：push('/assistant') 与 replace(新会话) 可能竞争
+        if (!activeSessionId.value) {
           messages.value = []
         }
         return
       }
+      activeSessionId.value = id
       await loadSession(id)
     },
     { immediate: true },
@@ -402,7 +416,7 @@ export function useAssistantChat(options: {
 
     const editMessageId = options?.editMessageId
     if (editMessageId) {
-      if (!sessionId.value) {
+      if (!activeSessionId.value) {
         ElMessage.error('当前会话尚未保存，无法编辑历史消息')
         return false
       }
@@ -447,7 +461,7 @@ export function useAssistantChat(options: {
 
     try {
       const payload = {
-        session_id: sessionId.value,
+        session_id: activeSessionId.value,
         content: text,
         show_bql: false,
         deep_think: deepThink.value,
@@ -578,10 +592,12 @@ export function useAssistantChat(options: {
 
   function startNewChat() {
     abortSubscription()
+    // 先清空当前会话，避免路由参数延迟更新时把新提问发到上一个会话
+    activeSessionId.value = undefined
     messages.value = []
     error.value = null
     loading.value = false
-    if (sessionId.value) {
+    if (routedSessionId.value) {
       router.push('/assistant')
     }
   }
@@ -590,6 +606,7 @@ export function useAssistantChat(options: {
     messages,
     loading,
     sessionLoading,
+    activeSessionId,
     deepThink,
     status,
     statusLoading,
