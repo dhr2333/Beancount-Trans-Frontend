@@ -1,3 +1,10 @@
+## [5.15.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.15.0...5.15.1) (2026-09-30)
+
+### Bug Fixes
+
+* **assistant:** 修复会话ID不同步导致消息发错会话 ([844ec19](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/844ec1950318ab90e792a93bebc93c1cc347d579))
+* **assistant:** 添加聊天消息重新生成按钮 ([0dbe2b0](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/0dbe2b04a7d038efe04e294afa33c4f6138d3640))
+
 ## [5.15.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.14.0...5.15.0) (2026-09-27)
 
 ### Features
