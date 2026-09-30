@@ -107,6 +107,13 @@
                   </el-icon>
                   复制
                 </el-button>
+                <el-button v-if="!shareSelectMode" size="small" text :disabled="loading || sharing"
+                  @click="handleRegenerate(index)">
+                  <el-icon>
+                    <Refresh />
+                  </el-icon>
+                  重新生成
+                </el-button>
                 <el-button v-if="!shareSelectMode" size="small" text :disabled="sharing"
                   @click="handleShareClick(index)">
                   <el-icon>
@@ -212,7 +219,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { CheckboxValueType, InputInstance } from 'element-plus'
-import { ChatDotRound, CircleCheck, CircleClose, DocumentCopy, EditPen, Share } from '@element-plus/icons-vue'
+import { ChatDotRound, CircleCheck, CircleClose, DocumentCopy, EditPen, Refresh, Share } from '@element-plus/icons-vue'
 import AssistantSessionSidebar from '../../components/assistant/AssistantSessionSidebar.vue'
 import AssistantShareCard from '../../components/assistant/AssistantShareCard.vue'
 import AssistantThinkingBlock from '../../components/assistant/AssistantThinkingBlock.vue'
@@ -630,6 +637,13 @@ async function confirmEdit() {
   cancelEdit()
   stickToBottom.value = true
   await send(text, { editMessageId })
+  await scrollToBottom()
+}
+
+async function handleRegenerate(index: number) {
+  if (loading.value) return
+  stickToBottom.value = true
+  await retryFromAssistant(index)
   await scrollToBottom()
 }
 
