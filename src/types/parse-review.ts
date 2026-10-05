@@ -101,6 +101,8 @@ export interface ReparseRequest {
   entry_uuid: string
   selected_key: string
   mapping_type?: 'expense' | 'income' | 'asset'
+  /** 新增/编辑映射时置 true：把关键字补充为同批匹配条目的候选分类 */
+  propagate_candidates?: boolean
 }
 
 /**
@@ -117,6 +119,19 @@ export interface ReparseResponse {
   }>
   tag_details?: TagDetail[]
   tag_overrides?: TagOverrides
+  /** propagate_candidates 时，被补充候选分类的其他条目（仅候选变化） */
+  candidate_updated_entries?: CandidateUpdatedEntry[]
+}
+
+/**
+ * 候选分类被补充的条目（当前分类不变）
+ */
+export interface CandidateUpdatedEntry {
+  uuid: string
+  expense_candidates_with_score: Array<{
+    key: string
+    score: number
+  }>
 }
 
 /**

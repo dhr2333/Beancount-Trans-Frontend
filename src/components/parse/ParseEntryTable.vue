@@ -1,12 +1,6 @@
 <template>
-  <el-table v-if="entries.length > 0" :data="entries" row-key="uuid" style="width: 100%" border
-    highlight-current-row>
-    <el-table-column
-      v-if="props.showSourceFile"
-      label="来源账单"
-      width="180"
-      show-overflow-tooltip
-    >
+  <el-table v-if="entries.length > 0" :data="entries" row-key="uuid" style="width: 100%" border highlight-current-row>
+    <el-table-column v-if="props.showSourceFile" label="来源账单" width="180" show-overflow-tooltip>
       <template #default="scope">
         <el-tag v-if="scope.row.source === 'copilot'" type="info" size="small">Copilot 记账</el-tag>
         <template v-else>
@@ -16,42 +10,23 @@
     </el-table-column>
     <el-table-column label="Beancount 条目预览" min-width="400">
       <template #default="scope">
-        <div
-          :class="getEntryClasses(scope.row.uuid, scope.row.edited_formatted)"
-        >
+        <div :class="getEntryClasses(scope.row.uuid, scope.row.edited_formatted)">
           <template v-if="!isEntryTextEditMode(scope.row.uuid)">
-            <div
-              class="entry-preview-render"
-              role="textbox"
-              tabindex="0"
+            <div class="entry-preview-render" role="textbox" tabindex="0"
               @click="onEntryPreviewShellClick(scope.row, $event)"
-              @keydown.enter.prevent="startTextEdit(scope.row.uuid)"
-            >
-              <div
-                v-for="(pline, li) in buildLineSegments(scope.row.edited_formatted)"
-                :key="li"
-                class="entry-preview-line"
-              >
+              @keydown.enter.prevent="startTextEdit(scope.row.uuid)">
+              <div v-for="(pline, li) in buildLineSegments(scope.row.edited_formatted)" :key="li"
+                class="entry-preview-line">
                 <template v-for="(seg, si) in pline.segments" :key="`${li}-${si}`">
-                  <span
-                    v-if="seg.kind === 'tag'"
-                    class="entry-preview-tag-chip"
-                    @click.stop
-                  >
+                  <span v-if="seg.kind === 'tag'" class="entry-preview-tag-chip" @click.stop>
                     <el-tooltip placement="top" :show-after="200">
                       <template #content>
                         <div class="entry-preview-tag-tooltip">
-                          <div
-                            v-for="(source, sidx) in getTagSourcesForPath(scope.row, seg.path)"
-                            :key="sidx"
-                            class="entry-preview-tag-source-line"
-                          >
-                            <button
-                              v-if="source.type === 'mapping' && source.key"
-                              type="button"
+                          <div v-for="(source, sidx) in getTagSourcesForPath(scope.row, seg.path)" :key="sidx"
+                            class="entry-preview-tag-source-line">
+                            <button v-if="source.type === 'mapping' && source.key" type="button"
                               class="entry-preview-tag-source-link"
-                              @click.stop="openEditMappingForRowByKey(scope.row, source)"
-                            >
+                              @click.stop="openEditMappingForRowByKey(scope.row, source)">
                               {{ formatTagSourceLabel(source) }}
                             </button>
                             <span v-else>{{ formatTagSourceLabel(source) }}</span>
@@ -60,48 +35,29 @@
                       </template>
                       <span class="entry-preview-tag-link">{{ seg.text }}</span>
                     </el-tooltip>
-                    <button
-                      type="button"
-                      class="entry-preview-tag-remove"
-                      aria-label="移除标签"
-                      @click.stop="removeTagFromEntry(scope.row, seg.path)"
-                    >
+                    <button type="button" class="entry-preview-tag-remove" aria-label="移除标签"
+                      @click.stop="removeTagFromEntry(scope.row, seg.path)">
                       ×
                     </button>
                   </span>
-                  <button
-                    v-else-if="seg.kind === 'account'"
-                    type="button"
-                    class="entry-preview-account-link"
-                    @click.stop="openAccountAssistFromSegment(scope.row, seg, $event)"
-                  >
+                  <button v-else-if="seg.kind === 'account'" type="button" class="entry-preview-account-link"
+                    @click.stop="openAccountAssistFromSegment(scope.row, seg, $event)">
                     {{ seg.text }}
                   </button>
                   <span v-else class="entry-preview-plain">{{ seg.text }}</span>
                 </template>
-                <button
-                  v-if="pline.isHeader"
-                  type="button"
-                  class="entry-preview-tag-add"
-                  @click.stop="openTagAssist(scope.row, $event)"
-                >
+                <button v-if="pline.isHeader" type="button" class="entry-preview-tag-add"
+                  @click.stop="openTagAssist(scope.row, $event)">
                   + 标签
                 </button>
               </div>
             </div>
           </template>
-          <el-input
-            v-else
-            :ref="(el: unknown) => setEntryInputRef(scope.row.uuid, el)"
-            v-model="scope.row.edited_formatted"
-            type="textarea"
-            :autosize="getEntryAutosize(scope.row.edited_formatted)"
-            class="entry-preview"
-            placeholder="编辑 Beancount 条目；失焦后返回预览。过账行中账户在预览模式下点击可更换"
-            @blur="onEntryTextareaBlur(scope.row)"
-            @input="clearTabCompleteSession(scope.row.uuid)"
-            @keydown.tab="bindEntryPreviewTab(scope.row)"
-          />
+          <el-input v-else :ref="(el: unknown) => setEntryInputRef(scope.row.uuid, el)"
+            v-model="scope.row.edited_formatted" type="textarea"
+            :autosize="getEntryAutosize(scope.row.edited_formatted)" class="entry-preview"
+            placeholder="编辑 Beancount 条目；失焦后返回预览。过账行中账户在预览模式下点击可更换" @blur="onEntryTextareaBlur(scope.row)"
+            @input="clearTabCompleteSession(scope.row.uuid)" @keydown.tab="bindEntryPreviewTab(scope.row)" />
           <div v-if="errorEntries[scope.row.uuid]" class="validation-message error-message">
             {{ errorEntries[scope.row.uuid] }}
           </div>
@@ -128,12 +84,8 @@
         <div v-else class="ai-classification-container">
           <div class="current-selection">
             <span class="label">{{ isNeutralParseReviewEntry(scope.row) ? '当前分类：' : '当前分类：' }}</span>
-            <el-tag
-              v-if="scope.row.selected_expense_key"
-              type="success"
-              class="selected-tag is-editable"
-              @click="openEditCurrentMappingForRow(scope.row)"
-            >
+            <el-tag v-if="scope.row.selected_expense_key" type="success" class="selected-tag is-editable"
+              @click="openEditCurrentMappingForRow(scope.row)">
               {{ scope.row.selected_expense_key }}
             </el-tag>
             <span v-else class="no-category-tip">{{ isNeutralParseReviewEntry(scope.row) ? '无分类建议' : '无分类建议' }}</span>
@@ -151,27 +103,21 @@
                   ({{ candidate.score }})
                 </span>
               </el-tag>
-              <el-button
-                v-if="shouldShowParseReviewCreateMapping(scope.row)"
-                size="small"
-                plain
-                @click="openCreateMappingForRow(scope.row)"
-                class="add-mapping-btn"
-              >
-                <el-icon><Plus /></el-icon> 新增映射
+              <el-button v-if="shouldShowParseReviewCreateMapping(scope.row)" size="small" plain
+                @click="openCreateMappingForRow(scope.row)" class="add-mapping-btn">
+                <el-icon>
+                  <Plus />
+                </el-icon> 新增映射
               </el-button>
             </div>
           </div>
           <div v-else class="candidates">
             <span class="label muted">无候选分类</span>
-            <el-button
-              v-if="shouldShowParseReviewCreateMapping(scope.row)"
-              size="small"
-              plain
-              @click="openCreateMappingForRow(scope.row)"
-              class="add-mapping-btn"
-            >
-              <el-icon><Plus /></el-icon> 新增映射
+            <el-button v-if="shouldShowParseReviewCreateMapping(scope.row)" size="small" plain
+              @click="openCreateMappingForRow(scope.row)" class="add-mapping-btn">
+              <el-icon>
+                <Plus />
+              </el-icon> 新增映射
             </el-button>
           </div>
         </div>
@@ -189,20 +135,12 @@
         <el-input v-model="mappingForm.key" placeholder="请输入关键字" />
       </el-form-item>
       <el-form-item label="映射账户" prop="accountId">
-        <AccountSelector v-model="mappingForm.accountId"
-          placeholder="请选择或搜索账户" />
+        <AccountSelector v-model="mappingForm.accountId" placeholder="请选择或搜索账户" />
       </el-form-item>
       <el-form-item :label="mappingPartyLabel" :prop="mappingPartyProp">
-        <el-input
-          v-if="mappingForm.type === 'asset'"
-          v-model="mappingForm.full"
-          placeholder="选填：对方信息"
-        />
-        <el-input
-          v-else
-          v-model="mappingForm.party"
-          :placeholder="mappingForm.type === 'expense' ? '如腾讯、星巴克' : '选填：付款方信息'"
-        />
+        <el-input v-if="mappingForm.type === 'asset'" v-model="mappingForm.full" placeholder="选填：对方信息" />
+        <el-input v-else v-model="mappingForm.party"
+          :placeholder="mappingForm.type === 'expense' ? '如腾讯、星巴克' : '选填：付款方信息'" />
       </el-form-item>
       <el-form-item label="标签" prop="tag_ids">
         <TagSelector v-model="mappingForm.tag_ids" multiple :show-preview="false" placeholder="请选择标签" />
@@ -218,47 +156,20 @@
 
   <!-- 点击预览内账户：浮动选择器（Teleport 至 body，兼容 EP 2.3 无 trigger=manual 类型） -->
   <Teleport to="body">
-    <div
-      v-if="accountPopover.visible"
-      class="parse-review-account-overlay"
-      @click.self="closeAccountAssistOverlay"
-    >
-      <div
-        class="parse-review-account-panel"
-        :style="accountAssistPanelStyle"
-        @click.stop
-      >
+    <div v-if="accountPopover.visible" class="parse-review-account-overlay" @click.self="closeAccountAssistOverlay">
+      <div class="parse-review-account-panel" :style="accountAssistPanelStyle" @click.stop>
         <div class="parse-review-account-original">{{ accountPopover.originalToken }}</div>
-        <div
-          v-if="accountDescriptionByName[accountPopover.originalToken]"
-          class="parse-review-account-desc"
-        >
+        <div v-if="accountDescriptionByName[accountPopover.originalToken]" class="parse-review-account-desc">
           {{ accountDescriptionByName[accountPopover.originalToken] }}
         </div>
-        <el-input
-          ref="accountOverlayQueryRef"
-          v-model="accountAssistQuery"
-          class="parse-review-account-query"
-          clearable
-          placeholder="输入账户名或描述筛选；↑↓ 选择，回车 / Tab 确认"
-          @keydown="onOverlayQueryKeydown"
-        />
-        <ul
-          v-if="overlayAccountMatches.length > 0"
-          ref="accountSuggestionsListRef"
-          class="parse-review-account-suggestions"
-          role="listbox"
-        >
-          <li
-            v-for="(item, idx) in overlayAccountMatches"
-            :key="item.account"
-            role="option"
-            :class="[
-              'parse-review-account-suggestion-item',
-              { 'is-active': idx === overlayActiveIndex }
-            ]"
-            @click="applyAccountReplacementByName(item.account)"
-          >
+        <el-input ref="accountOverlayQueryRef" v-model="accountAssistQuery" class="parse-review-account-query" clearable
+          placeholder="输入账户名或描述筛选；↑↓ 选择，回车 / Tab 确认" @keydown="onOverlayQueryKeydown" />
+        <ul v-if="overlayAccountMatches.length > 0" ref="accountSuggestionsListRef"
+          class="parse-review-account-suggestions" role="listbox">
+          <li v-for="(item, idx) in overlayAccountMatches" :key="item.account" role="option" :class="[
+            'parse-review-account-suggestion-item',
+            { 'is-active': idx === overlayActiveIndex }
+          ]" @click="applyAccountReplacementByName(item.account)">
             <span class="parse-review-account-suggestion-name">{{ item.account }}</span>
             <span v-if="item.description" class="parse-review-account-suggestion-desc">
               {{ item.description }}
@@ -271,41 +182,17 @@
 
   <!-- 点击预览内标签：添加标签浮层 -->
   <Teleport to="body">
-    <div
-      v-if="tagPopover.visible"
-      class="parse-review-tag-overlay"
-      @click.self="closeTagAssistOverlay"
-    >
-      <div
-        class="parse-review-tag-panel"
-        :style="tagAssistPanelStyle"
-        @click.stop
-      >
+    <div v-if="tagPopover.visible" class="parse-review-tag-overlay" @click.self="closeTagAssistOverlay">
+      <div class="parse-review-tag-panel" :style="tagAssistPanelStyle" @click.stop>
         <div class="parse-review-tag-panel-title">添加标签</div>
-        <el-input
-          ref="tagOverlayQueryRef"
-          v-model="tagAssistQuery"
-          class="parse-review-tag-query"
-          clearable
-          placeholder="搜索标签路径；↑↓ 选择，回车添加"
-          @keydown="onTagOverlayQueryKeydown"
-        />
-        <ul
-          v-if="overlayTagMatches.length > 0"
-          ref="tagSuggestionsListRef"
-          class="parse-review-tag-suggestions"
-          role="listbox"
-        >
-          <li
-            v-for="(item, idx) in overlayTagMatches"
-            :key="item.full_path"
-            role="option"
-            :class="[
-              'parse-review-tag-suggestion-item',
-              { 'is-active': idx === tagOverlayActiveIndex }
-            ]"
-            @click="applyTagAddition(item.full_path)"
-          >
+        <el-input ref="tagOverlayQueryRef" v-model="tagAssistQuery" class="parse-review-tag-query" clearable
+          placeholder="搜索标签路径；↑↓ 选择，回车添加" @keydown="onTagOverlayQueryKeydown" />
+        <ul v-if="overlayTagMatches.length > 0" ref="tagSuggestionsListRef" class="parse-review-tag-suggestions"
+          role="listbox">
+          <li v-for="(item, idx) in overlayTagMatches" :key="item.full_path" role="option" :class="[
+            'parse-review-tag-suggestion-item',
+            { 'is-active': idx === tagOverlayActiveIndex }
+          ]" @click="applyTagAddition(item.full_path)">
             <span class="parse-review-tag-suggestion-name">#{{ item.full_path }}</span>
             <span v-if="item.description" class="parse-review-tag-suggestion-desc">
               {{ item.description }}
@@ -354,7 +241,8 @@ const props = defineProps<{
   onReparse: (
     uuid: string,
     selectedKey: string,
-    mappingType?: 'expense' | 'income' | 'asset'
+    mappingType?: 'expense' | 'income' | 'asset',
+    propagateCandidates?: boolean
   ) => Promise<void>
   onPersistEdit: (
     uuid: string,
@@ -469,7 +357,7 @@ const buildParseReviewMappingOptions = (row: FormattedEntry) => ({
   getCreateDefaults: getParseReviewCreateDefaults,
   requireAuth: props.requireAuth,
   onReparse: (key: string, type: 'expense' | 'income' | 'asset') =>
-    props.onReparse(row.uuid, key, type === 'asset' ? 'asset' : undefined)
+    props.onReparse(row.uuid, key, type === 'asset' ? 'asset' : undefined, true)
 })
 
 const openCreateMappingForRow = (row: FormattedEntry) => {
@@ -511,8 +399,9 @@ const handleKeywordSelect = async (uuid: string, selectedKey: string) => {
   flex-shrink: 0;
   font-size: 12px;
   line-height: 1.6;
-  
+
   &.has-error {
+
     :deep(.el-textarea__inner),
     :deep(.ep-textarea__inner),
     .entry-preview-render {
@@ -520,8 +409,9 @@ const handleKeywordSelect = async (uuid: string, selectedKey: string) => {
       box-shadow: 0 0 0 1px var(--el-color-danger) inset;
     }
   }
-  
+
   &.has-warning {
+
     :deep(.el-textarea__inner),
     :deep(.ep-textarea__inner),
     .entry-preview-render {
@@ -529,8 +419,9 @@ const handleKeywordSelect = async (uuid: string, selectedKey: string) => {
       box-shadow: 0 0 0 1px var(--el-color-warning) inset;
     }
   }
-  
+
   &.has-other {
+
     :deep(.el-textarea__inner),
     :deep(.ep-textarea__inner),
     .entry-preview-render {
@@ -543,16 +434,15 @@ const handleKeywordSelect = async (uuid: string, selectedKey: string) => {
 
 // 暗黑模式下：避免 primary-light-* 过亮导致文本对比度差
 :deep(html.dark) .entry-preview-wrapper.has-other {
+
   :deep(.el-textarea__inner),
   :deep(.ep-textarea__inner),
   .entry-preview-render {
     /* el-config-provider namespace=ep：暗黑语义在 --ep-*，--el-* 在 dist/index.css 中仍为亮色 */
     color: var(--ep-text-color-primary, var(--el-text-color-primary));
-    background-color: color-mix(
-      in srgb,
-      var(--ep-color-primary, var(--el-color-primary)) 18%,
-      var(--ep-bg-color, var(--el-bg-color))
-    );
+    background-color: color-mix(in srgb,
+        var(--ep-color-primary, var(--el-color-primary)) 18%,
+        var(--ep-bg-color, var(--el-bg-color)));
   }
 }
 
@@ -562,12 +452,12 @@ const handleKeywordSelect = async (uuid: string, selectedKey: string) => {
   line-height: 1.4;
   padding: 4px 8px;
   border-radius: 4px;
-  
+
   &.error-message {
     color: var(--el-color-danger);
     background-color: var(--el-color-danger-light-9);
   }
-  
+
   &.warning-message {
     color: var(--el-color-warning);
     background-color: var(--el-color-warning-light-9);
@@ -621,16 +511,11 @@ $entry-preview-min-height: calc(1 * 1.6em + 10px + 2px);
   word-break: break-word;
   padding: $entry-preview-inner-padding;
   border-radius: $entry-preview-inner-radius;
-  border: $entry-preview-inner-border
-    var(--ep-input-border-color, var(--el-input-border-color, var(--ep-border-color, var(--el-border-color))));
-  background-color: var(
-    --ep-input-bg-color,
-    var(--el-input-bg-color, var(--ep-fill-color-blank, var(--el-fill-color-blank)))
-  );
-  color: var(
-    --ep-input-text-color,
-    var(--el-input-text-color, var(--ep-text-color-regular, var(--el-text-color-regular)))
-  );
+  border: $entry-preview-inner-border var(--ep-input-border-color, var(--el-input-border-color, var(--ep-border-color, var(--el-border-color))));
+  background-color: var(--ep-input-bg-color,
+      var(--el-input-bg-color, var(--ep-fill-color-blank, var(--el-fill-color-blank))));
+  color: var(--ep-input-text-color,
+      var(--el-input-text-color, var(--ep-text-color-regular, var(--el-text-color-regular))));
   cursor: text;
   outline: none;
   transition: border-color 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
@@ -643,22 +528,19 @@ $entry-preview-min-height: calc(1 * 1.6em + 10px + 2px);
   }
 
   .entry-preview-render:hover {
-    border-color: var(
-      --ep-input-hover-border-color,
-      var(--el-input-hover-border-color, var(--ep-border-color-hover, var(--el-border-color-hover)))
-    );
+    border-color: var(--ep-input-hover-border-color,
+        var(--el-input-hover-border-color, var(--ep-border-color-hover, var(--el-border-color-hover))));
   }
 
   .entry-preview-render:focus-visible {
-    border-color: var(
-      --ep-input-hover-border-color,
-      var(--el-input-hover-border-color, var(--ep-border-color-hover, var(--el-border-color-hover)))
-    );
+    border-color: var(--ep-input-hover-border-color,
+        var(--el-input-hover-border-color, var(--ep-border-color-hover, var(--el-border-color-hover))));
     box-shadow: none;
   }
 }
 
 .entry-preview-wrapper.is-entry-edit-mode:not(.has-error):not(.has-warning):not(.has-other) {
+
   :deep(.el-textarea__inner),
   :deep(.ep-textarea__inner) {
     border-color: var(--ep-color-primary, var(--el-color-primary));
@@ -857,11 +739,9 @@ html.dark .no-category-tip {
   position: fixed;
   inset: 0;
   z-index: 3000;
-  background-color: color-mix(
-    in srgb,
-    var(--ep-overlay-color-lighter, var(--el-overlay-color-lighter, #000)) 12%,
-    transparent
-  );
+  background-color: color-mix(in srgb,
+      var(--ep-overlay-color-lighter, var(--el-overlay-color-lighter, #000)) 12%,
+      transparent);
 }
 
 .parse-review-account-panel {
@@ -959,11 +839,9 @@ html.dark .parse-review-account-suggestion-item.is-active {
   position: fixed;
   inset: 0;
   z-index: 3000;
-  background-color: color-mix(
-    in srgb,
-    var(--ep-overlay-color-lighter, var(--el-overlay-color-lighter, #000)) 12%,
-    transparent
-  );
+  background-color: color-mix(in srgb,
+      var(--ep-overlay-color-lighter, var(--el-overlay-color-lighter, #000)) 12%,
+      transparent);
 }
 
 .parse-review-tag-panel {

@@ -5,7 +5,8 @@
       <div class="header-left">
         <h2>条目审核</h2>
         <el-text type="info" size="small" style="display: block; margin-top: 4px;">
-          共 {{ entryCount }} 条 · {{ fileSourceCount }} 个账单<template v-if="copilotEntryCount > 0"> · Copilot 记账 {{ copilotEntryCount }} 条</template>
+          共 {{ entryCount }} 条 · {{ fileSourceCount }} 个账单<template v-if="copilotEntryCount > 0"> · Copilot 记账 {{
+            copilotEntryCount }} 条</template>
         </el-text>
         <!-- <el-text v-if="remainingTime" type="info" size="small" style="display: block; margin-top: 4px;">
           剩余时间：{{ remainingTime }}
@@ -15,15 +16,13 @@
         <el-dropdown v-if="reparseSourceFiles.length > 0" :disabled="reviewExpired" @command="handleReparseAll">
           <el-button :loading="loading.reparseAll" :disabled="reviewExpired">
             重新解析
-            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            <el-icon class="el-icon--right">
+              <ArrowDown />
+            </el-icon>
           </el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item
-                v-for="file in reparseSourceFiles"
-                :key="file.key"
-                :command="file.file_id"
-              >
+              <el-dropdown-item v-for="file in reparseSourceFiles" :key="file.key" :command="file.file_id">
                 重新解析「{{ file.file_name }}」
               </el-dropdown-item>
             </el-dropdown-menu>
@@ -33,30 +32,16 @@
       </div>
     </div>
 
-    <el-alert
-      v-if="reviewExpired"
-      type="warning"
-      :closable="false"
-      show-icon
-      title="解析待办已过期，系统将自动写入"
-      description="审核截止时间已过，无法再编辑或确认写入。"
-      class="expired-banner"
-    />
+    <el-alert v-if="reviewExpired" type="warning" :closable="false" show-icon title="解析待办已过期，系统将自动写入"
+      description="审核截止时间已过，无法再编辑或确认写入。" class="expired-banner" />
 
     <!-- 加载状态 -->
     <div v-loading="loading.results" class="content-container" :class="{ 'is-review-expired': reviewExpired }">
       <!-- 审核结果表格 -->
-      <ParseEntryTable
-        :entries="formattedEntries"
-        :error-entries="errorEntries"
-        :validation-warnings="validationWarnings"
-        :disabled="reviewExpired"
-        :show-source-file="true"
-        :on-reparse="handleTableReparse"
-        :on-persist-edit="persistEntryEdit"
-        :on-patch-tags="handleTablePatchTags"
-        :on-remove-entry="removeEntryFromReview"
-      />
+      <ParseEntryTable :entries="formattedEntries" :error-entries="errorEntries"
+        :validation-warnings="validationWarnings" :disabled="reviewExpired" :show-source-file="true"
+        :on-reparse="handleTableReparse" :on-persist-edit="persistEntryEdit" :on-patch-tags="handleTablePatchTags"
+        :on-remove-entry="removeEntryFromReview" />
     </div>
 
     <!-- 底部操作栏 -->
@@ -82,21 +67,11 @@
       </template>
     </el-dialog>
 
-    <el-dialog
-      v-model="reparsePasswordDialogVisible"
-      title="输入解密密码"
-      width="450px"
-      :close-on-click-modal="false"
-    >
+    <el-dialog v-model="reparsePasswordDialogVisible" title="输入解密密码" width="450px" :close-on-click-modal="false">
       <p class="reparse-password-tip">
         全部重新解析会覆盖该账单的手改内容。若文件已加密，请输入密码后重试。
       </p>
-      <el-input
-        v-model="reparsePassword"
-        type="password"
-        placeholder="密码（选填）"
-        show-password
-      />
+      <el-input v-model="reparsePassword" type="password" placeholder="密码（选填）" show-password />
       <template #footer>
         <el-button @click="reparsePasswordDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="loading.reparseAll" @click="confirmReparseAllWithPassword">
@@ -267,7 +242,8 @@ const applyReparsePayloadToEntry = (entryUuid: string, updated: ReparseResponse)
 const handleTableReparse = async (
   entryUuid: string,
   selectedKey: string,
-  mappingType?: 'expense' | 'income' | 'asset'
+  mappingType?: 'expense' | 'income' | 'asset',
+  propagateCandidates = false
 ) => {
   const entry = formattedEntries.value.find((item) => item.uuid === entryUuid)
   if (entry?.source === 'copilot') {
@@ -282,11 +258,28 @@ const handleTableReparse = async (
     file_id: locator.fileId,
     entry_uuid: entryUuid,
     selected_key: selectedKey,
-    ...(mappingType ? { mapping_type: mappingType } : {})
+    ...(mappingType ? { mapping_type: mappingType } : {}),
+    ...(propagateCandidates ? { propagate_candidates: true } : {})
   })
   const updated = response.data
   applyReparsePayloadToEntry(entryUuid, updated)
+
+  // 新增/编辑映射时，仅同步其他匹配条目的候选分类，不动其当前分类
+  const candidateUpdated = updated.candidate_updated_entries ?? []
+  for (const item of candidateUpdated) {
+    const index = formattedEntries.value.findIndex((e) => e.uuid === item.uuid)
+    if (index !== -1) {
+      formattedEntries.value[index] = {
+        ...formattedEntries.value[index],
+        expense_candidates_with_score: item.expense_candidates_with_score
+      }
+    }
+  }
+
   ElMessage.success('已更新分类')
+  if (candidateUpdated.length > 0) {
+    ElMessage.success(`已为 ${candidateUpdated.length} 条相似条目补充候选分类`)
+  }
 }
 
 /** 表格内标签增删，返回后端最新的 tag 字段供组件回写 */
