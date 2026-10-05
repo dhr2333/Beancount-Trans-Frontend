@@ -117,7 +117,6 @@ export interface ReparseResponse {
   }>
   tag_details?: TagDetail[]
   tag_overrides?: TagOverrides
-  propagated_entries?: ReparseResponse[]
 }
 
 /**

@@ -286,15 +286,7 @@ const handleTableReparse = async (
   })
   const updated = response.data
   applyReparsePayloadToEntry(entryUuid, updated)
-
-  const propagated = updated.propagated_entries ?? []
-  for (const item of propagated) {
-    applyReparsePayloadToEntry(item.uuid, item)
-  }
   ElMessage.success('已更新分类')
-  if (propagated.length > 0) {
-    ElMessage.success(`已自动套用 ${propagated.length} 条相似条目`)
-  }
 }
 
 /** 表格内标签增删，返回后端最新的 tag 字段供组件回写 */
