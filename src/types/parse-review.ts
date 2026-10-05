@@ -128,6 +128,8 @@ export interface ReparseResponse {
  */
 export interface CandidateUpdatedEntry {
   uuid: string
+  /** 条目所属账单文件 ID */
+  file_id: number
   expense_candidates_with_score: Array<{
     key: string
     score: number

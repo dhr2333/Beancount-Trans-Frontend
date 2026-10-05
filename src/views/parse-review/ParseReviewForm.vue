@@ -264,10 +264,12 @@ const handleTableReparse = async (
   const updated = response.data
   applyReparsePayloadToEntry(entryUuid, updated)
 
-  // 新增/编辑映射时，仅同步其他匹配条目的候选分类，不动其当前分类
+  // 新增/编辑映射时，仅同步解析审核页其他匹配条目的候选分类，不动其当前分类
   const candidateUpdated = updated.candidate_updated_entries ?? []
   for (const item of candidateUpdated) {
-    const index = formattedEntries.value.findIndex((e) => e.uuid === item.uuid)
+    const index = formattedEntries.value.findIndex(
+      (e) => e.uuid === item.uuid && e.file_id === item.file_id
+    )
     if (index !== -1) {
       formattedEntries.value[index] = {
         ...formattedEntries.value[index],
