@@ -60,7 +60,9 @@
         <el-alert title="注意事项" type="info" :closable="false" show-icon class="notice-alert">
           <ul class="notice-list">
             <li><strong>平台创建</strong>：仅在集成的 Gitea 上新建仓库（模板或空库）</li>
-            <li><strong>关联远程</strong>：支持关联任意可公网访问的 SSH 仓库（GitHub / GitLab / Gitea / Gogs / 自建）；平台会生成用于<strong>拉取</strong>账本的 Deploy Key（公钥加到远程）并给出 Webhook 配置，本地推送仍使用您自己的 Git 凭据（如需平台「提交到账本」写回，须给该公钥写权限）</li>
+            <li><strong>关联远程</strong>：支持关联任意可公网访问的 SSH 仓库（GitHub / GitLab / Gitea / Gogs /
+              自建）；平台会生成用于<strong>拉取</strong>账本的
+              Deploy Key（公钥加到远程）并给出 Webhook 配置，本地推送仍使用您自己的 Git 凭据（如需平台「提交到账本」写回，须给该公钥写权限）</li>
             <li>仓库体积建议控制在约 20MB 以内，适合个人账本</li>
           </ul>
         </el-alert>
@@ -129,12 +131,25 @@
         <div class="card-header">
           <div>
             <h3>关联远程仓库</h3>
-            <el-text type="info" size="small">请使用 SSH 克隆地址（git@… 或 ssh://…），支持 GitHub / GitLab / Gitea / Gogs 及自建 Git</el-text>
+            <el-text type="info" size="small">请使用 SSH 克隆地址（git@… 或 ssh://…），支持 GitHub / GitLab / Gitea / Gogs 及自建
+              Git</el-text>
           </div>
         </div>
       </template>
 
       <div class="form-wrap">
+        <el-alert type="warning" :closable="false" show-icon title="关联已有账本前，请先完成三处改造" class="ledger-adapt-alert">
+          <ul class="notice-list">
+            <li>仓库根目录需有入口文件 <code>main.bean</code></li>
+            <li><code>main.bean</code> 中需包含 <code>include "trans/main.bean"</code></li>
+            <li><code>.gitignore</code> 中需包含 <code>trans/</code></li>
+          </ul>
+          <el-text type="info" size="small">
+            详见
+            <a :href="gitSyncDocUrl" target="_blank" rel="noopener">「配置 Git 同步」文档</a>。
+          </el-text>
+        </el-alert>
+
         <el-form label-position="top" class="external-form">
           <el-form-item label="SSH 地址" required>
             <el-input v-model="linkForm.remote_ssh_url" placeholder="git@github.com:owner/repo.git" clearable />
@@ -154,15 +169,8 @@
           </el-form-item>
           <el-collapse class="link-advanced-collapse">
             <el-collapse-item title="高级选项（一般无需填写）" name="advanced">
-              <el-form-item
-                label="仓库全名"
-                class="advanced-form-item"
-              >
-                <el-input
-                  v-model="linkForm.external_full_name"
-                  placeholder="owner/repo；留空则由平台从 SSH 地址解析"
-                  clearable
-                />
+              <el-form-item label="仓库全名" class="advanced-form-item">
+                <el-input v-model="linkForm.external_full_name" placeholder="owner/repo；留空则由平台从 SSH 地址解析" clearable />
                 <el-text type="info" size="small" class="field-hint">
                   用于与 Webhook 载荷中的仓库路径匹配；仅当地址无法解析时再填。
                 </el-text>
@@ -232,6 +240,19 @@
           </el-card>
         </div>
 
+        <el-alert v-if="selectedOption === false" type="warning" :closable="false" show-icon title="关联已有账本前，请先完成三处改造"
+          class="ledger-adapt-alert">
+          <ul class="notice-list">
+            <li>仓库根目录需有入口文件 <code>main.bean</code></li>
+            <li><code>main.bean</code> 中需包含 <code>include "trans/main.bean"</code></li>
+            <li><code>.gitignore</code> 中需包含 <code>trans/</code></li>
+          </ul>
+          <el-text type="info" size="small">
+            详见
+            <a :href="gitSyncDocUrl" target="_blank" rel="noopener">「配置 Git 同步」文档</a>。
+          </el-text>
+        </el-alert>
+
         <div class="action-buttons">
           <el-button size="large" @click="backToPathFromHosted">返回</el-button>
           <el-button type="primary" size="large" :loading="loading" :disabled="selectedOption === undefined"
@@ -266,6 +287,9 @@ type Step =
 const step = ref<Step>('intro')
 const loading = ref(false)
 const selectedOption = ref<boolean | undefined>(undefined)
+
+const gitSyncDocUrl =
+  'https://trans.dhr2333.cn/docs/%E6%93%8D%E4%BD%9C%E6%8C%87%E5%8D%97/git-sync'
 
 interface LinkForm {
   remote_ssh_url: string
@@ -332,7 +356,7 @@ const selectOption = (option: boolean) => {
 const pickErrorMessage = (error: unknown, fallback: string) => {
   if (error && typeof error === 'object' && 'response' in error) {
     const r = error as {
-      response?: { data?: { error?: string; [field: string]: unknown } }
+      response?: { data?: { error?: string;[field: string]: unknown } }
     }
     const data = r.response?.data
     if (data) {
@@ -461,6 +485,10 @@ const submitCreateHosted = async () => {
 
 .notice-alert {
   margin-bottom: 24px;
+}
+
+.ledger-adapt-alert {
+  margin-bottom: 16px;
 }
 
 .notice-list {
