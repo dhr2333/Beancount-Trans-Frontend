@@ -38,7 +38,7 @@
           class="linked-remote-intro">
           <template #title>关联远程：完成平台侧对接</template>
           <p class="linked-intro-text">
-            请按顺序展开下方<strong>步骤 1、步骤 2</strong>，在托管平台配置公钥与 Webhook。本地 Git 的克隆与推送由您自行完成，此处仅说明如何让平台从您的远程仓库拉取。
+            请按顺序展开下方<strong>步骤 1、步骤 2</strong>，在托管平台配置公钥与 Webhook。本地 Git 的克隆由您自行完成；平台从该远程仓库拉取账本。若要让平台把审核后的条目写回仓库，请使用 <strong>「提交到账本」</strong>（需给该公钥写权限）。
           </p>
           <el-text type="warning" size="small" class="mt-2">
             Webhook Secret 仅首次展示，请务必及时复制保存。刷新或重新进入页面后通常不再显示。如丢失请删除仓库后重新关联。
@@ -248,6 +248,8 @@ git push origin {{ defaultBranch }}</code></pre>
               <p v-if="repository.webhook_callback_url"><strong>Webhook：</strong>推送至上述分支且远程已配置 Webhook
                 后，平台会尝试自动拉取；也可手动点击「立即同步」。</p>
               <p v-else><strong>注意：</strong>平台托管仓库由 Gitea 触发同步；您也可随时使用「立即同步」。</p>
+              <p><strong>提交到账本：</strong>平台审核通过的条目可用操作区的「提交到账本」写回
+                <code>{年}/{月}.bean</code> 并推送，本地 <code>git pull</code> 取回。</p>
             </div>
           </el-collapse-item>
 

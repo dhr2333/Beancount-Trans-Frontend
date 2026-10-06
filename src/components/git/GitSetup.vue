@@ -60,7 +60,7 @@
         <el-alert title="注意事项" type="info" :closable="false" show-icon class="notice-alert">
           <ul class="notice-list">
             <li><strong>平台创建</strong>：仅在集成的 Gitea 上新建仓库（模板或空库）</li>
-            <li><strong>关联远程</strong>：支持关联任意可公网访问的 SSH 仓库（GitHub / GitLab / Gitea / Gogs / 自建）；平台会生成<strong>只读拉取</strong>用的 Deploy Key（公钥加到远程）并给出 Webhook 配置，本地推送仍使用您自己的 Git 凭据</li>
+            <li><strong>关联远程</strong>：支持关联任意可公网访问的 SSH 仓库（GitHub / GitLab / Gitea / Gogs / 自建）；平台会生成用于<strong>拉取</strong>账本的 Deploy Key（公钥加到远程）并给出 Webhook 配置，本地推送仍使用您自己的 Git 凭据（如需平台「提交到账本」写回，须给该公钥写权限）</li>
             <li>仓库体积建议控制在约 20MB 以内，适合个人账本</li>
           </ul>
         </el-alert>
