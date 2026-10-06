@@ -13,8 +13,7 @@
             <el-text type="info" size="small" class="subtitle">管理您的 Git 仓库和同步设置</el-text>
           </div>
           <div class="header-right">
-            <el-tag
-              :type="repository.sync_paused ? SyncStatusType.paused : SyncStatusType[repository.sync_status]"
+            <el-tag :type="repository.sync_paused ? SyncStatusType.paused : SyncStatusType[repository.sync_status]"
               :icon="getSyncIcon(repository.sync_paused ? 'paused' : repository.sync_status)" effect="plain">
               {{ repository.sync_paused ? SyncStatusText.paused : SyncStatusText[repository.sync_status] }}
             </el-tag>
@@ -38,7 +37,8 @@
           class="linked-remote-intro">
           <template #title>关联远程：完成平台侧对接</template>
           <p class="linked-intro-text">
-            请按顺序展开下方<strong>步骤 1、步骤 2</strong>，在托管平台配置公钥与 Webhook。本地 Git 的克隆由您自行完成；平台从该远程仓库拉取账本。若要让平台把审核后的条目写回仓库，请使用 <strong>「提交到账本」</strong>（需给该公钥写权限）。
+            请按顺序展开下方<strong>步骤 1、步骤 2</strong>，在托管平台配置公钥与 Webhook。本地 Git 的克隆由您自行完成；平台从该远程仓库拉取账本。若要让平台把审核后的条目写回仓库，请使用
+            <strong>「提交到账本」</strong>（需给该公钥写权限）。
           </p>
           <el-text type="warning" size="small" class="mt-2">
             Webhook Secret 仅首次展示，请务必及时复制保存。刷新或重新进入页面后通常不再显示。如丢失请删除仓库后重新关联。
@@ -148,7 +148,8 @@
             <div class="instruction-content link-step-panel">
               <p>平台通过 Deploy Key 公钥从您的远程仓库拉取账本，与您在本地执行 <code>git push</code> 时使用的账户或 SSH
                 密钥<strong>无关</strong>。</p>
-              <p>在远程仓库（{{ providerLabel }}）的 <strong>{{ providerDeployKeyHint }}</strong> 中粘贴下方公钥，并勾选<strong>只读</strong>。</p>
+              <p>在远程仓库（{{ providerLabel }}）的 <strong>{{ providerDeployKeyHint }}</strong>
+                中粘贴下方公钥，并勾选<strong>只读</strong>。</p>
               <template v-if="repository.deploy_key_public">
                 <el-input type="textarea" :rows="4" :model-value="repository.deploy_key_public" readonly
                   class="ssh-url-input" />
@@ -165,7 +166,8 @@
           <el-collapse-item v-if="isLinkedRemote" title="步骤 2：配置 Webhook（推送后自动拉取）" name="link-webhook">
             <div class="instruction-content link-step-panel">
               <p>
-                在远程仓库（{{ providerLabel }}）的 Webhooks 设置中新增一条 push 事件：<strong>Payload URL</strong> 使用下方地址；<strong>Content type</strong>
+                在远程仓库（{{ providerLabel }}）的 Webhooks 设置中新增一条 push 事件：<strong>Payload URL</strong> 使用下方地址；<strong>Content
+                  type</strong>
                 选择
                 <code>application/json</code>；事件勾选 push。将平台提供的 Secret 填入 Secret / Token 字段（GitLab 为
                 <strong>Secret token</strong>，GitHub / Gitea / Gogs 为 <strong>Secret</strong>）。
@@ -242,14 +244,15 @@ EOF</code></pre>
               <p>编辑账本后推送到默认分支 <code>{{ defaultBranch }}</code>：</p>
               <div class="code-block">
                 <pre><code>git add .
-git commit -m "更新账本"
-git push origin {{ defaultBranch }}</code></pre>
+              git commit -m "更新账本"
+              git push origin {{ defaultBranch }}</code></pre>
               </div>
               <p v-if="repository.webhook_callback_url"><strong>Webhook：</strong>推送至上述分支且远程已配置 Webhook
                 后，平台会尝试自动拉取；也可手动点击「立即同步」。</p>
               <p v-else><strong>注意：</strong>平台托管仓库由 Gitea 触发同步；您也可随时使用「立即同步」。</p>
               <p><strong>提交到账本：</strong>平台审核通过的条目可用操作区的「提交到账本」写回
-                <code>{年}/{月}.bean</code> 并推送，本地 <code>git pull</code> 取回。</p>
+                <code>{年}/{月}.bean</code> 并推送，本地 <code>git pull</code> 取回。
+              </p>
             </div>
           </el-collapse-item>
 
@@ -297,9 +300,7 @@ git push origin {{ defaultBranch }}</code></pre>
                 <div class="setting-actions">
                   <el-popconfirm
                     :title="isLinkedRemote ? '确定要删除同步配置吗？这将停止同步并清除平台内配置，但不会删除远程仓库中的代码。' : '确定要删除仓库吗？这将停止同步并清除配置。'"
-                    @confirm="confirmDeleteRepository"
-                    width="260"
-                  >
+                    @confirm="confirmDeleteRepository" width="260">
                     <template #reference>
                       <el-button type="danger" plain size="small" :loading="deletingRepository">
                         <el-icon class="el-icon--left"><i-ep-delete /></el-icon>
@@ -589,7 +590,7 @@ const buildCommitPreviewHtml = (preview: LedgerCommitPreview): string => {
   const rows = preview.plans
     .map(
       (plan) =>
-        `<li>${escape(plan.target)}：新增 <b>${plan.new}</b> 条，跳过重复 ${plan.duplicate} 条</li>`
+        `<li>${escape(plan.target)}：<b>${plan.count}</b> 条</li>`
     )
     .join('')
   return (
@@ -633,9 +634,7 @@ const handleTransCommit = async () => {
     }
 
     const result = await commitTrans()
-    ElMessage.success(
-      `${result.message}（新增 ${result.entries_appended} 条，跳过重复 ${result.entries_duplicated} 条）`
-    )
+    ElMessage.success(`${result.message}（写入 ${result.entries_appended} 条）`)
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as { response?: { data?: { error?: string } } }

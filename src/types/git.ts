@@ -131,8 +131,7 @@ export interface LedgerCommitPlan {
   year: number
   month: number
   target: string
-  new: number
-  duplicate: number
+  count: number
 }
 
 // trans/ 文件解析错误
@@ -163,7 +162,6 @@ export interface LedgerCommitResult {
   message: string
   plans: LedgerCommitPlan[]
   entries_appended: number
-  entries_duplicated: number
   files_cleared: number
   push?: LedgerPushResult | null
 }
