@@ -1,3 +1,14 @@
+## [5.16.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.15.1...5.16.0) (2026-10-06)
+
+### Features
+
+* **git:** 实现 trans 条目迁移到月度账本功能 ([2ade2f6](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/2ade2f60d88ec606d17c066fa0975fb34a5e93f8))
+
+### Bug Fixes
+
+* **parse-review:** 修复条目匹配错误的问题 ([12f79c7](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/12f79c7d26d8e15aeb076afa1a07749e23e43dee))
+* **parse-review:** 实现分类映射的候选分类批量同步功能 ([e98b494](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/e98b4943bfa0363a19c7b4f87d019a002dd3d8e0))
+
 ## [5.15.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.15.0...5.15.1) (2026-09-30)
 
 ### Bug Fixes
