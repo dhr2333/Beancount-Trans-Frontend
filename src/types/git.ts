@@ -126,6 +126,48 @@ export interface ClearSyncedLedgerResponse {
   repo_name: string
 }
 
+// 单个月度文件的迁移计划
+export interface LedgerCommitPlan {
+  year: number
+  month: number
+  target: string
+  new: number
+  duplicate: number
+}
+
+// trans/ 文件解析错误
+export interface LedgerCommitError {
+  file: string
+  error: string
+}
+
+// 迁移预览响应
+export interface LedgerCommitPreview {
+  total_entries: number
+  files_scanned: number
+  plans: LedgerCommitPlan[]
+  errors: LedgerCommitError[]
+}
+
+// 推送结果
+export interface LedgerPushResult {
+  status: string
+  message: string
+  commit?: string | null
+  files?: string[]
+}
+
+// 迁移提交响应
+export interface LedgerCommitResult {
+  status: 'success' | 'skipped'
+  message: string
+  plans: LedgerCommitPlan[]
+  entries_appended: number
+  entries_duplicated: number
+  files_cleared: number
+  push?: LedgerPushResult | null
+}
+
 // API 错误响应
 export interface GitErrorResponse {
   error: string

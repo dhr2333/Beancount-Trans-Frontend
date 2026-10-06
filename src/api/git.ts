@@ -7,7 +7,9 @@ import type {
   SyncResponse,
   DeployKeyResponse,
   DeleteRepositoryResponse,
-  ClearSyncedLedgerResponse
+  ClearSyncedLedgerResponse,
+  LedgerCommitPreview,
+  LedgerCommitResult
 } from '../types/git'
 
 /**
@@ -100,13 +102,20 @@ export const getSyncStatus = async (): Promise<SyncStatusInfo> => {
 }
 
 /**
- * 下载 trans 目录压缩包
- * GET /api/git/trans/download/
+ * 预览 trans/ 条目迁移到月度账本
+ * POST /api/git/trans/commit/preview/
  */
-export const downloadTransArchive = async (): Promise<Blob> => {
-  const response = await axios.get(`/git/trans/download/`, {
-    responseType: 'blob'
-  })
+export const previewTransCommit = async (): Promise<LedgerCommitPreview> => {
+  const response = await axios.post(`/git/trans/commit/preview/`)
+  return response.data
+}
+
+/**
+ * 提交 trans/ 条目到月度账本并推送远程
+ * POST /api/git/trans/commit/
+ */
+export const commitTrans = async (): Promise<LedgerCommitResult> => {
+  const response = await axios.post(`/git/trans/commit/`)
   return response.data
 }
 
@@ -142,29 +151,6 @@ export const handleDeployKeyDownload = async (regenerate: boolean = false) => {
     return {
       success: true,
       message: regenerate ? 'Deploy Key 已重新生成并下载' : 'Deploy Key 已下载'
-    }
-  } catch (error: any) {
-    return {
-      success: false,
-      message: error.response?.data?.error || '下载失败'
-    }
-  }
-}
-
-/**
- * 工具函数：处理 Trans 目录下载
- */
-export const handleTransDownload = async () => {
-  try {
-    const blob = await downloadTransArchive()
-    const username = localStorage.getItem('username') || 'user'
-    const filename = `${username}_trans.zip`
-
-    downloadFile(blob, filename)
-
-    return {
-      success: true,
-      message: 'Trans 目录已下载'
     }
   } catch (error: any) {
     return {

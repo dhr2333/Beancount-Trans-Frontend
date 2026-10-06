@@ -124,9 +124,9 @@
 
       <!-- 操作按钮区域 -->
       <div class="actions-section">
-        <el-button type="success" plain :loading="downloadingTrans" @click="downloadTrans" class="action-btn-main">
-          <el-icon class="el-icon--left"><i-ep-download /></el-icon>
-          下载解析结果
+        <el-button type="success" plain :loading="committingTrans" @click="handleTransCommit" class="action-btn-main">
+          <el-icon class="el-icon--left"><i-ep-upload /></el-icon>
+          {{ committingTrans ? '提交中...' : '提交到账本' }}
         </el-button>
         <el-button v-if="!isLinkedRemote" type="primary" plain :loading="downloadingKey" @click="downloadDeployKey"
           class="action-btn-main">
@@ -321,7 +321,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   triggerSync as apiTriggerSync,
   handleDeployKeyDownload,
-  handleTransDownload,
+  previewTransCommit,
+  commitTrans,
   pollSyncStatus,
   deleteGitRepository as apiDeleteGitRepository,
   cancelSync as apiCancelSync
@@ -329,7 +330,8 @@ import {
 import {
   SyncStatusText,
   SyncStatusType,
-  type GitRepository
+  type GitRepository,
+  type LedgerCommitPreview
 } from '../../types/git'
 
 // 组件属性
@@ -347,7 +349,7 @@ const emit = defineEmits<{
 const syncing = ref(false)
 const downloadingKey = ref(false)
 const regeneratingKey = ref(false)
-const downloadingTrans = ref(false)
+const committingTrans = ref(false)
 const deletingRepository = ref(false)
 const cancellingSync = ref(false)
 
@@ -574,23 +576,73 @@ const handleCancelSync = async () => {
   }
 }
 
-const downloadTrans = async () => {
-  downloadingTrans.value = true
+/**
+ * 构建迁移预览的 HTML 摘要（用于确认弹窗）
+ */
+const buildCommitPreviewHtml = (preview: LedgerCommitPreview): string => {
+  const escape = (text: string) =>
+    text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  const header = `共扫描 <b>${preview.files_scanned}</b> 个文件、<b>${preview.total_entries}</b> 条条目：`
+  const rows = preview.plans
+    .map(
+      (plan) =>
+        `<li>${escape(plan.target)}：新增 <b>${plan.new}</b> 条，跳过重复 ${plan.duplicate} 条</li>`
+    )
+    .join('')
+  return (
+    `<div style="line-height:1.7">${header}` +
+    `<ul style="padding-left:18px;margin:8px 0">${rows}</ul>` +
+    `<span style="color:#909399;font-size:12px">提交后 trans/ 中的条目将被清空，且会推送到远程仓库，无法撤销。</span></div>`
+  )
+}
+
+/**
+ * 提交 trans/ 条目到月度账本：预览 → 确认 → 提交并推送
+ */
+const handleTransCommit = async () => {
+  committingTrans.value = true
 
   try {
-    const result = await handleTransDownload()
-    if (result.success) {
-      ElMessage.success(result.message)
-    } else {
-      ElMessage.error(result.message)
+    const preview = await previewTransCommit()
+
+    if (preview.errors?.length) {
+      ElMessage.error(`存在无法解析的文件：${preview.errors[0].file}`)
+      return
     }
-  } catch (error) {
-    // 理论上 handleTransDownload 内部已经 catch 了所有 error 并返回 { success: false }，
-    // 但为了保险起见，这里还是 catch 一下
-    console.error(error)
-    ElMessage.error('下载失败')
+    if (!preview.plans.length) {
+      ElMessage.info('trans/ 下没有可迁移的条目')
+      return
+    }
+
+    try {
+      await ElMessageBox.confirm(
+        buildCommitPreviewHtml(preview),
+        '确认提交到月度账本',
+        {
+          confirmButtonText: '提交并推送',
+          cancelButtonText: '取消',
+          type: 'warning',
+          dangerouslyUseHTMLString: true
+        }
+      )
+    } catch {
+      return // 用户取消
+    }
+
+    const result = await commitTrans()
+    ElMessage.success(
+      `${result.message}（新增 ${result.entries_appended} 条，跳过重复 ${result.entries_duplicated} 条）`
+    )
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { data?: { error?: string } } }
+      ElMessage.error(axiosError.response?.data?.error || '提交失败，请稍后重试')
+    } else {
+      ElMessage.error('网络错误，请稍后重试')
+    }
   } finally {
-    downloadingTrans.value = false
+    committingTrans.value = false
   }
 }
 
