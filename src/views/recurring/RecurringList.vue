@@ -239,7 +239,7 @@ function buildPayload(): RecurringTaskPayload {
         rule_text: form.value.rule_text.trim(),
         recurrence_basis: form.value.recurrence_basis,
         start_date: form.value.start_date,
-        template_ref: form.value.kind === 'generate_review' ? (form.value.template_ref || null) : null
+        template_ref: form.value.kind === 'generate_review' ? (form.value.template_ref || '') : ''
     }
 }
 
