@@ -22,9 +22,8 @@
                 <el-tree ref="accountTreeRef" :key="accountTreeRenderKey" :data="accountTree" :props="treeProps"
                     node-key="id" :expand-on-click-node="false" :default-expand-all="false"
                     :default-expanded-keys="expandedKeys" :current-node-key="currentSelectedAccountId ?? undefined"
-                    highlight-current class="account-tree" v-loading="loading"
-                    @node-click="handleNodeClick" @node-expand="handleNodeExpand"
-                    @node-collapse="handleNodeCollapse">
+                    highlight-current class="account-tree" v-loading="loading" @node-click="handleNodeClick"
+                    @node-expand="handleNodeExpand" @node-collapse="handleNodeCollapse">
                     <template #default="{ node, data }">
                         <div class="tree-node">
                             <span class="node-label">{{ data.account }}</span>
@@ -96,11 +95,13 @@
                             </el-descriptions-item> -->
                             <el-descriptions-item label="对账周期" v-if="shouldShowReconciliationCycle(selectedAccount)">
                                 <span
-                                    v-if="selectedAccount.reconciliation_cycle_unit && selectedAccount.reconciliation_cycle_interval">
-                                    每 {{ selectedAccount.reconciliation_cycle_interval }} {{
-                                        getCycleUnitLabel(selectedAccount.reconciliation_cycle_unit) }}
+                                    v-if="accountMappings.reconciliation_cycle_display && accountMappings.reconciliation_cycle_display !== '未设置'">
+                                    {{ accountMappings.reconciliation_cycle_display }}
                                 </span>
-                                <span v-else style="color: var(--ep-text-color-secondary);">未开启</span>
+                                <span v-else-if="selectedAccount.reconciliation_rule" class="reconciliation-rule-text">
+                                    {{ selectedAccount.reconciliation_rule }}
+                                </span>
+                                <span v-else style="color: var(--ep-text-color-secondary);">未设置</span>
                             </el-descriptions-item>
                             <el-descriptions-item label="描述">
                                 {{ selectedAccount.description || '-' }}
@@ -215,27 +216,8 @@
                 </el-form-item>
                 <template v-if="shouldShowReconciliationCycleForNewAccount()">
                     <el-divider content-position="left">对账周期设置（可选）</el-divider>
-                    <el-form-item label="周期单位">
-                        <el-select :model-value="newAccount.reconciliation_cycle_unit || undefined" @update:model-value="(value) => {
-                            newAccount.reconciliation_cycle_unit = value || null
-                            // 当周期单位被清空时，清空周期间隔
-                            if (!value) {
-                                newAccount.reconciliation_cycle_interval = null
-                            } else if (!newAccount.reconciliation_cycle_interval) {
-                                // 如果周期单位有值但周期间隔为空，设置为默认值1
-                                newAccount.reconciliation_cycle_interval = 1
-                            }
-                        }" placeholder="请选择周期单位" clearable>
-                            <el-option label="天" value="days" />
-                            <el-option label="周" value="weeks" />
-                            <el-option label="月" value="months" />
-                            <el-option label="年" value="years" />
-                        </el-select>
-                    </el-form-item>
-                    <el-form-item label="周期间隔" prop="reconciliation_cycle_interval">
-                        <el-input-number :model-value="newAccount.reconciliation_cycle_interval || 1"
-                            @update:model-value="newAccount.reconciliation_cycle_interval = $event || null" :min="1"
-                            :disabled="!newAccount.reconciliation_cycle_unit" placeholder="请输入间隔" style="width: 100%" />
+                    <el-form-item label="对账规则" prop="reconciliation_rule">
+                        <RecurrenceRuleInput v-model="newAccount.reconciliation_rule" />
                     </el-form-item>
                 </template>
             </el-form>
@@ -252,34 +234,12 @@
                     <el-input v-model="editAccountForm.account" />
                 </el-form-item>
                 <el-form-item label="描述">
-                    <el-input v-model="editAccountForm.description" maxlength="256"
-                        placeholder="早餐" />
+                    <el-input v-model="editAccountForm.description" maxlength="256" placeholder="早餐" />
                 </el-form-item>
                 <template v-if="shouldShowReconciliationCycle(selectedAccount)">
                     <el-divider content-position="left">对账周期设置（可选）</el-divider>
-                    <el-form-item label="周期单位">
-                        <el-select :model-value="editAccountForm.reconciliation_cycle_unit || undefined"
-                            @update:model-value="(value) => {
-                                editAccountForm.reconciliation_cycle_unit = value || null
-                                // 当周期单位被清空时，清空周期间隔
-                                if (!value) {
-                                    editAccountForm.reconciliation_cycle_interval = null
-                                } else if (!editAccountForm.reconciliation_cycle_interval) {
-                                    // 如果周期单位有值但周期间隔为空，设置为默认值1
-                                    editAccountForm.reconciliation_cycle_interval = 1
-                                }
-                            }" placeholder="请选择周期单位" clearable>
-                            <el-option label="天" value="days" />
-                            <el-option label="周" value="weeks" />
-                            <el-option label="月" value="months" />
-                            <el-option label="年" value="years" />
-                        </el-select>
-                    </el-form-item>
-                    <el-form-item label="周期间隔" prop="reconciliation_cycle_interval">
-                        <el-input-number :model-value="editAccountForm.reconciliation_cycle_interval || 1"
-                            @update:model-value="editAccountForm.reconciliation_cycle_interval = $event || null"
-                            :min="1" :disabled="!editAccountForm.reconciliation_cycle_unit" placeholder="请输入间隔"
-                            style="width: 100%" />
+                    <el-form-item label="对账规则" prop="reconciliation_rule">
+                        <RecurrenceRuleInput v-model="editAccountForm.reconciliation_rule" />
                     </el-form-item>
                 </template>
             </el-form>
@@ -404,6 +364,7 @@ import type {
     FormRules
 } from 'element-plus'
 import AnonymousPrompt from '../common/AnonymousPrompt.vue'
+import RecurrenceRuleInput from '../recurrence/RecurrenceRuleInput.vue'
 import { hasAuthTokens } from '../../utils/auth'
 import { getAccountTypeColor } from '~/utils/accountTypeColor'
 import { extractApiErrorMessage } from '../../utils/errorHelper'
@@ -419,8 +380,7 @@ interface Account {
     enable: boolean
     created: string
     modified: string
-    reconciliation_cycle_unit?: string | null
-    reconciliation_cycle_interval?: number | null
+    reconciliation_rule?: string | null
     description?: string
     children?: Account[]
     mapping_count?: {
@@ -444,8 +404,7 @@ interface AccountMapping {
 interface AccountMappingsResponse {
     account: string
     account_id: number
-    reconciliation_cycle_unit: string | null
-    reconciliation_cycle_interval: number | null
+    reconciliation_rule: string | null
     reconciliation_cycle_display: string
     expense_mappings: AccountMapping[]
     assets_mappings: AccountMapping[]
@@ -482,8 +441,7 @@ const mappingDetailsLoading = ref(false)
 const accountMappings = ref<AccountMappingsResponse>({
     account: '',
     account_id: 0,
-    reconciliation_cycle_unit: null,
-    reconciliation_cycle_interval: null,
+    reconciliation_rule: null,
     reconciliation_cycle_display: '未设置',
     expense_mappings: [],
     assets_mappings: [],
@@ -496,15 +454,13 @@ const activeMappingTab = ref('expense')
 const newAccount = ref({
     account: '',
     description: '',
-    reconciliation_cycle_unit: null as string | null,
-    reconciliation_cycle_interval: null as number | null
+    reconciliation_rule: ''
 })
 
 const editAccountForm = ref({
     account: '',
     description: '',
-    reconciliation_cycle_unit: null as string | null,
-    reconciliation_cycle_interval: null as number | null
+    reconciliation_rule: ''
 })
 
 // 删除账户相关
@@ -582,28 +538,26 @@ const accountPathRules = [
     { pattern: /^[A-Z][A-Za-z0-9:-]*$/, message: '账户路径必须以大写字母开头，只能包含字母、数字、冒号和连字符', trigger: 'blur' }
 ]
 
-const reconciliationIntervalRule = (getCycleUnit: () => string | null | undefined) => ({
+// 对账规则字段：仅做「填写了就不能是空白」的简单校验，DSL 语法由后端校验并返回 400
+const reconciliationRuleField = {
     validator: (_rule: unknown, value: unknown, callback: (e?: Error) => void) => {
-        const cycleUnit = getCycleUnit()
-        if (cycleUnit && (value === null || value === undefined || value === '')) {
-            callback(new Error('如果设置了对账周期单位，周期间隔必须填写'))
-        } else if (cycleUnit && value !== null && value !== undefined && typeof value === 'number' && value <= 0) {
-            callback(new Error('对账周期间隔必须大于 0'))
+        if (typeof value === 'string' && value.length > 0 && value.trim() === '') {
+            callback(new Error('对账规则不能为空'))
         } else {
             callback()
         }
     },
-    trigger: 'blur' as const
-})
+    trigger: 'change' as const
+}
 
 const addAccountRules: FormRules = {
     account: accountPathRules,
-    reconciliation_cycle_interval: [reconciliationIntervalRule(() => newAccount.value.reconciliation_cycle_unit)]
+    reconciliation_rule: [reconciliationRuleField]
 }
 
 const editAccountRules: FormRules = {
     account: accountPathRules,
-    reconciliation_cycle_interval: [reconciliationIntervalRule(() => editAccountForm.value.reconciliation_cycle_unit)]
+    reconciliation_rule: [reconciliationRuleField]
 }
 
 
@@ -730,8 +684,7 @@ const showAddAccountDialog = () => {
     newAccount.value = {
         account: '',
         description: '',
-        reconciliation_cycle_unit: null,
-        reconciliation_cycle_interval: null
+        reconciliation_rule: ''
     }
     addAccountDialog.value = true
 }
@@ -748,8 +701,8 @@ const createAccount = async () => {
         await fetchAccountTree()
         emitAccountTreeUpdated()
 
-        // 如果创建账户时设置了对账周期，触发横幅刷新
-        if (newAccount.value.reconciliation_cycle_unit) {
+        // 如果创建账户时设置了对账规则，触发横幅刷新
+        if (newAccount.value.reconciliation_rule) {
             emitTaskBannerRefresh()
         }
     } catch (error: any) {
@@ -771,8 +724,7 @@ const editAccount = () => {
     editAccountForm.value = {
         account: selectedAccount.value.account,
         description: selectedAccount.value.description || '',
-        reconciliation_cycle_unit: selectedAccount.value.reconciliation_cycle_unit || null,
-        reconciliation_cycle_interval: selectedAccount.value.reconciliation_cycle_interval || null
+        reconciliation_rule: selectedAccount.value.reconciliation_rule || ''
     }
     editAccountDialog.value = true
 }
@@ -788,30 +740,25 @@ const updateAccount = async () => {
         const updateData: {
             account: string
             description?: string
-            reconciliation_cycle_unit?: string | null
-            reconciliation_cycle_interval?: number | null
+            reconciliation_rule?: string
         } = {
             account: editAccountForm.value.account,
             description: editAccountForm.value.description || ''
         }
 
-        // 如果账户应该显示对账周期，则包含这些字段；否则清除这些字段
+        // 如果账户应该显示对账周期，则包含对账规则；否则清除该字段
         const shouldShow = shouldShowReconciliationCycle(selectedAccount.value)
         if (shouldShow) {
-            // 账户可以对账，包含对账周期字段
-            updateData.reconciliation_cycle_unit = editAccountForm.value.reconciliation_cycle_unit
-            updateData.reconciliation_cycle_interval = editAccountForm.value.reconciliation_cycle_interval
+            updateData.reconciliation_rule = editAccountForm.value.reconciliation_rule || ''
         } else {
-            // 账户不能对账，清除对账周期字段
-            updateData.reconciliation_cycle_unit = null
-            updateData.reconciliation_cycle_interval = null
+            updateData.reconciliation_rule = ''
         }
 
         // 检查对账周期配置是否发生变化
-        const oldCycleUnit = selectedAccount.value.reconciliation_cycle_unit
-        const newCycleUnit = updateData.reconciliation_cycle_unit
+        const oldRule = selectedAccount.value.reconciliation_rule || ''
+        const newRule = updateData.reconciliation_rule
         // 开启对账周期（从无到有）或删除对账周期（从有到无）时，待办任务会变化，需要刷新横幅
-        const cycleConfigChanged = (oldCycleUnit && !newCycleUnit) || (!oldCycleUnit && newCycleUnit)
+        const cycleConfigChanged = (!!oldRule && !newRule) || (!oldRule && !!newRule)
 
         await axios.put(`/account/${selectedAccount.value.id}/`, updateData)
         ElMessage.success('账户更新成功')
@@ -822,8 +769,7 @@ const updateAccount = async () => {
             await fetchAccountTree()
         } else {
             selectedAccount.value.description = updateData.description
-            selectedAccount.value.reconciliation_cycle_unit = updateData.reconciliation_cycle_unit ?? null
-            selectedAccount.value.reconciliation_cycle_interval = updateData.reconciliation_cycle_interval ?? null
+            selectedAccount.value.reconciliation_rule = updateData.reconciliation_rule ?? null
         }
         emitAccountTreeUpdated()
 
@@ -993,17 +939,6 @@ const formatDateTime = (dateString: string): string => {
         `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
-// 获取周期单位标签
-const getCycleUnitLabel = (unit: string): string => {
-    const labels: Record<string, string> = {
-        'days': '天',
-        'weeks': '周',
-        'months': '月',
-        'years': '年'
-    }
-    return labels[unit] || unit
-}
-
 // 判断是否应该显示对账周期字段
 const shouldShowReconciliationCycle = (account: AccountOption | null): boolean => {
     if (!account) return false
@@ -1056,10 +991,9 @@ const fetchAccountMappings = async () => {
         const response = await axios.get<AccountMappingsResponse>(`/account/${selectedAccount.value.id}/mappings/`)
         accountMappings.value = response.data
 
-        // 同步对账周期信息到 selectedAccount
+        // 同步对账规则到 selectedAccount
         if (selectedAccount.value) {
-            selectedAccount.value.reconciliation_cycle_unit = response.data.reconciliation_cycle_unit
-            selectedAccount.value.reconciliation_cycle_interval = response.data.reconciliation_cycle_interval
+            selectedAccount.value.reconciliation_rule = response.data.reconciliation_rule
         }
 
         // 设置默认激活的标签页

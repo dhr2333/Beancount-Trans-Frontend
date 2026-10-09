@@ -93,8 +93,15 @@ async function loadPendingTasks() {
       task_type: 'entry_review'
     })
 
+    const recurringResponse = await getTasks({
+      due: true,
+      status: 'pending',
+      task_type: 'recurring'
+    })
+
     let reconciliationTasks: ScheduledTask[] = []
     let entryReviewTasks: ScheduledTask[] = []
+    let recurringTasks: ScheduledTask[] = []
 
     // 处理对账待办
     const reconciliationData = reconciliationResponse.data
@@ -112,8 +119,16 @@ async function loadPendingTasks() {
       entryReviewTasks = (entryReviewData as { results: ScheduledTask[], count: number }).results || []
     }
 
+    // 处理循环待办
+    const recurringData = recurringResponse.data
+    if (Array.isArray(recurringData)) {
+      recurringTasks = recurringData as ScheduledTask[]
+    } else if (recurringData && typeof recurringData === 'object' && 'results' in recurringData) {
+      recurringTasks = (recurringData as { results: ScheduledTask[], count: number }).results || []
+    }
+
     // 合并所有待办任务
-    const allTasks = [...reconciliationTasks, ...entryReviewTasks]
+    const allTasks = [...reconciliationTasks, ...entryReviewTasks, ...recurringTasks]
     const newCount = allTasks.length
     const newEntryReviewCount = entryReviewTasks.length
 
@@ -124,7 +139,7 @@ async function loadPendingTasks() {
     const isInTour = shouldResumeTour()
     const tourProgress = getTourProgress()
     const currentStep = tourProgress?.currentStep ?? -1
-    
+
     // 检查是否有新的条目审核任务（用于导览触发步骤4）
     // 条件：1) 在导览中 2) 之前没有条目审核任务(0) 3) 现在有条目审核任务(>0) 4) 还没有触发过步骤4
     // 或者：需要恢复导览且当前步骤为3（步骤4）
@@ -183,7 +198,7 @@ async function loadPendingTasks() {
         isInTour,
         currentStep
       })
-      
+
       // 检查当前页面是否正确（步骤4需要在 /file 页面）
       const currentPath = route.path
       if (!isRouteMatchForStep(3, currentPath)) {
@@ -192,7 +207,7 @@ async function loadPendingTasks() {
         // 跳转后，在目标页面的 onMounted 中会再次触发
         return
       }
-      
+
       // 标记已触发，避免重复触发
       tourStep4Triggered.value = true
       // 等待DOM渲染完成
@@ -211,7 +226,7 @@ async function loadPendingTasks() {
         isInTour,
         currentStep
       })
-      
+
       // 步骤5可以在任何有 BaseHeader 的页面显示，不需要检查页面
       // 标记已触发，避免重复触发
       tourStep5Triggered.value = true
@@ -272,7 +287,7 @@ onMounted(async () => {
     if (progress) {
       const { currentStep } = progress
       const currentPath = route.path
-      
+
       // 步骤4需要在 /file 页面
       if (currentStep === 3) {
         if (currentPath === '/file') {

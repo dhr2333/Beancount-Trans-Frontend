@@ -19,6 +19,12 @@
           <el-badge v-if="entryReviewCount > 0" :value="formatBadgeValue(entryReviewCount)"
             :type="filterType === 'entry_review' ? 'danger' : 'info'" class="filter-badge" />
         </el-button>
+        <el-button :type="filterType === 'recurring' ? 'primary' : 'default'" @click="filterType = 'recurring'"
+          class="filter-button">
+          <span class="button-text">待办</span>
+          <el-badge v-if="recurringCount > 0" :value="formatBadgeValue(recurringCount)"
+            :type="filterType === 'recurring' ? 'danger' : 'info'" class="filter-badge" />
+        </el-button>
       </div>
     </div>
 
@@ -35,9 +41,11 @@
           <template #description>
             <p class="empty-text" v-if="filterType === 'reconciliation'">所有账户都已对账完成</p>
             <p class="empty-text" v-else-if="filterType === 'entry_review'">暂无条目审核待办</p>
+            <p class="empty-text" v-else-if="filterType === 'recurring'">暂无循环待办</p>
             <p class="empty-text" v-else>暂无待办任务</p>
             <p class="empty-hint" v-if="filterType === 'reconciliation'">在「账户管理」中设置对账周期，系统会自动创建待办任务</p>
             <p class="empty-hint" v-else-if="filterType === 'entry_review'">在「文件管理」中上传并解析文件，解析完成后条目会进入统一的条目审核待办</p>
+            <p class="empty-hint" v-else-if="filterType === 'recurring'">如需添加周期提醒，请在「循环待办」中创建</p>
           </template>
         </el-empty>
       </div>
@@ -103,11 +111,30 @@
                 </div>
                 <div class="card-actions" @click.stop>
                   <el-button type="primary" size="small" :loading="writingTaskIds.has(task.id)"
-                    :disabled="isReviewExpired(task)"
-                    @click="handleDirectWrite(task)" class="direct-write-btn">
+                    :disabled="isReviewExpired(task)" @click="handleDirectWrite(task)" class="direct-write-btn">
                     跳过
                   </el-button>
                 </div>
+              </div>
+            </template>
+
+            <!-- 循环待办：显示标题、到期日与完成按钮（仅提示） -->
+            <template v-else-if="task.task_type === 'recurring'">
+              <div class="file-name">
+                {{ task.recurring_title || '循环待办' }}
+              </div>
+              <div class="date-info" @click.stop>
+                <span class="recurring-date">{{ task.scheduled_date || '—' }}</span>
+                <el-tag v-if="task.scheduled_date && isOverdue(task.scheduled_date)" type="danger" size="small"
+                  class="overdue-tag">
+                  逾期
+                </el-tag>
+              </div>
+              <div class="card-actions recurring-actions" @click.stop>
+                <el-button type="primary" size="small" :loading="completingTaskIds.has(task.id)"
+                  @click="handleCompleteRecurring(task)" class="complete-btn">
+                  完成
+                </el-button>
               </div>
             </template>
           </div>
@@ -125,7 +152,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Check
 } from '@element-plus/icons-vue'
-import { getTasks, updateTask } from '../../api/reconciliation'
+import { getTasks, updateTask, completeTask } from '../../api/reconciliation'
 import { confirmWrite } from '../../api/parse-review'
 import type { ScheduledTask } from '../../types/reconciliation'
 import { isReviewExpired } from '../../types/reconciliation'
@@ -138,8 +165,10 @@ const tasks = ref<ScheduledTask[]>([])
 const total = ref(0)
 const reconciliationCount = ref(0)
 const entryReviewCount = ref(0)
-const filterType = ref<'reconciliation' | 'entry_review'>('entry_review')
+const recurringCount = ref(0)
+const filterType = ref<'reconciliation' | 'entry_review' | 'recurring'>('entry_review')
 const writingTaskIds = ref<Set<number>>(new Set())
+const completingTaskIds = ref<Set<number>>(new Set())
 
 onMounted(async () => {
   // 动态注入样式，确保清除日期选择器的边框
@@ -236,6 +265,19 @@ async function loadCounts() {
     } else if (entryReviewData && typeof entryReviewData === 'object' && 'count' in entryReviewData) {
       entryReviewCount.value = (entryReviewData as { count: number }).count || 0
     }
+
+    // 加载循环待办数量（仅统计到期项）
+    const recurringResponse = await getTasks({
+      status: 'pending',
+      task_type: 'recurring',
+      due: true
+    })
+    const recurringData = recurringResponse.data
+    if (Array.isArray(recurringData)) {
+      recurringCount.value = recurringData.length
+    } else if (recurringData && typeof recurringData === 'object' && 'count' in recurringData) {
+      recurringCount.value = (recurringData as { count: number }).count || 0
+    }
   } catch (error: unknown) {
     console.error('加载待办数量错误:', error)
     // 静默失败，不影响主流程
@@ -255,8 +297,8 @@ async function loadTasks() {
       task_type: filterType.value
     }
 
-    // 条目审核待办不需要 due 筛选；对账待办使用 due=true
-    if (filterType.value === 'reconciliation') {
+    // 条目审核待办不需要 due 筛选；对账/循环待办使用 due=true
+    if (filterType.value === 'reconciliation' || filterType.value === 'recurring') {
       params.due = true
     }
 
@@ -280,6 +322,8 @@ async function loadTasks() {
       reconciliationCount.value = total.value
     } else if (filterType.value === 'entry_review') {
       entryReviewCount.value = total.value
+    } else if (filterType.value === 'recurring') {
+      recurringCount.value = total.value
     }
   } catch (error: unknown) {
     console.error('加载待办列表错误:', error)
@@ -311,6 +355,10 @@ function isOverdue(dateString: string | null): boolean {
 }
 
 function handleStart(task: ScheduledTask) {
+  // 循环待办仅提示，卡片不跳转
+  if (task.task_type === 'recurring') {
+    return
+  }
   if (task.task_type === 'entry_review') {
     if (isReviewExpired(task)) {
       ElMessage.warning('条目审核待办已过期，系统将自动写入')
@@ -319,6 +367,43 @@ function handleStart(task: ScheduledTask) {
     router.push('/entry-review')
   } else {
     router.push(`/reconciliation/${task.id}`)
+  }
+}
+
+// 完成循环待办实例
+async function handleCompleteRecurring(task: ScheduledTask) {
+  if (task.task_type !== 'recurring') return
+
+  try {
+    await ElMessageBox.confirm(
+      `确定将循环待办「${task.recurring_title || '循环待办'}」标记为完成吗？`,
+      '确认完成',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch {
+    return
+  }
+
+  completingTaskIds.value.add(task.id)
+  try {
+    await completeTask(task.id)
+    ElMessage.success('已完成')
+    await loadTasks()
+    await loadCounts()
+    emitTaskBannerRefresh()
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { data?: { message?: string } } }
+      ElMessage.error(axiosError.response?.data?.message || '完成循环待办失败')
+    } else {
+      ElMessage.error('网络错误，请稍后重试')
+    }
+  } finally {
+    completingTaskIds.value.delete(task.id)
   }
 }
 

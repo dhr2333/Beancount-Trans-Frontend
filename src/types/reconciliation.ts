@@ -3,26 +3,6 @@
  */
 
 /**
- * 周期单位枚举
- */
-export enum CycleUnit {
-  DAYS = 'days',
-  WEEKS = 'weeks',
-  MONTHS = 'months',
-  YEARS = 'years'
-}
-
-/**
- * 周期单位显示文本映射
- */
-export const CycleUnitLabels: Record<CycleUnit, string> = {
-  [CycleUnit.DAYS]: '天',
-  [CycleUnit.WEEKS]: '周',
-  [CycleUnit.MONTHS]: '月',
-  [CycleUnit.YEARS]: '年'
-}
-
-/**
  * 任务状态枚举
  */
 export enum TaskStatus {
@@ -51,21 +31,86 @@ export interface ScheduledTask {
   id: number
   task_type: string
   task_type_display: string
-  scheduled_date: string | null  // 解析待办可能为 null
+  scheduled_date: string | null  // 条目审核待办可能为 null
   completed_date: string | null
   status: TaskStatus
   status_display: string
   account_name: string | null
   account_type: string | null
-  file_name?: string | null  // 解析待办的文件名
-  file_id?: number | null  // 解析待办的文件ID
-  review_expires_at?: number | null  // 解析待办的用户审核截止时间（Unix 时间戳，秒）
+  review_expires_at?: number | null  // 条目审核待办的用户审核截止时间（Unix 时间戳，秒）
   entry_count?: number | null  // 条目审核待办的待审核条目数
+  recurring_title?: string | null  // 循环待办标题
+  recurring_kind?: RecurrenceKind | null  // 循环待办的到期产出类型
   created: string
   modified: string
 }
 
-/** 解析待办是否已过用户审核截止时间 */
+/**
+ * 循环待办到期产出类型
+ * - notify: 通知
+ * - generate_review: 生成审核待办
+ */
+export type RecurrenceKind = 'notify' | 'generate_review'
+
+/**
+ * 循环基准
+ * - scheduled: 按计划日期
+ * - completed: 按完成日期
+ */
+export type RecurrenceBasis = 'scheduled' | 'completed'
+
+/**
+ * 循环待办定义状态
+ */
+export type RecurringTaskStatus = 'active' | 'paused' | 'ended'
+
+/**
+ * 循环待办定义接口
+ */
+export interface RecurringTask {
+  id: number
+  title: string
+  note: string
+  kind: RecurrenceKind
+  kind_display: string
+  template_ref: string | null
+  rule_text: string
+  rrule: string
+  recurrence_basis: RecurrenceBasis
+  start_date: string | null
+  next_date: string | null
+  status: RecurringTaskStatus
+  generated_count: number
+  next_occurrences: string[]
+  describe: string
+  created: string
+  modified: string
+}
+
+/**
+ * 循环待办定义创建/更新请求体（可写字段）
+ */
+export interface RecurringTaskPayload {
+  title: string
+  note?: string
+  kind: RecurrenceKind
+  template_ref?: string | null
+  rule_text: string
+  start_date?: string | null
+  recurrence_basis: RecurrenceBasis
+}
+
+/**
+ * 循环规则预览结果
+ */
+export interface RecurrencePreview {
+  rule_text: string
+  describe: string
+  basis: RecurrenceBasis
+  next_occurrences: string[]
+}
+
+/** 条目审核待办是否已过用户审核截止时间 */
 export function isReviewExpired(task: Pick<ScheduledTask, 'review_expires_at' | 'created'>): boolean {
   if (task.review_expires_at) {
     return Date.now() >= task.review_expires_at * 1000

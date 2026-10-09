@@ -59,6 +59,17 @@ export function cancelTask(id: number): Promise<{ data: ScheduledTask }> {
 }
 
 /**
+ * 完成循环待办实例
+ * @param id 待办任务 ID
+ * @returns 完成结果（含下一次日期）
+ */
+export function completeTask(
+  id: number
+): Promise<{ data: { completed: number, next_date: string | null } }> {
+  return axios.post(`${API_BASE}/tasks/${id}/complete/`)
+}
+
+/**
  * 开始对账（获取预期余额）
  * @param id 待办任务 ID
  * @returns 预期余额信息

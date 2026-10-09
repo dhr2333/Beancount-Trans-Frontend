@@ -74,18 +74,16 @@
                                 <div class="account-items">
                                     <div v-for="item in group" :key="item.id" class="account-item">
                                         <div class="account-item-left">
-                                            <el-tooltip v-if="item.description" :content="item.description" placement="top">
+                                            <el-tooltip v-if="item.description" :content="item.description"
+                                                placement="top">
                                                 <span class="account-path">{{ item.account_path }}</span>
                                             </el-tooltip>
                                             <span v-else class="account-path">{{ item.account_path }}</span>
-                                            <span
-                                                v-if="item.reconciliation_cycle_unit && item.reconciliation_cycle_interval"
-                                                class="reconciliation-cycle">
+                                            <span v-if="item.reconciliation_rule" class="reconciliation-cycle">
                                                 <el-icon>
                                                     <Clock />
                                                 </el-icon>
-                                                <span>每 {{ item.reconciliation_cycle_interval }} {{
-                                                    getCycleUnitName(item.reconciliation_cycle_unit) }}</span>
+                                                <span>{{ item.reconciliation_rule }}</span>
                                             </span>
                                         </div>
                                         <div class="account-item-right">
@@ -179,8 +177,7 @@ interface AccountTemplateItem {
     id: number
     account_path: string
     enable: boolean
-    reconciliation_cycle_unit?: string | null
-    reconciliation_cycle_interval?: number | null
+    reconciliation_rule?: string | null
     description?: string
 }
 
@@ -221,17 +218,6 @@ const getAccountTypeName = (type: string) => {
         'Expenses': '支出账户'
     }
     return nameMap[type] || type
-}
-
-// 获取周期单位名称
-const getCycleUnitName = (unit: string) => {
-    const unitMap: Record<string, string> = {
-        'days': '天',
-        'weeks': '周',
-        'months': '月',
-        'years': '年'
-    }
-    return unitMap[unit] || unit
 }
 
 // 按账户类型分组

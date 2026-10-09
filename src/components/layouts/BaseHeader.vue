@@ -60,6 +60,9 @@
       <router-link to="/reconciliation" class="no-underline">
         <el-menu-item index="/reconciliation">待办列表</el-menu-item>
       </router-link>
+      <router-link to="/config/recurring" class="no-underline">
+        <el-menu-item index="/config/recurring">循环待办</el-menu-item>
+      </router-link>
       <el-menu-item>
         <a href="https://trans.dhr2333.cn/docs/%E6%95%99%E7%A8%8B/quick-start" class="help-link" target="_blank">教程</a>
       </el-menu-item>
