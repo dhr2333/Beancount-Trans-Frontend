@@ -46,20 +46,6 @@ export function previewRecurringTask(id: number) {
 }
 
 /**
- * 暂停循环待办定义
- */
-export function pauseRecurringTask(id: number) {
-  return axios.post<RecurringTask>(`${API_BASE}/${id}/pause/`)
-}
-
-/**
- * 恢复循环待办定义
- */
-export function resumeRecurringTask(id: number) {
-  return axios.post<RecurringTask>(`${API_BASE}/${id}/resume/`)
-}
-
-/**
  * 即时预览规则（未保存的 rule_text）
  * @param data 规则 DSL 文本与可选的开始日期
  */

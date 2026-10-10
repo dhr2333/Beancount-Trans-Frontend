@@ -64,8 +64,6 @@
             </div>
             <div class="row-actions">
               <el-button size="small" text @click="startEdit(defn)">编辑</el-button>
-              <el-button v-if="defn.status === 'active'" size="small" text @click="handlePause(defn)">暂停</el-button>
-              <el-button v-else-if="defn.status === 'paused'" size="small" text @click="handleResume(defn)">恢复</el-button>
               <el-button size="small" text type="danger" @click="handleDelete(defn)">删除</el-button>
             </div>
           </template>
@@ -203,9 +201,7 @@ import {
   listRecurringTasks,
   createRecurringTask,
   updateRecurringTask,
-  deleteRecurringTask,
-  pauseRecurringTask,
-  resumeRecurringTask
+  deleteRecurringTask
 } from '../../api/recurring'
 import RecurrenceRuleInput from '../../components/recurrence/RecurrenceRuleInput.vue'
 import type { ScheduledTask, RecurringTask, RecurringTaskStatus } from '../../types/reconciliation'
@@ -720,30 +716,6 @@ async function handleSaveEdit(defn: RecurringTask) {
     ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '保存失败，请检查循环规则'))
   } finally {
     saving.value = false
-  }
-}
-
-async function handlePause(defn: RecurringTask) {
-  try {
-    await pauseRecurringTask(defn.id)
-    ElMessage.success('已暂停')
-    await loadDefinitions()
-    emitTaskBannerRefresh()
-  } catch (error: unknown) {
-    const axiosError = error as { response?: { data?: unknown } }
-    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '暂停失败'))
-  }
-}
-
-async function handleResume(defn: RecurringTask) {
-  try {
-    await resumeRecurringTask(defn.id)
-    ElMessage.success('已恢复')
-    await loadDefinitions()
-    emitTaskBannerRefresh()
-  } catch (error: unknown) {
-    const axiosError = error as { response?: { data?: unknown } }
-    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '恢复失败'))
   }
 }
 
