@@ -40,29 +40,9 @@ export interface ScheduledTask {
   review_expires_at?: number | null  // 条目审核待办的用户审核截止时间（Unix 时间戳，秒）
   entry_count?: number | null  // 条目审核待办的待审核条目数
   recurring_title?: string | null  // 循环待办标题
-  recurring_kind?: RecurrenceKind | null  // 循环待办的到期产出类型
   created: string
   modified: string
 }
-
-/**
- * 循环待办到期产出类型
- * - notify: 通知
- * - generate_review: 生成审核待办
- */
-export type RecurrenceKind = 'notify' | 'generate_review'
-
-/**
- * 循环基准
- * - scheduled: 按计划日期
- * - completed: 按完成日期
- */
-export type RecurrenceBasis = 'scheduled' | 'completed'
-
-/**
- * 循环待办定义状态
- */
-export type RecurringTaskStatus = 'active' | 'paused' | 'ended'
 
 /**
  * 循环待办定义接口
@@ -70,26 +50,17 @@ export type RecurringTaskStatus = 'active' | 'paused' | 'ended'
 export interface RecurringTask {
   id: number
   title: string
-  note: string
-  kind: RecurrenceKind
-  kind_display: string
-  template_ref: string | null
   rule_text: string
   rrule: string
-  recurrence_basis: RecurrenceBasis
   start_date: string | null
   next_date: string | null
-  status: RecurringTaskStatus
-  generated_count: number
-  next_occurrences: string[]
-  describe: string
   created: string
   modified: string
 }
 
 /**
  * 循环待办定义创建/更新请求体（可写字段）
- * 界面只暴露标题、规则、备注、开始日期；kind/template_ref/recurrence_basis 由后端默认值兜底
+ * 界面只暴露标题、规则；note/start_date 可选
  */
 export interface RecurringTaskPayload {
   title: string
@@ -104,8 +75,6 @@ export interface RecurringTaskPayload {
 export interface RecurrencePreview {
   rule_text: string
   describe: string
-  basis: RecurrenceBasis
-  next_occurrences: string[]
 }
 
 /** 条目审核待办是否已过用户审核截止时间 */

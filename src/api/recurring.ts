@@ -39,13 +39,6 @@ export function deleteRecurringTask(id: number) {
 }
 
 /**
- * 预览已保存的循环待办定义的下一次触发时间
- */
-export function previewRecurringTask(id: number) {
-  return axios.post<RecurrencePreview>(`${API_BASE}/${id}/preview/`)
-}
-
-/**
  * 即时预览规则（未保存的 rule_text）
  * @param data 规则 DSL 文本与可选的开始日期
  */
