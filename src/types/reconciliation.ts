@@ -89,15 +89,13 @@ export interface RecurringTask {
 
 /**
  * 循环待办定义创建/更新请求体（可写字段）
+ * 界面只暴露标题、规则、备注、开始日期；kind/template_ref/recurrence_basis 由后端默认值兜底
  */
 export interface RecurringTaskPayload {
   title: string
-  note?: string
-  kind: RecurrenceKind
-  template_ref?: string | null
   rule_text: string
+  note?: string
   start_date?: string | null
-  recurrence_basis: RecurrenceBasis
 }
 
 /**

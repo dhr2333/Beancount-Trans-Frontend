@@ -19,17 +19,62 @@
           <el-badge v-if="entryReviewCount > 0" :value="formatBadgeValue(entryReviewCount)"
             :type="filterType === 'entry_review' ? 'danger' : 'info'" class="filter-badge" />
         </el-button>
-        <el-button :type="filterType === 'recurring' ? 'primary' : 'default'" @click="filterType = 'recurring'"
-          class="filter-button">
-          <span class="button-text">待办</span>
-          <el-badge v-if="recurringCount > 0" :value="formatBadgeValue(recurringCount)"
+        <el-button :type="recurringButtonType" @click="handleRecurringClick" class="filter-button"
+          :title="filterType === 'recurring' && !recurringManageMode ? '再次点击进入管理' : '查看循环待办'">
+          <span class="button-text">{{ recurringManageMode ? '循环 · 管理' : '循环' }}</span>
+          <el-badge v-if="!recurringManageMode && recurringCount > 0" :value="formatBadgeValue(recurringCount)"
             :type="filterType === 'recurring' ? 'danger' : 'info'" class="filter-badge" />
         </el-button>
       </div>
     </div>
 
+    <!-- 循环待办 · 管理视图（就地增删改，不跳页） -->
+    <div v-if="filterType === 'recurring' && recurringManageMode" v-loading="definitionsLoading" class="recurring-manage">
+      <div class="new-rule-row">
+        <el-input v-model="newTitle" class="new-title" maxlength="128" placeholder="标题，如：每月复核科目与标签" />
+        <div class="new-rule">
+          <RecurrenceRuleInput v-model="newRuleText" />
+        </div>
+        <el-button type="primary" :loading="creating" @click="handleCreate">新建</el-button>
+      </div>
+
+      <div v-if="definitions.length === 0" class="empty-state">
+        <p class="empty-text">还没有循环待办</p>
+        <p class="empty-hint">在上方填写标题与规则（如 every month on the last），或让 Copilot 帮你创建</p>
+      </div>
+
+      <div v-else class="recurring-rows">
+        <div v-for="defn in definitions" :key="defn.id" class="recurring-row">
+          <div v-if="editingId === defn.id" class="edit-row">
+            <el-input v-model="editingTitle" class="edit-title" maxlength="128" placeholder="标题" />
+            <div class="edit-rule">
+              <RecurrenceRuleInput v-model="editingRule" />
+            </div>
+            <div class="edit-actions">
+              <el-button size="small" type="primary" :loading="saving" @click="handleSaveEdit(defn)">保存</el-button>
+              <el-button size="small" @click="cancelEdit">取消</el-button>
+            </div>
+          </div>
+          <template v-else>
+            <div class="row-main">
+              <span class="row-title">{{ defn.title }}</span>
+              <code class="row-rule">🔁 {{ defn.describe || defn.rule_text }}</code>
+              <span class="row-next">⏭ {{ defn.next_date || '—' }}</span>
+              <el-tag size="small" :type="statusTagType(defn.status)">{{ statusLabel(defn.status) }}</el-tag>
+            </div>
+            <div class="row-actions">
+              <el-button size="small" text @click="startEdit(defn)">编辑</el-button>
+              <el-button v-if="defn.status === 'active'" size="small" text @click="handlePause(defn)">暂停</el-button>
+              <el-button v-else-if="defn.status === 'paused'" size="small" text @click="handleResume(defn)">恢复</el-button>
+              <el-button size="small" text type="danger" @click="handleDelete(defn)">删除</el-button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
     <!-- 待办列表：大卡片设计 -->
-    <div v-loading="loading" class="tasks-container">
+    <div v-else v-loading="loading" class="tasks-container">
       <!-- 空状态：引导设置 -->
       <div v-if="tasks.length === 0" class="empty-state">
         <el-empty description="暂无待办任务">
@@ -146,7 +191,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -154,9 +199,19 @@ import {
 } from '@element-plus/icons-vue'
 import { getTasks, updateTask, completeTask } from '../../api/reconciliation'
 import { confirmWrite } from '../../api/parse-review'
-import type { ScheduledTask } from '../../types/reconciliation'
+import {
+  listRecurringTasks,
+  createRecurringTask,
+  updateRecurringTask,
+  deleteRecurringTask,
+  pauseRecurringTask,
+  resumeRecurringTask
+} from '../../api/recurring'
+import RecurrenceRuleInput from '../../components/recurrence/RecurrenceRuleInput.vue'
+import type { ScheduledTask, RecurringTask, RecurringTaskStatus } from '../../types/reconciliation'
 import { isReviewExpired } from '../../types/reconciliation'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
+import { extractApiErrorMessage } from '../../utils/errorHelper'
 
 const router = useRouter()
 
@@ -169,6 +224,18 @@ const recurringCount = ref(0)
 const filterType = ref<'reconciliation' | 'entry_review' | 'recurring'>('entry_review')
 const writingTaskIds = ref<Set<number>>(new Set())
 const completingTaskIds = ref<Set<number>>(new Set())
+
+// 循环待办管理视图状态
+const recurringManageMode = ref(false)
+const definitions = ref<RecurringTask[]>([])
+const definitionsLoading = ref(false)
+const newTitle = ref('')
+const newRuleText = ref('')
+const creating = ref(false)
+const editingId = ref<number | null>(null)
+const editingTitle = ref('')
+const editingRule = ref('')
+const saving = ref(false)
 
 onMounted(async () => {
   // 动态注入样式，确保清除日期选择器的边框
@@ -192,6 +259,10 @@ onActivated(async () => {
 
 // 监听筛选类型变化
 watch(filterType, () => {
+  if (filterType.value !== 'recurring') {
+    recurringManageMode.value = false
+    cancelEdit()
+  }
   loadTasks()
 })
 
@@ -532,6 +603,171 @@ async function handleDirectWrite(task: ScheduledTask) {
     }
   }
 }
+
+// ---- 循环待办：管理视图 ----
+
+// 单个「循环」按钮的视觉状态：未选中 / 待办视图 / 管理视图
+const recurringButtonType = computed<'primary' | 'warning' | 'default'>(() => {
+  if (filterType.value !== 'recurring') return 'default'
+  return recurringManageMode.value ? 'warning' : 'primary'
+})
+
+// 合并按钮：首次点击看待办，再次点击进管理，管理态再点返回待办
+function handleRecurringClick() {
+  if (filterType.value !== 'recurring') {
+    filterType.value = 'recurring'
+    recurringManageMode.value = false
+    return
+  }
+  if (!recurringManageMode.value) {
+    recurringManageMode.value = true
+    cancelEdit()
+    loadDefinitions()
+    return
+  }
+  recurringManageMode.value = false
+}
+
+function statusLabel(status: RecurringTaskStatus): string {
+  const map: Record<RecurringTaskStatus, string> = {
+    active: '进行中',
+    paused: '已暂停',
+    ended: '已结束'
+  }
+  return map[status] || status
+}
+
+function statusTagType(status: RecurringTaskStatus): 'success' | 'info' | 'warning' {
+  if (status === 'active') return 'success'
+  if (status === 'paused') return 'info'
+  return 'warning'
+}
+
+async function loadDefinitions() {
+  definitionsLoading.value = true
+  try {
+    const response = await listRecurringTasks()
+    definitions.value = Array.isArray(response.data) ? response.data : []
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: unknown } }
+    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '加载循环待办失败'))
+  } finally {
+    definitionsLoading.value = false
+  }
+}
+
+function startEdit(defn: RecurringTask) {
+  editingId.value = defn.id
+  editingTitle.value = defn.title
+  editingRule.value = defn.rule_text
+}
+
+function cancelEdit() {
+  editingId.value = null
+  editingTitle.value = ''
+  editingRule.value = ''
+}
+
+async function handleCreate() {
+  const title = newTitle.value.trim()
+  const rule = newRuleText.value.trim()
+  if (!title) {
+    ElMessage.warning('请输入标题')
+    return
+  }
+  if (!rule) {
+    ElMessage.warning('请输入循环规则')
+    return
+  }
+
+  creating.value = true
+  try {
+    await createRecurringTask({ title, rule_text: rule })
+    ElMessage.success('循环待办已创建')
+    newTitle.value = ''
+    newRuleText.value = ''
+    await loadDefinitions()
+    emitTaskBannerRefresh()
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: unknown } }
+    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '创建失败，请检查循环规则'))
+  } finally {
+    creating.value = false
+  }
+}
+
+async function handleSaveEdit(defn: RecurringTask) {
+  const title = editingTitle.value.trim()
+  const rule = editingRule.value.trim()
+  if (!title) {
+    ElMessage.warning('请输入标题')
+    return
+  }
+  if (!rule) {
+    ElMessage.warning('请输入循环规则')
+    return
+  }
+
+  saving.value = true
+  try {
+    await updateRecurringTask(defn.id, { title, rule_text: rule })
+    ElMessage.success('已保存')
+    cancelEdit()
+    await loadDefinitions()
+    emitTaskBannerRefresh()
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: unknown } }
+    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '保存失败，请检查循环规则'))
+  } finally {
+    saving.value = false
+  }
+}
+
+async function handlePause(defn: RecurringTask) {
+  try {
+    await pauseRecurringTask(defn.id)
+    ElMessage.success('已暂停')
+    await loadDefinitions()
+    emitTaskBannerRefresh()
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: unknown } }
+    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '暂停失败'))
+  }
+}
+
+async function handleResume(defn: RecurringTask) {
+  try {
+    await resumeRecurringTask(defn.id)
+    ElMessage.success('已恢复')
+    await loadDefinitions()
+    emitTaskBannerRefresh()
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: unknown } }
+    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '恢复失败'))
+  }
+}
+
+async function handleDelete(defn: RecurringTask) {
+  try {
+    await ElMessageBox.confirm(`确定要删除循环待办「${defn.title}」吗？`, '确认删除', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+  } catch {
+    return
+  }
+
+  try {
+    await deleteRecurringTask(defn.id)
+    ElMessage.success('删除成功')
+    await loadDefinitions()
+    emitTaskBannerRefresh()
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: unknown } }
+    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '删除失败'))
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -638,6 +874,113 @@ async function handleDirectWrite(task: ScheduledTask) {
 
   .tasks-container {
     min-height: 400px;
+  }
+
+  .recurring-manage {
+    min-height: 200px;
+
+    .new-rule-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      background: var(--ep-bg-color);
+      border: 2px dashed var(--ep-border-color);
+      border-radius: 12px;
+
+      .new-title {
+        width: 220px;
+        flex-shrink: 0;
+      }
+
+      .new-rule {
+        flex: 1;
+        min-width: 0;
+      }
+    }
+
+    .recurring-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .recurring-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--ep-bg-color);
+      border: 2px solid var(--ep-border-color);
+      border-radius: 12px;
+      transition: border-color 0.2s;
+
+      &:hover {
+        border-color: var(--ep-color-primary);
+      }
+
+      &>.row-main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .row-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--ep-text-color-primary);
+      }
+
+      .row-rule {
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 13px;
+        color: var(--ep-text-color-regular);
+        background: var(--ep-fill-color-light);
+        padding: 2px 8px;
+        border-radius: 6px;
+      }
+
+      .row-next {
+        font-size: 13px;
+        color: var(--ep-text-color-secondary);
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      }
+
+      .row-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+
+      .edit-row {
+        flex: 1;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+
+        .edit-title {
+          width: 220px;
+          flex-shrink: 0;
+        }
+
+        .edit-rule {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .edit-actions {
+          display: flex;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+      }
+    }
   }
 
   .empty-state {

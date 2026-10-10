@@ -17,8 +17,6 @@ import MappingTemplates from "./components/template/MappingTemplates.vue"
 // 对账功能
 import ReconciliationList from "./views/reconciliation/ReconciliationList.vue"
 import ReconciliationForm from "./views/reconciliation/ReconciliationForm.vue"
-// 循环待办
-import RecurringList from "./views/recurring/RecurringList.vue"
 // 条目审核功能
 import ParseReviewForm from "./views/parse-review/ParseReviewForm.vue"
 // Copilot
@@ -41,7 +39,6 @@ const router = createRouter({
     { path: '/config/accounts', name: "accountManagement", component: AccountManagement },
     { path: '/config/tags', name: "tagManagement", component: TagManagement },
     { path: '/config/mappings', name: "mappingManagement", component: MappingManagement },
-    { path: '/config/recurring', name: "recurringList", component: RecurringList },
     // 模板管理
     { path: '/template/accounts', name: "accountTemplates", component: AccountTemplates },
     { path: '/template/mappings', name: "mappingTemplates", component: MappingTemplates },
