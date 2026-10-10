@@ -54,6 +54,7 @@ export interface RecurringTask {
   rrule: string
   start_date: string | null
   next_date: string | null
+  next_run_date: string | null  // 管理页展示用：下一次执行日期（未到期=下次生成日；已到期=按当天完成推算）
   created: string
   modified: string
 }

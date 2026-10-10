@@ -60,7 +60,7 @@
             <div class="row-main">
               <span class="row-title">{{ defn.title }}</span>
               <code class="row-rule">🔁 {{ defn.rule_text }}</code>
-              <span class="row-next">⏭ {{ defn.next_date || '—' }}</span>
+              <span class="row-next">⏭ {{ defn.next_run_date || '—' }}</span>
             </div>
             <div class="row-actions">
               <el-button size="small" text @click="startEdit(defn)">编辑</el-button>
