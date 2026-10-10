@@ -34,8 +34,11 @@
       <div class="new-rule-row">
         <el-input v-model="newTitle" class="new-title" maxlength="128" placeholder="标题，如：每月复核科目与标签" />
         <div class="new-rule">
-          <RecurrenceRuleInput v-model="newRuleText" />
+          <RecurrenceRuleInput v-model="newRuleText" :show-preview="false" />
         </div>
+        <el-date-picker v-model="newStartDate" class="new-date" type="date" format="YYYY-MM-DD"
+          value-format="YYYY-MM-DD" :clearable="true" placeholder="首次日期（默认今天）" placement="bottom-start"
+          :teleported="true" :popper-options="datePickerPopperOptions" />
         <el-button type="primary" :loading="creating" @click="handleCreate">新建</el-button>
       </div>
 
@@ -46,27 +49,22 @@
 
       <div v-else class="recurring-rows">
         <div v-for="defn in definitions" :key="defn.id" class="recurring-row">
-          <div v-if="editingId === defn.id" class="edit-row">
-            <el-input v-model="editingTitle" class="edit-title" maxlength="128" placeholder="标题" />
-            <div class="edit-rule">
-              <RecurrenceRuleInput v-model="editingRule" />
-            </div>
-            <div class="edit-actions">
-              <el-button size="small" type="primary" :loading="saving" @click="handleSaveEdit(defn)">保存</el-button>
-              <el-button size="small" @click="cancelEdit">取消</el-button>
-            </div>
+          <el-input v-model="drafts[defn.id].title" class="row-title-input" maxlength="128" placeholder="标题"
+            @blur="saveTitle(defn)" @keyup.enter="saveTitle(defn)" />
+          <div class="row-rule-input">
+            <RecurrenceRuleInput v-model="drafts[defn.id].rule_text" :show-preview="false" @blur="saveRule(defn)"
+              @submit="saveRule(defn)" />
           </div>
-          <template v-else>
-            <div class="row-main">
-              <span class="row-title">{{ defn.title }}</span>
-              <code class="row-rule">🔁 {{ defn.rule_text }}</code>
-              <span class="row-next">⏭ {{ defn.next_run_date || '—' }}</span>
-            </div>
-            <div class="row-actions">
-              <el-button size="small" text @click="startEdit(defn)">编辑</el-button>
-              <el-button size="small" text type="danger" @click="handleDelete(defn)">删除</el-button>
-            </div>
-          </template>
+          <div class="row-date">
+            <el-date-picker v-if="dateEditable(defn)" :model-value="defn.next_run_date || undefined"
+              @update:model-value="(value: string) => handleStartDateChange(defn, value)" type="date"
+              format="YYYY-MM-DD" value-format="YYYY-MM-DD" :clearable="false" placeholder="选择日期" class="date-picker"
+              placement="bottom-start" :teleported="true" :popper-options="datePickerPopperOptions" />
+            <span v-else class="row-next" title="完成后自动计算">⏭ {{ defn.next_run_date || '—' }}</span>
+          </div>
+          <div class="row-actions">
+            <el-button size="small" text type="danger" @click="handleDelete(defn)">删除</el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -170,7 +168,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated, watch } from 'vue'
+import { ref, computed, reactive, onMounted, onActivated, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -208,11 +206,10 @@ const definitions = ref<RecurringTask[]>([])
 const definitionsLoading = ref(false)
 const newTitle = ref('')
 const newRuleText = ref('')
+const newStartDate = ref<string | null>(null)
 const creating = ref(false)
-const editingId = ref<number | null>(null)
-const editingTitle = ref('')
-const editingRule = ref('')
-const saving = ref(false)
+// 行内编辑草稿（按定义 id）；标题/规则失焦或回车自动保存
+const drafts = reactive<Record<number, { title: string; rule_text: string }>>({})
 
 onMounted(async () => {
   // 动态注入样式，确保清除日期选择器的边框
@@ -238,7 +235,6 @@ onActivated(async () => {
 watch(filterType, () => {
   if (filterType.value !== 'recurring') {
     recurringManageMode.value = false
-    cancelEdit()
   }
   loadTasks()
 })
@@ -533,8 +529,10 @@ async function handleDateChange(taskId: number, newDate: string) {
       scheduled_date: newDate
     })
     ElMessage.success('修改日期成功')
-    // 刷新列表以更新逾期状态
-    loadTasks()
+    // 刷新列表/角标/横幅（改期后待办数量可能变化）
+    await loadTasks()
+    await loadCounts()
+    emitTaskBannerRefresh()
   } catch (error: unknown) {
     // 失败时恢复原值
     if (task) {
@@ -607,19 +605,24 @@ const recurringButtonType = computed<'primary' | 'warning' | 'default'>(() => {
 })
 
 // 合并按钮：首次点击看待办，再次点击进管理，管理态再点返回待办
-function handleRecurringClick() {
+async function handleRecurringClick() {
   if (filterType.value !== 'recurring') {
     filterType.value = 'recurring'
     recurringManageMode.value = false
+    // watch(filterType) 会加载任务列表，这里补一次角标刷新
+    await loadCounts()
     return
   }
   if (!recurringManageMode.value) {
     recurringManageMode.value = true
-    cancelEdit()
     loadDefinitions()
     return
   }
+  // 管理 → 待办：重载任务列表与角标（管理态内可能已新建/改期/删除）
   recurringManageMode.value = false
+  await loadTasks()
+  await loadCounts()
+  emitTaskBannerRefresh()
 }
 
 async function loadDefinitions() {
@@ -627,6 +630,7 @@ async function loadDefinitions() {
   try {
     const response = await listRecurringTasks()
     definitions.value = Array.isArray(response.data) ? response.data : []
+    syncDrafts()
   } catch (error: unknown) {
     const axiosError = error as { response?: { data?: unknown } }
     ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '加载循环待办失败'))
@@ -635,16 +639,88 @@ async function loadDefinitions() {
   }
 }
 
-function startEdit(defn: RecurringTask) {
-  editingId.value = defn.id
-  editingTitle.value = defn.title
-  editingRule.value = defn.rule_text
+// 为缺少草稿的定义补齐初值（不覆盖正在编辑的草稿）
+function syncDrafts() {
+  for (const defn of definitions.value) {
+    if (!drafts[defn.id]) {
+      drafts[defn.id] = { title: defn.title, rule_text: defn.rule_text }
+    }
+  }
 }
 
-function cancelEdit() {
-  editingId.value = null
-  editingTitle.value = ''
-  editingRule.value = ''
+// 定义变更后：重载定义 + 重算角标 + 刷新全局横幅
+async function refreshAfterChange() {
+  await loadDefinitions()
+  await loadCounts()
+  emitTaskBannerRefresh()
+}
+
+// 日期可编辑：按计划基准且尚未生成待办（存在待执行实例时只读）
+function dateEditable(defn: RecurringTask): boolean {
+  return !defn.has_pending && defn.recurrence_basis === 'scheduled'
+}
+
+function revertDraft(defn: RecurringTask, field: 'title' | 'rule_text') {
+  const d = drafts[defn.id]
+  if (d) d[field] = defn[field]
+}
+
+async function saveTitle(defn: RecurringTask) {
+  const d = drafts[defn.id]
+  const title = (d?.title || '').trim()
+  if (!title) {
+    ElMessage.warning('标题不能为空')
+    revertDraft(defn, 'title')
+    return
+  }
+  if (title === defn.title) return
+
+  try {
+    await updateRecurringTask(defn.id, { title })
+    if (d) d.title = title
+    defn.title = title
+    ElMessage.success('已保存')
+    await refreshAfterChange()
+  } catch (error: unknown) {
+    revertDraft(defn, 'title')
+    const axiosError = error as { response?: { data?: unknown } }
+    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '保存失败'))
+  }
+}
+
+async function saveRule(defn: RecurringTask) {
+  const d = drafts[defn.id]
+  const rule = (d?.rule_text || '').trim()
+  if (!rule) {
+    ElMessage.warning('循环规则不能为空')
+    revertDraft(defn, 'rule_text')
+    return
+  }
+  if (rule === defn.rule_text) return
+
+  try {
+    await updateRecurringTask(defn.id, { rule_text: rule })
+    if (d) d.rule_text = rule
+    defn.rule_text = rule
+    ElMessage.success('已保存')
+    await refreshAfterChange()
+  } catch (error: unknown) {
+    revertDraft(defn, 'rule_text')
+    const axiosError = error as { response?: { data?: unknown } }
+    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '保存失败，请检查循环规则'))
+  }
+}
+
+async function handleStartDateChange(defn: RecurringTask, value: string) {
+  if (!value) return
+  try {
+    await updateRecurringTask(defn.id, { start_date: value })
+    ElMessage.success('已修改生成日期')
+    await refreshAfterChange()
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: unknown } }
+    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '修改生成日期失败'))
+  }
 }
 
 async function handleCreate() {
@@ -661,44 +737,17 @@ async function handleCreate() {
 
   creating.value = true
   try {
-    await createRecurringTask({ title, rule_text: rule })
+    await createRecurringTask({ title, rule_text: rule, start_date: newStartDate.value })
     ElMessage.success('循环待办已创建')
     newTitle.value = ''
     newRuleText.value = ''
-    await loadDefinitions()
-    emitTaskBannerRefresh()
+    newStartDate.value = null
+    await refreshAfterChange()
   } catch (error: unknown) {
     const axiosError = error as { response?: { data?: unknown } }
     ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '创建失败，请检查循环规则'))
   } finally {
     creating.value = false
-  }
-}
-
-async function handleSaveEdit(defn: RecurringTask) {
-  const title = editingTitle.value.trim()
-  const rule = editingRule.value.trim()
-  if (!title) {
-    ElMessage.warning('请输入标题')
-    return
-  }
-  if (!rule) {
-    ElMessage.warning('请输入循环规则')
-    return
-  }
-
-  saving.value = true
-  try {
-    await updateRecurringTask(defn.id, { title, rule_text: rule })
-    ElMessage.success('已保存')
-    cancelEdit()
-    await loadDefinitions()
-    emitTaskBannerRefresh()
-  } catch (error: unknown) {
-    const axiosError = error as { response?: { data?: unknown } }
-    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '保存失败，请检查循环规则'))
-  } finally {
-    saving.value = false
   }
 }
 
@@ -853,6 +902,11 @@ async function handleDelete(defn: RecurringTask) {
         flex: 1;
         min-width: 0;
       }
+
+      .new-date {
+        width: 170px;
+        flex-shrink: 0;
+      }
     }
 
     .recurring-rows {
@@ -864,7 +918,6 @@ async function handleDelete(defn: RecurringTask) {
     .recurring-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
       gap: 12px;
       padding: 12px 16px;
       background: var(--ep-bg-color);
@@ -876,34 +929,29 @@ async function handleDelete(defn: RecurringTask) {
         border-color: var(--ep-color-primary);
       }
 
-      &>.row-main {
+      .row-title-input {
+        width: 200px;
+        flex-shrink: 0;
+      }
+
+      .row-rule-input {
         flex: 1;
         min-width: 0;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
       }
 
-      .row-title {
-        font-size: 16px;
-        font-weight: 600;
-        color: var(--ep-text-color-primary);
-      }
+      .row-date {
+        flex-shrink: 0;
 
-      .row-rule {
-        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-        font-size: 13px;
-        color: var(--ep-text-color-regular);
-        background: var(--ep-fill-color-light);
-        padding: 2px 8px;
-        border-radius: 6px;
+        .date-picker {
+          width: 130px;
+        }
       }
 
       .row-next {
         font-size: 13px;
         color: var(--ep-text-color-secondary);
         font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        white-space: nowrap;
       }
 
       .row-actions {
@@ -911,29 +959,6 @@ async function handleDelete(defn: RecurringTask) {
         align-items: center;
         gap: 4px;
         flex-shrink: 0;
-      }
-
-      .edit-row {
-        flex: 1;
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-
-        .edit-title {
-          width: 220px;
-          flex-shrink: 0;
-        }
-
-        .edit-rule {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .edit-actions {
-          display: flex;
-          gap: 8px;
-          flex-shrink: 0;
-        }
       }
     }
   }

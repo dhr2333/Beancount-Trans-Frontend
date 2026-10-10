@@ -45,6 +45,13 @@ export interface ScheduledTask {
 }
 
 /**
+ * 循环基准
+ * - scheduled: 按计划日期（下一次 = 上一次待办日期 + rrule）
+ * - completed: when done（下一次 = 完成日期 + rrule）
+ */
+export type RecurrenceBasis = 'scheduled' | 'completed'
+
+/**
  * 循环待办定义接口
  */
 export interface RecurringTask {
@@ -53,8 +60,9 @@ export interface RecurringTask {
   rule_text: string
   rrule: string
   start_date: string | null
-  next_date: string | null
-  next_run_date: string | null  // 管理页展示用：下一次执行日期（未到期=下次生成日；已到期=按当天完成推算）
+  recurrence_basis: RecurrenceBasis
+  next_run_date: string | null  // 管理页展示用：下一次执行日期（动态推算，不入库）
+  has_pending: boolean          // 是否存在待执行实例（存在时管理页日期只读，只能改实例日期）
   created: string
   modified: string
 }

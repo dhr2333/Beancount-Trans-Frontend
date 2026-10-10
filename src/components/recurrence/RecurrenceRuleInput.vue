@@ -1,6 +1,7 @@
 <template>
   <div class="recurrence-rule-input">
-    <el-input v-model="text" :placeholder="placeholder" clearable @input="handleInput" @clear="handleClear" />
+    <el-input v-model="text" :placeholder="placeholder" clearable @input="handleInput" @clear="handleClear"
+      @blur="emit('blur')" @keyup.enter="emit('submit')" />
 
     <div v-if="showPreview" class="preview-block">
       <div v-if="previewLoading" class="preview-hint">正在解析…</div>
@@ -27,7 +28,11 @@ const props = withDefaults(
     placeholder: '例如：every month on the last / every week on Tuesday, Friday'
   }
 )
-const emit = defineEmits<{ (e: 'update:modelValue', value: string): void }>()
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: string): void
+  (e: 'blur'): void
+  (e: 'submit'): void
+}>()
 
 const text = ref('')
 const previewLoading = ref(false)
