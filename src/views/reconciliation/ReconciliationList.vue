@@ -29,7 +29,8 @@
     </div>
 
     <!-- 循环待办 · 管理视图（就地增删改，不跳页） -->
-    <div v-if="filterType === 'recurring' && recurringManageMode" v-loading="definitionsLoading" class="recurring-manage">
+    <div v-if="filterType === 'recurring' && recurringManageMode" v-loading="definitionsLoading"
+      class="recurring-manage">
       <div class="new-rule-row">
         <el-input v-model="newTitle" class="new-title" maxlength="128" placeholder="标题，如：每月复核科目与标签" />
         <div class="new-rule">
@@ -58,9 +59,8 @@
           <template v-else>
             <div class="row-main">
               <span class="row-title">{{ defn.title }}</span>
-              <code class="row-rule">🔁 {{ defn.describe || defn.rule_text }}</code>
+              <code class="row-rule">🔁 {{ defn.rule_text }}</code>
               <span class="row-next">⏭ {{ defn.next_date || '—' }}</span>
-              <el-tag size="small" :type="statusTagType(defn.status)">{{ statusLabel(defn.status) }}</el-tag>
             </div>
             <div class="row-actions">
               <el-button size="small" text @click="startEdit(defn)">编辑</el-button>
@@ -88,16 +88,15 @@
             <p class="empty-text" v-else>暂无待办任务</p>
             <p class="empty-hint" v-if="filterType === 'reconciliation'">在「账户管理」中设置对账周期，系统会自动创建待办任务</p>
             <p class="empty-hint" v-else-if="filterType === 'entry_review'">在「文件管理」中上传并解析文件，解析完成后条目会进入统一的条目审核待办</p>
-            <p class="empty-hint" v-else-if="filterType === 'recurring'">如需添加周期提醒，请在「循环待办」中创建</p>
+            <p class="empty-hint" v-else-if="filterType === 'recurring'">再次点击「循环」进入管理，即可新建周期提醒</p>
           </template>
         </el-empty>
       </div>
 
       <!-- 待办卡片列表 -->
       <div v-else class="tasks-grid">
-        <div v-for="task in tasks" :key="task.id" class="task-card" :class="{
-          'task-overdue': task.task_type === 'reconciliation' && task.scheduled_date && isOverdue(task.scheduled_date)
-        }" @click="handleStart(task)">
+        <div v-for="task in tasks" :key="task.id" class="task-card" :class="{ 'task-overdue': isTaskOverdue(task) }"
+          @click="handleStart(task)">
           <!-- 卡片主体 -->
           <div class="card-main">
             <!-- 对账待办：显示账户名称和日期选择器 -->
@@ -109,30 +108,8 @@
                 <el-date-picker :model-value="task.scheduled_date || undefined"
                   @update:model-value="(value: string) => handleDateChange(task.id, value)" type="date"
                   format="YYYY-MM-DD" value-format="YYYY-MM-DD" :clearable="false" placeholder="选择日期"
-                  class="date-picker no-border-date-picker" placement="bottom-start" :teleported="true" :popper-options="{
-                    modifiers: [
-                      {
-                        name: 'offset',
-                        options: {
-                          offset: [0, 4]
-                        }
-                      },
-                      {
-                        name: 'preventOverflow',
-                        options: {
-                          boundary: 'viewport',
-                          padding: 8
-                        }
-                      },
-                      {
-                        name: 'computeStyles',
-                        options: {
-                          adaptive: true,
-                          roundOffsets: true
-                        }
-                      }
-                    ]
-                  }" />
+                  class="date-picker no-border-date-picker" placement="bottom-start" :teleported="true"
+                  :popper-options="datePickerPopperOptions" />
                 <el-tag v-if="task.scheduled_date && isOverdue(task.scheduled_date)" type="danger" size="small"
                   class="overdue-tag">
                   逾期
@@ -161,13 +138,17 @@
               </div>
             </template>
 
-            <!-- 循环待办：显示标题、到期日与完成按钮（仅提示） -->
+            <!-- 循环待办：显示标题、可编辑日期（参考对账卡片）与完成按钮 -->
             <template v-else-if="task.task_type === 'recurring'">
               <div class="file-name">
                 {{ task.recurring_title || '循环待办' }}
               </div>
               <div class="date-info" @click.stop>
-                <span class="recurring-date">{{ task.scheduled_date || '—' }}</span>
+                <el-date-picker :model-value="task.scheduled_date || undefined"
+                  @update:model-value="(value: string) => handleDateChange(task.id, value)" type="date"
+                  format="YYYY-MM-DD" value-format="YYYY-MM-DD" :clearable="false" placeholder="选择日期"
+                  class="date-picker no-border-date-picker" placement="bottom-start" :teleported="true"
+                  :popper-options="datePickerPopperOptions" />
                 <el-tag v-if="task.scheduled_date && isOverdue(task.scheduled_date)" type="danger" size="small"
                   class="overdue-tag">
                   逾期
@@ -204,7 +185,7 @@ import {
   deleteRecurringTask
 } from '../../api/recurring'
 import RecurrenceRuleInput from '../../components/recurrence/RecurrenceRuleInput.vue'
-import type { ScheduledTask, RecurringTask, RecurringTaskStatus } from '../../types/reconciliation'
+import type { ScheduledTask, RecurringTask } from '../../types/reconciliation'
 import { isReviewExpired } from '../../types/reconciliation'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 import { extractApiErrorMessage } from '../../utils/errorHelper'
@@ -412,6 +393,15 @@ async function loadTasks() {
   }
 }
 
+// 日期选择器弹层定位（对账 / 循环卡片共用）
+const datePickerPopperOptions = {
+  modifiers: [
+    { name: 'offset', options: { offset: [0, 4] } },
+    { name: 'preventOverflow', options: { boundary: 'viewport', padding: 8 } },
+    { name: 'computeStyles', options: { adaptive: true, roundOffsets: true } }
+  ]
+}
+
 function isOverdue(dateString: string | null): boolean {
   if (!dateString) return false
   const date = new Date(dateString)
@@ -419,6 +409,12 @@ function isOverdue(dateString: string | null): boolean {
   today.setHours(0, 0, 0, 0)
   date.setHours(0, 0, 0, 0)
   return date < today
+}
+
+// 对账 / 循环待办卡片：到期待办高亮
+function isTaskOverdue(task: ScheduledTask): boolean {
+  if (task.task_type !== 'reconciliation' && task.task_type !== 'recurring') return false
+  return !!task.scheduled_date && isOverdue(task.scheduled_date)
 }
 
 function handleStart(task: ScheduledTask) {
@@ -457,8 +453,10 @@ async function handleCompleteRecurring(task: ScheduledTask) {
 
   completingTaskIds.value.add(task.id)
   try {
-    await completeTask(task.id)
-    ElMessage.success('已完成')
+    const response = await completeTask(task.id)
+    const nextDate = response.data?.next_date
+    // 下一次执行时间只在完成后才可知（when done 与按计划日期的生成逻辑不同）
+    ElMessage.success(nextDate ? `已完成，下次执行：${nextDate}` : '已完成（该循环已结束）')
     await loadTasks()
     await loadCounts()
     emitTaskBannerRefresh()
@@ -622,21 +620,6 @@ function handleRecurringClick() {
     return
   }
   recurringManageMode.value = false
-}
-
-function statusLabel(status: RecurringTaskStatus): string {
-  const map: Record<RecurringTaskStatus, string> = {
-    active: '进行中',
-    paused: '已暂停',
-    ended: '已结束'
-  }
-  return map[status] || status
-}
-
-function statusTagType(status: RecurringTaskStatus): 'success' | 'info' | 'warning' {
-  if (status === 'active') return 'success'
-  if (status === 'paused') return 'info'
-  return 'warning'
 }
 
 async function loadDefinitions() {
@@ -1023,7 +1006,8 @@ async function handleDelete(defn: RecurringTask) {
           var(--ep-bg-color) 0%,
           rgba(245, 108, 108, 0.05) 100%);
 
-      .account-name {
+      .account-name,
+      .file-name {
         color: var(--ep-color-danger);
       }
     }
@@ -1031,6 +1015,11 @@ async function handleDelete(defn: RecurringTask) {
     .card-main {
       flex: 1;
       min-width: 0;
+    }
+
+    // 循环待办「完成」按钮：与日期行保持间距
+    .recurring-actions {
+      margin-top: 12px;
     }
 
     .account-name,

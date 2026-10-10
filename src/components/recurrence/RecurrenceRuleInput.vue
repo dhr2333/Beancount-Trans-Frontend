@@ -5,12 +5,7 @@
     <div v-if="showPreview" class="preview-block">
       <div v-if="previewLoading" class="preview-hint">正在解析…</div>
       <div v-else-if="previewError" class="preview-error">{{ previewError }}</div>
-      <div v-else-if="previewDescribe" class="preview-result">
-        <span class="preview-describe">{{ previewDescribe }}</span>
-        <span v-if="previewDates.length" class="preview-dates">
-          下次：{{ previewDates.slice(0, 5).join(' · ') }}
-        </span>
-      </div>
+      <div v-else-if="previewDescribe" class="preview-result">{{ previewDescribe }}</div>
     </div>
   </div>
 </template>
@@ -38,7 +33,6 @@ const text = ref('')
 const previewLoading = ref(false)
 const previewError = ref('')
 const previewDescribe = ref('')
-const previewDates = ref<string[]>([])
 
 let lastEmitted = ''
 let previewTimer: ReturnType<typeof setTimeout> | null = null
@@ -65,14 +59,12 @@ async function runPreview() {
   const value = (text.value || '').trim()
   previewError.value = ''
   previewDescribe.value = ''
-  previewDates.value = []
   if (!value) return
 
   previewLoading.value = true
   try {
     const response = await previewRule({ rule_text: value, start_date: props.startDate })
     previewDescribe.value = response.data.describe || ''
-    previewDates.value = response.data.next_occurrences || []
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as { response?: { data?: { error?: string } } }
@@ -131,19 +123,7 @@ onUnmounted(() => {
 
 .preview-result {
   font-size: 12px;
-  color: var(--ep-text-color-regular);
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.preview-describe {
   font-weight: 600;
-}
-
-.preview-dates {
-  color: var(--ep-text-color-secondary);
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  color: var(--ep-text-color-regular);
 }
 </style>
