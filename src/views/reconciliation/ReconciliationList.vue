@@ -36,9 +36,6 @@
         <div class="new-rule">
           <RecurrenceRuleInput v-model="newRuleText" :show-preview="false" />
         </div>
-        <el-date-picker v-model="newStartDate" class="new-date" type="date" format="YYYY-MM-DD"
-          value-format="YYYY-MM-DD" :clearable="true" placeholder="首次日期（默认今天）" placement="bottom-start"
-          :teleported="true" :popper-options="datePickerPopperOptions" />
         <el-button type="primary" :loading="creating" @click="handleCreate">新建</el-button>
       </div>
 
@@ -60,7 +57,7 @@
               @update:model-value="(value: string) => handleStartDateChange(defn, value)" type="date"
               format="YYYY-MM-DD" value-format="YYYY-MM-DD" :clearable="false" placeholder="选择日期" class="date-picker"
               placement="bottom-start" :teleported="true" :popper-options="datePickerPopperOptions" />
-            <span v-else class="row-next" title="完成后自动计算">⏭ {{ defn.next_run_date || '—' }}</span>
+            <span v-else class="row-next" title="本次待办完成后的下一次待办生成日期（不可修改）">{{ defn.next_run_date || '—' }}</span>
           </div>
           <div class="row-actions">
             <el-button size="small" text type="danger" @click="handleDelete(defn)">删除</el-button>
@@ -206,7 +203,6 @@ const definitions = ref<RecurringTask[]>([])
 const definitionsLoading = ref(false)
 const newTitle = ref('')
 const newRuleText = ref('')
-const newStartDate = ref<string | null>(null)
 const creating = ref(false)
 // 行内编辑草稿（按定义 id）；标题/规则失焦或回车自动保存
 const drafts = reactive<Record<number, { title: string; rule_text: string }>>({})
@@ -529,10 +525,8 @@ async function handleDateChange(taskId: number, newDate: string) {
       scheduled_date: newDate
     })
     ElMessage.success('修改日期成功')
-    // 刷新列表/角标/横幅（改期后待办数量可能变化）
-    await loadTasks()
-    await loadCounts()
-    emitTaskBannerRefresh()
+    // 刷新列表以更新逾期状态
+    loadTasks()
   } catch (error: unknown) {
     // 失败时恢复原值
     if (task) {
@@ -605,12 +599,10 @@ const recurringButtonType = computed<'primary' | 'warning' | 'default'>(() => {
 })
 
 // 合并按钮：首次点击看待办，再次点击进管理，管理态再点返回待办
-async function handleRecurringClick() {
+function handleRecurringClick() {
   if (filterType.value !== 'recurring') {
     filterType.value = 'recurring'
     recurringManageMode.value = false
-    // watch(filterType) 会加载任务列表，这里补一次角标刷新
-    await loadCounts()
     return
   }
   if (!recurringManageMode.value) {
@@ -618,11 +610,9 @@ async function handleRecurringClick() {
     loadDefinitions()
     return
   }
-  // 管理 → 待办：重载任务列表与角标（管理态内可能已新建/改期/删除）
+  // 返回待办列表：重新拉取，确保管理中新生成/取消的待办立即展示
   recurringManageMode.value = false
-  await loadTasks()
-  await loadCounts()
-  emitTaskBannerRefresh()
+  loadTasks()
 }
 
 async function loadDefinitions() {
@@ -648,16 +638,9 @@ function syncDrafts() {
   }
 }
 
-// 定义变更后：重载定义 + 重算角标 + 刷新全局横幅
-async function refreshAfterChange() {
-  await loadDefinitions()
-  await loadCounts()
-  emitTaskBannerRefresh()
-}
-
-// 日期可编辑：按计划基准且尚未生成待办（存在待执行实例时只读）
+// 日期可编辑：仅当该定义尚未生成待办（存在待执行实例时，日期表示「完成后下一次日期」只读）
 function dateEditable(defn: RecurringTask): boolean {
-  return !defn.has_pending && defn.recurrence_basis === 'scheduled'
+  return !defn.has_pending
 }
 
 function revertDraft(defn: RecurringTask, field: 'title' | 'rule_text') {
@@ -680,7 +663,7 @@ async function saveTitle(defn: RecurringTask) {
     if (d) d.title = title
     defn.title = title
     ElMessage.success('已保存')
-    await refreshAfterChange()
+    await loadDefinitions()
   } catch (error: unknown) {
     revertDraft(defn, 'title')
     const axiosError = error as { response?: { data?: unknown } }
@@ -703,7 +686,8 @@ async function saveRule(defn: RecurringTask) {
     if (d) d.rule_text = rule
     defn.rule_text = rule
     ElMessage.success('已保存')
-    await refreshAfterChange()
+    await loadDefinitions()
+    emitTaskBannerRefresh()
   } catch (error: unknown) {
     revertDraft(defn, 'rule_text')
     const axiosError = error as { response?: { data?: unknown } }
@@ -712,11 +696,12 @@ async function saveRule(defn: RecurringTask) {
 }
 
 async function handleStartDateChange(defn: RecurringTask, value: string) {
-  if (!value) return
+  if (!value || value === defn.next_run_date) return
   try {
     await updateRecurringTask(defn.id, { start_date: value })
     ElMessage.success('已修改生成日期')
-    await refreshAfterChange()
+    await loadDefinitions()
+    emitTaskBannerRefresh()
   } catch (error: unknown) {
     const axiosError = error as { response?: { data?: unknown } }
     ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '修改生成日期失败'))
@@ -737,12 +722,12 @@ async function handleCreate() {
 
   creating.value = true
   try {
-    await createRecurringTask({ title, rule_text: rule, start_date: newStartDate.value })
+    await createRecurringTask({ title, rule_text: rule })
     ElMessage.success('循环待办已创建')
     newTitle.value = ''
     newRuleText.value = ''
-    newStartDate.value = null
-    await refreshAfterChange()
+    await loadDefinitions()
+    emitTaskBannerRefresh()
   } catch (error: unknown) {
     const axiosError = error as { response?: { data?: unknown } }
     ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '创建失败，请检查循环规则'))
@@ -902,11 +887,6 @@ async function handleDelete(defn: RecurringTask) {
         flex: 1;
         min-width: 0;
       }
-
-      .new-date {
-        width: 170px;
-        flex-shrink: 0;
-      }
     }
 
     .recurring-rows {
@@ -941,17 +921,52 @@ async function handleDelete(defn: RecurringTask) {
 
       .row-date {
         flex-shrink: 0;
+        width: 130px;
+        display: flex;
+        align-items: center;
 
-        .date-picker {
+        // 可修改态（下一次待办生成日期）：去掉边框与日历图标，
+        // 外观与只读态保持一致，仅日期颜色不同
+        // 注意：直接命中 EP 自带类名（不依赖 .date-picker 是否落在触发元素上）
+        :deep(.ep-date-editor),
+        :deep(.el-date-editor) {
           width: 130px;
         }
-      }
 
-      .row-next {
-        font-size: 13px;
-        color: var(--ep-text-color-secondary);
-        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-        white-space: nowrap;
+        :deep(.ep-input__prefix),
+        :deep(.el-input__prefix),
+        :deep(.ep-input__prefix-inner),
+        :deep(.el-input__prefix-inner),
+        :deep([class*="input__prefix"]) {
+          display: none !important;
+        }
+
+        :deep(.ep-input__wrapper),
+        :deep(.el-input__wrapper) {
+          padding: 0 !important;
+          border: none !important;
+          box-shadow: none !important;
+          background: transparent !important;
+        }
+
+        :deep(.ep-input__inner),
+        :deep(.el-input__inner) {
+          padding: 0 !important;
+          font-size: 14px;
+          font-family: inherit;
+          text-align: left;
+          color: var(--ep-color-primary);
+        }
+
+        // 只读态（本次待办完成后的下一次待办生成日期）：
+        // 与可修改态同位置、同字体，仅颜色不同
+        .row-next {
+          font-size: 14px;
+          font-family: inherit;
+          line-height: 1.5;
+          white-space: nowrap;
+          color: var(--ep-text-color-secondary);
+        }
       }
 
       .row-actions {
