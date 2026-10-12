@@ -14,16 +14,20 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { previewRule } from '../../api/recurring'
+import type { RecurrenceBasis } from '../../types/reconciliation'
 
 const props = withDefaults(
   defineProps<{
     modelValue: string
     showPreview?: boolean
+    /** 关闭内部展示但仍向上抛出 preview 事件（供外部自渲染预览） */
+    emitPreview?: boolean
     startDate?: string | null
     placeholder?: string
   }>(),
   {
     showPreview: true,
+    emitPreview: false,
     startDate: null,
     placeholder: '例如：every month on the last / every week on Tuesday, Friday'
   }
@@ -32,6 +36,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
   (e: 'blur'): void
   (e: 'submit'): void
+  (e: 'preview', payload: { describe: string; basis?: RecurrenceBasis; next_occurrences?: string[]; error: string }): void
 }>()
 
 const text = ref('')
@@ -55,7 +60,7 @@ function handleClear() {
 
 // 防抖预览（~400ms）
 function schedulePreview() {
-  if (!props.showPreview) return
+  if (!props.showPreview && !props.emitPreview) return
   if (previewTimer) clearTimeout(previewTimer)
   previewTimer = setTimeout(runPreview, 400)
 }
@@ -64,12 +69,21 @@ async function runPreview() {
   const value = (text.value || '').trim()
   previewError.value = ''
   previewDescribe.value = ''
-  if (!value) return
+  if (!value) {
+    emit('preview', { describe: '', error: '' })
+    return
+  }
 
   previewLoading.value = true
   try {
     const response = await previewRule({ rule_text: value, start_date: props.startDate })
     previewDescribe.value = response.data.describe || ''
+    emit('preview', {
+      describe: previewDescribe.value,
+      basis: response.data.basis,
+      next_occurrences: response.data.next_occurrences,
+      error: ''
+    })
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as { response?: { data?: { error?: string } } }
@@ -77,6 +91,7 @@ async function runPreview() {
     } else {
       previewError.value = '规则解析失败'
     }
+    emit('preview', { describe: '', error: previewError.value })
   } finally {
     previewLoading.value = false
   }

@@ -31,24 +31,20 @@
     <!-- 循环待办 · 管理视图（就地增删改，不跳页） -->
     <div v-if="filterType === 'recurring' && recurringManageMode" v-loading="definitionsLoading"
       class="recurring-manage">
-      <div class="new-rule-row">
-        <el-input v-model="newTitle" class="new-title" maxlength="128" placeholder="标题，如：每月复核科目与标签" />
-        <div class="new-rule">
-          <RecurrenceRuleInput v-model="newRuleText" :show-preview="false" />
-        </div>
-        <el-button type="primary" :loading="creating" @click="handleCreate">新建</el-button>
+      <div class="manage-toolbar">
+        <el-button type="primary" @click="createDialogVisible = true">＋ 新建循环待办</el-button>
       </div>
 
       <div v-if="definitions.length === 0" class="empty-state">
         <p class="empty-text">还没有循环待办</p>
-        <p class="empty-hint">在上方填写标题与规则（如 every month on the last），或让 Copilot 帮你创建</p>
+        <p class="empty-hint">点击「新建循环待办」填写周期、内容与日期，或让 Copilot 帮你创建</p>
       </div>
 
       <div v-else class="recurring-rows">
         <div v-for="defn in definitions" :key="defn.id" class="recurring-row">
           <div class="recurring-row-main">
-            <el-input v-model="drafts[defn.id].title" class="row-title-input" maxlength="128" placeholder="标题"
-              @blur="saveTitle(defn)" @keyup.enter="saveTitle(defn)" />
+            <el-input v-if="drafts[defn.id].kind === 'notify'" v-model="drafts[defn.id].note" class="row-note-input"
+              maxlength="128" placeholder="内容（待办卡片文本）" @blur="saveNote(defn)" @keyup.enter="saveNote(defn)" />
             <div class="row-rule-input">
               <RecurrenceRuleInput v-model="drafts[defn.id].rule_text" :show-preview="false" @blur="saveRule(defn)"
                 @submit="saveRule(defn)" />
@@ -74,6 +70,8 @@
           </div>
         </div>
       </div>
+
+      <RecurringTaskCreateDialog v-model="createDialogVisible" @created="handleCreated" />
     </div>
 
     <!-- 待办列表：大卡片设计 -->
@@ -146,7 +144,7 @@
             <!-- 循环待办：显示标题、可编辑日期（参考对账卡片）与完成按钮 -->
             <template v-else-if="task.task_type === 'recurring'">
               <div class="file-name">
-                {{ task.recurring_title || '循环待办' }}
+                {{ task.recurring_label || '循环待办' }}
               </div>
               <div class="date-info" @click.stop>
                 <el-date-picker :model-value="task.scheduled_date || undefined"
@@ -185,11 +183,11 @@ import { getTasks, updateTask, completeTask } from '../../api/reconciliation'
 import { confirmWrite } from '../../api/parse-review'
 import {
   listRecurringTasks,
-  createRecurringTask,
   updateRecurringTask,
   deleteRecurringTask
 } from '../../api/recurring'
 import RecurrenceRuleInput from '../../components/recurrence/RecurrenceRuleInput.vue'
+import RecurringTaskCreateDialog from '../../components/recurrence/RecurringTaskCreateDialog.vue'
 import type { ScheduledTask, RecurringTask, RecurringKind } from '../../types/reconciliation'
 import { isReviewExpired } from '../../types/reconciliation'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
@@ -211,11 +209,9 @@ const completingTaskIds = ref<Set<number>>(new Set())
 const recurringManageMode = ref(false)
 const definitions = ref<RecurringTask[]>([])
 const definitionsLoading = ref(false)
-const newTitle = ref('')
-const newRuleText = ref('')
-const creating = ref(false)
-// 行内编辑草稿（按定义 id）；标题/规则/模板失焦或回车自动保存
-const drafts = reactive<Record<number, { title: string; rule_text: string; kind: RecurringKind; template: string }>>({})
+const createDialogVisible = ref(false)
+// 行内编辑草稿（按定义 id）；内容/规则/模板失焦或回车自动保存
+const drafts = reactive<Record<number, { note: string; rule_text: string; kind: RecurringKind; template: string }>>({})
 
 onMounted(async () => {
   // 动态注入样式，确保清除日期选择器的边框
@@ -441,7 +437,7 @@ async function handleCompleteRecurring(task: ScheduledTask) {
 
   try {
     await ElMessageBox.confirm(
-      `确定将循环待办「${task.recurring_title || '循环待办'}」标记为完成吗？`,
+      `确定将循环待办「${task.recurring_label || '循环待办'}」标记为完成吗？`,
       '确认完成',
       {
         confirmButtonText: '确定',
@@ -626,7 +622,7 @@ function syncDrafts() {
   for (const defn of definitions.value) {
     if (!drafts[defn.id]) {
       drafts[defn.id] = {
-        title: defn.title,
+        note: defn.note,
         rule_text: defn.rule_text,
         kind: defn.kind,
         template: defn.template,
@@ -640,29 +636,25 @@ function dateEditable(defn: RecurringTask): boolean {
   return !defn.has_pending
 }
 
-function revertDraft(defn: RecurringTask, field: 'title' | 'rule_text') {
+function revertDraft(defn: RecurringTask, field: 'note' | 'rule_text') {
   const d = drafts[defn.id]
   if (d) d[field] = defn[field]
 }
 
-async function saveTitle(defn: RecurringTask) {
+async function saveNote(defn: RecurringTask) {
   const d = drafts[defn.id]
-  const title = (d?.title || '').trim()
-  if (!title) {
-    ElMessage.warning('标题不能为空')
-    revertDraft(defn, 'title')
-    return
-  }
-  if (title === defn.title) return
+  const note = (d?.note || '').trim()
+  if (note === defn.note) return
 
   try {
-    await updateRecurringTask(defn.id, { title })
-    if (d) d.title = title
-    defn.title = title
+    await updateRecurringTask(defn.id, { note })
+    if (d) d.note = note
+    defn.note = note
     ElMessage.success('已保存')
     await loadDefinitions()
+    emitTaskBannerRefresh()
   } catch (error: unknown) {
-    revertDraft(defn, 'title')
+    revertDraft(defn, 'note')
     const axiosError = error as { response?: { data?: unknown } }
     ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '保存失败'))
   }
@@ -754,37 +746,24 @@ async function handleStartDateChange(defn: RecurringTask, value: string) {
   }
 }
 
-async function handleCreate() {
-  const title = newTitle.value.trim()
-  const rule = newRuleText.value.trim()
-  if (!title) {
-    ElMessage.warning('请输入标题')
-    return
-  }
-  if (!rule) {
-    ElMessage.warning('请输入循环规则')
-    return
-  }
+// 新建成功：刷新定义列表与全局横幅
+async function handleCreated() {
+  await loadDefinitions()
+  emitTaskBannerRefresh()
+}
 
-  creating.value = true
-  try {
-    await createRecurringTask({ title, rule_text: rule })
-    ElMessage.success('循环待办已创建')
-    newTitle.value = ''
-    newRuleText.value = ''
-    await loadDefinitions()
-    emitTaskBannerRefresh()
-  } catch (error: unknown) {
-    const axiosError = error as { response?: { data?: unknown } }
-    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '创建失败，请检查循环规则'))
-  } finally {
-    creating.value = false
-  }
+// 定义展示标签（无标题：取内容首行，回退规则文本）
+function defnLabel(defn: RecurringTask): string {
+  const note = (defn.note || '').trim()
+  if (note) return note.split('\n')[0].slice(0, 128)
+  const template = (defn.template || '').trim()
+  if (template) return template.split('\n')[0].slice(0, 128)
+  return defn.rule_text
 }
 
 async function handleDelete(defn: RecurringTask) {
   try {
-    await ElMessageBox.confirm(`确定要删除循环待办「${defn.title}」吗？`, '确认删除', {
+    await ElMessageBox.confirm(`确定要删除循环待办「${defnLabel(defn)}」吗？`, '确认删除', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
@@ -914,25 +893,8 @@ async function handleDelete(defn: RecurringTask) {
   .recurring-manage {
     min-height: 200px;
 
-    .new-rule-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 16px;
+    .manage-toolbar {
       margin-bottom: 16px;
-      background: var(--ep-bg-color);
-      border: 2px dashed var(--ep-border-color);
-      border-radius: 12px;
-
-      .new-title {
-        width: 220px;
-        flex-shrink: 0;
-      }
-
-      .new-rule {
-        flex: 1;
-        min-width: 0;
-      }
     }
 
     .recurring-rows {
@@ -966,7 +928,7 @@ async function handleDelete(defn: RecurringTask) {
         flex-shrink: 0;
       }
 
-      .row-title-input {
+      .row-note-input {
         width: 200px;
         flex-shrink: 0;
       }

@@ -39,7 +39,7 @@ export interface ScheduledTask {
   account_type: string | null
   review_expires_at?: number | null  // 条目审核待办的用户审核截止时间（Unix 时间戳，秒）
   entry_count?: number | null  // 条目审核待办的待审核条目数
-  recurring_title?: string | null  // 循环待办标题
+  recurring_label?: string | null  // 循环待办展示标签（取定义内容派生）
   created: string
   modified: string
 }
@@ -63,7 +63,6 @@ export type RecurringKind = 'notify' | 'generate_review'
  */
 export interface RecurringTask {
   id: number
-  title: string
   rule_text: string
   rrule: string
   start_date: string | null
@@ -72,6 +71,8 @@ export interface RecurringTask {
   kind: RecurringKind
   /** 固定模板正文（kind=generate_review 时使用，原样生成审核条目，无占位符） */
   template: string
+  /** 备注/通知类文本（kind=notify 时作为待办内容） */
+  note: string
   next_run_date: string | null  // 管理页展示用：下一次执行日期（动态推算，不入库）
   has_pending: boolean          // 是否存在待执行实例（存在时管理页日期只读，只能改实例日期）
   created: string
@@ -80,10 +81,9 @@ export interface RecurringTask {
 
 /**
  * 循环待办定义创建/更新请求体（可写字段）
- * 界面暴露标题、规则、到期产出与模板；note/start_date 可选
+ * 界面暴露规则、到期产出与内容；note/start_date 可选
  */
 export interface RecurringTaskPayload {
-  title: string
   rule_text: string
   note?: string
   start_date?: string | null
@@ -97,6 +97,8 @@ export interface RecurringTaskPayload {
 export interface RecurrencePreview {
   rule_text: string
   describe: string
+  basis?: RecurrenceBasis
+  next_occurrences?: string[]
 }
 
 /** 条目审核待办是否已过用户审核截止时间（截止时间为空表示长期有效，永不过期） */
