@@ -46,21 +46,31 @@
 
       <div v-else class="recurring-rows">
         <div v-for="defn in definitions" :key="defn.id" class="recurring-row">
-          <el-input v-model="drafts[defn.id].title" class="row-title-input" maxlength="128" placeholder="标题"
-            @blur="saveTitle(defn)" @keyup.enter="saveTitle(defn)" />
-          <div class="row-rule-input">
-            <RecurrenceRuleInput v-model="drafts[defn.id].rule_text" :show-preview="false" @blur="saveRule(defn)"
-              @submit="saveRule(defn)" />
+          <div class="recurring-row-main">
+            <el-input v-model="drafts[defn.id].title" class="row-title-input" maxlength="128" placeholder="标题"
+              @blur="saveTitle(defn)" @keyup.enter="saveTitle(defn)" />
+            <div class="row-rule-input">
+              <RecurrenceRuleInput v-model="drafts[defn.id].rule_text" :show-preview="false" @blur="saveRule(defn)"
+                @submit="saveRule(defn)" />
+            </div>
+            <el-select v-model="drafts[defn.id].kind" class="row-kind-select" @change="saveKind(defn)">
+              <el-option label="通知" value="notify" />
+              <el-option label="生成审核待办" value="generate_review" />
+            </el-select>
+            <div class="row-date">
+              <el-date-picker v-if="dateEditable(defn)" :model-value="defn.next_run_date || undefined"
+                @update:model-value="(value: string) => handleStartDateChange(defn, value)" type="date"
+                format="YYYY-MM-DD" value-format="YYYY-MM-DD" :clearable="false" placeholder="选择日期" class="date-picker"
+                placement="bottom-start" :teleported="true" :popper-options="datePickerPopperOptions" />
+              <span v-else class="row-next" title="本次待办完成后的下一次待办生成日期">{{ defn.next_run_date || '—' }}</span>
+            </div>
+            <div class="row-actions">
+              <el-button size="small" text type="danger" @click="handleDelete(defn)">删除</el-button>
+            </div>
           </div>
-          <div class="row-date">
-            <el-date-picker v-if="dateEditable(defn)" :model-value="defn.next_run_date || undefined"
-              @update:model-value="(value: string) => handleStartDateChange(defn, value)" type="date"
-              format="YYYY-MM-DD" value-format="YYYY-MM-DD" :clearable="false" placeholder="选择日期" class="date-picker"
-              placement="bottom-start" :teleported="true" :popper-options="datePickerPopperOptions" />
-            <span v-else class="row-next" title="本次待办完成后的下一次待办生成日期（不可修改）">{{ defn.next_run_date || '—' }}</span>
-          </div>
-          <div class="row-actions">
-            <el-button size="small" text type="danger" @click="handleDelete(defn)">删除</el-button>
+          <div v-if="drafts[defn.id].kind === 'generate_review'" class="recurring-row-template">
+            <el-input v-model="drafts[defn.id].template" type="textarea" :rows="4" class="row-template-input"
+              placeholder="固定模板将原样生成审核条目；日期等随期变化的内容请在审核页手动修改" @blur="saveTemplate(defn)" />
           </div>
         </div>
       </div>
@@ -180,7 +190,7 @@ import {
   deleteRecurringTask
 } from '../../api/recurring'
 import RecurrenceRuleInput from '../../components/recurrence/RecurrenceRuleInput.vue'
-import type { ScheduledTask, RecurringTask } from '../../types/reconciliation'
+import type { ScheduledTask, RecurringTask, RecurringKind } from '../../types/reconciliation'
 import { isReviewExpired } from '../../types/reconciliation'
 import { emitTaskBannerRefresh } from '../../utils/accountEvents'
 import { extractApiErrorMessage } from '../../utils/errorHelper'
@@ -204,8 +214,8 @@ const definitionsLoading = ref(false)
 const newTitle = ref('')
 const newRuleText = ref('')
 const creating = ref(false)
-// 行内编辑草稿（按定义 id）；标题/规则失焦或回车自动保存
-const drafts = reactive<Record<number, { title: string; rule_text: string }>>({})
+// 行内编辑草稿（按定义 id）；标题/规则/模板失焦或回车自动保存
+const drafts = reactive<Record<number, { title: string; rule_text: string; kind: RecurringKind; template: string }>>({})
 
 onMounted(async () => {
   // 动态注入样式，确保清除日期选择器的边框
@@ -464,33 +474,15 @@ async function handleCompleteRecurring(task: ScheduledTask) {
   }
 }
 
-// 计算剩余时间（基于 review_expires_at 或 created）
+// 计算剩余时间（基于 review_expires_at；为空表示长期有效）
 function getRemainingTime(task: ScheduledTask): string {
-  if (task.review_expires_at) {
-    const expiryTime = task.review_expires_at * 1000
-    const now = Date.now()
-    const remainingMs = expiryTime - now
-
-    if (remainingMs <= 0) {
-      return '已过期，等待自动写入'
-    }
-
-    const remainingHours = Math.floor(remainingMs / (3600 * 1000))
-    const remainingMinutes = Math.floor((remainingMs % (3600 * 1000)) / (60 * 1000))
-
-    if (remainingHours > 0) {
-      return `${remainingHours}小时${remainingMinutes}分钟`
-    } else {
-      return `${remainingMinutes}分钟`
-    }
+  if (task.review_expires_at === null || task.review_expires_at === undefined) {
+    // 空值表示「长期有效」（如仅含循环待办来源：永不过期、不自动写入）
+    return '长期有效'
   }
 
-  // 回退到使用 created（兼容旧数据或缓存不存在的情况）
-  const createdTime = new Date(task.created).getTime()
-  const now = Date.now()
-  const elapsed = now - createdTime
-  const totalHours = 24
-  const remainingMs = totalHours * 3600 * 1000 - elapsed
+  const expiryTime = task.review_expires_at * 1000
+  const remainingMs = expiryTime - Date.now()
 
   if (remainingMs <= 0) {
     return '已过期，等待自动写入'
@@ -633,7 +625,12 @@ async function loadDefinitions() {
 function syncDrafts() {
   for (const defn of definitions.value) {
     if (!drafts[defn.id]) {
-      drafts[defn.id] = { title: defn.title, rule_text: defn.rule_text }
+      drafts[defn.id] = {
+        title: defn.title,
+        rule_text: defn.rule_text,
+        kind: defn.kind,
+        template: defn.template,
+      }
     }
   }
 }
@@ -692,6 +689,55 @@ async function saveRule(defn: RecurringTask) {
     revertDraft(defn, 'rule_text')
     const axiosError = error as { response?: { data?: unknown } }
     ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '保存失败，请检查循环规则'))
+  }
+}
+
+async function saveKind(defn: RecurringTask) {
+  const d = drafts[defn.id]
+  const kind = d?.kind ?? defn.kind
+  if (kind === defn.kind) return
+
+  // 切到「生成审核待办」但模板为空：先展开模板编辑区，待填写后再自动保存
+  if (kind === 'generate_review' && !(d?.template || '').trim()) {
+    ElMessage.info('请先在该行下方填写模板，失焦后自动保存')
+    return
+  }
+
+  try {
+    await updateRecurringTask(defn.id, { kind, template: d?.template ?? '' })
+    defn.kind = kind
+    ElMessage.success('已保存')
+    await loadDefinitions()
+    emitTaskBannerRefresh()
+  } catch (error: unknown) {
+    if (d) d.kind = defn.kind
+    const axiosError = error as { response?: { data?: unknown } }
+    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '保存失败'))
+  }
+}
+
+async function saveTemplate(defn: RecurringTask) {
+  const d = drafts[defn.id]
+  const template = d?.template ?? ''
+  const kind = d?.kind ?? defn.kind
+  if (template === defn.template && kind === defn.kind) return
+  if (kind === 'generate_review' && !template.trim()) {
+    ElMessage.warning('生成审核待办时模板不能为空')
+    return
+  }
+
+  try {
+    // 一并提交 kind：覆盖「先切换类型、再补模板」的延迟保存
+    await updateRecurringTask(defn.id, { kind, template })
+    defn.template = template
+    defn.kind = kind
+    ElMessage.success('已保存')
+    await loadDefinitions()
+    emitTaskBannerRefresh()
+  } catch (error: unknown) {
+    // 保存失败时保留草稿与模板编辑区，便于重试
+    const axiosError = error as { response?: { data?: unknown } }
+    ElMessage.error(extractApiErrorMessage(axiosError.response?.data, '保存失败'))
   }
 }
 
@@ -897,8 +943,8 @@ async function handleDelete(defn: RecurringTask) {
 
     .recurring-row {
       display: flex;
-      align-items: center;
-      gap: 12px;
+      flex-direction: column;
+      gap: 10px;
       padding: 12px 16px;
       background: var(--ep-bg-color);
       border: 2px solid var(--ep-border-color);
@@ -907,6 +953,17 @@ async function handleDelete(defn: RecurringTask) {
 
       &:hover {
         border-color: var(--ep-color-primary);
+      }
+
+      .recurring-row-main {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .row-kind-select {
+        width: 140px;
+        flex-shrink: 0;
       }
 
       .row-title-input {
@@ -974,6 +1031,19 @@ async function handleDelete(defn: RecurringTask) {
         align-items: center;
         gap: 4px;
         flex-shrink: 0;
+      }
+
+      .recurring-row-template {
+        .row-template-input {
+          width: 100%;
+
+          :deep(.ep-textarea__inner),
+          :deep(.el-textarea__inner) {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+          }
+        }
       }
     }
   }

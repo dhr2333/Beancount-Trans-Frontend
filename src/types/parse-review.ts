@@ -32,12 +32,12 @@ export interface TagOverrides {
 }
 
 /**
- * 条目来源：账单文件解析 / Copilot 记账
+ * 条目来源：账单文件解析 / Copilot 记账 / 循环待办
  */
-export type EntrySource = 'file' | 'copilot'
+export type EntrySource = 'file' | 'copilot' | 'recurring'
 
 /**
- * 写操作来源定位信息：账单来源带 file_id，Copilot 来源 file_id 为 null
+ * 写操作来源定位信息：账单来源带 file_id，Copilot / 循环待办来源 file_id 为 null
  */
 export interface EntrySourceLocator {
   source: EntrySource
@@ -63,9 +63,9 @@ export interface FormattedEntry {
   installment_period?: number | null
   /** 条目来源（缺省按 'file' 处理，兼容旧数据） */
   source?: EntrySource
-  /** 来源账单文件 ID（统一条目审核接口返回）；Copilot 条目为 null */
+  /** 来源账单文件 ID（统一条目审核接口返回）；Copilot / 循环待办条目为 null */
   file_id?: number | null
-  /** 来源账单文件名（统一条目审核接口返回）；Copilot 条目为 'Copilot 记账' */
+  /** 来源账单文件名（统一条目审核接口返回）；Copilot 为 'Copilot 记账'，循环待办为定义标题 */
   file_name?: string
 }
 

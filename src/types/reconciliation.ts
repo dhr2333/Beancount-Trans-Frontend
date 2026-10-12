@@ -52,6 +52,13 @@ export interface ScheduledTask {
 export type RecurrenceBasis = 'scheduled' | 'completed'
 
 /**
+ * 到期产出
+ * - notify: 生成文本提醒（循环待办卡片）
+ * - generate_review: 到期把固定模板并入统一审核队列，生成审核条目
+ */
+export type RecurringKind = 'notify' | 'generate_review'
+
+/**
  * 循环待办定义接口
  */
 export interface RecurringTask {
@@ -61,6 +68,10 @@ export interface RecurringTask {
   rrule: string
   start_date: string | null
   recurrence_basis: RecurrenceBasis
+  /** 到期产出类型 */
+  kind: RecurringKind
+  /** 固定模板正文（kind=generate_review 时使用，原样生成审核条目，无占位符） */
+  template: string
   next_run_date: string | null  // 管理页展示用：下一次执行日期（动态推算，不入库）
   has_pending: boolean          // 是否存在待执行实例（存在时管理页日期只读，只能改实例日期）
   created: string
@@ -69,13 +80,15 @@ export interface RecurringTask {
 
 /**
  * 循环待办定义创建/更新请求体（可写字段）
- * 界面只暴露标题、规则；note/start_date 可选
+ * 界面暴露标题、规则、到期产出与模板；note/start_date 可选
  */
 export interface RecurringTaskPayload {
   title: string
   rule_text: string
   note?: string
   start_date?: string | null
+  kind?: RecurringKind
+  template?: string
 }
 
 /**
@@ -86,13 +99,12 @@ export interface RecurrencePreview {
   describe: string
 }
 
-/** 条目审核待办是否已过用户审核截止时间 */
+/** 条目审核待办是否已过用户审核截止时间（截止时间为空表示长期有效，永不过期） */
 export function isReviewExpired(task: Pick<ScheduledTask, 'review_expires_at' | 'created'>): boolean {
-  if (task.review_expires_at) {
-    return Date.now() >= task.review_expires_at * 1000
+  if (task.review_expires_at === null || task.review_expires_at === undefined) {
+    return false
   }
-  const createdTime = new Date(task.created).getTime()
-  return Date.now() >= createdTime + 24 * 3600 * 1000
+  return Date.now() >= task.review_expires_at * 1000
 }
 
 /**

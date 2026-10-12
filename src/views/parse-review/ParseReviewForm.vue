@@ -146,36 +146,47 @@ onBeforeUnmount(() => {
   reparsePollAborted = true
 })
 
-/** 审核来源（账单文件 / Copilot 暂存区），按条目首次出现顺序去重 */
+/** 审核来源（账单文件 / Copilot 暂存区 / 循环待办），按条目首次出现顺序去重 */
 interface ReviewSource {
-  /** 来源键：账单为 file_id 字符串，Copilot 为 'copilot' */
+  /** 来源键：账单为 file_id 字符串，虚拟来源（Copilot / 循环待办）为来源名 */
   key: string
-  source: 'file' | 'copilot'
+  source: 'file' | 'copilot' | 'recurring'
   file_id: number | null
   file_name: string
 }
 
-/** 来源键：Copilot 条目共用一个虚拟来源，其余按 file_id 区分 */
+/** 来源键：虚拟来源（Copilot / 循环待办）共用一个来源，其余按 file_id 区分 */
 const sourceKey = (entry: FormattedEntry): string =>
-  entry.source === 'copilot' ? 'copilot' : String(entry.file_id)
+  entry.source && entry.source !== 'file' ? entry.source : String(entry.file_id)
+
+/** 虚拟来源（无 file_id）的默认展示名 */
+const VIRTUAL_SOURCE_LABELS: Record<'copilot' | 'recurring', string> = {
+  copilot: 'Copilot 记账',
+  recurring: '循环待办',
+}
 
 const sourceFiles = computed<ReviewSource[]>(() => {
   const seen = new Map<string, ReviewSource>()
   for (const entry of formattedEntries.value) {
     const key = sourceKey(entry)
     if (seen.has(key)) continue
-    const isCopilot = entry.source === 'copilot'
+    const source = entry.source ?? 'file'
+    if (source === 'copilot' || source === 'recurring') {
+      seen.set(key, {
+        key,
+        source,
+        file_id: null,
+        file_name: entry.file_name || VIRTUAL_SOURCE_LABELS[source]
+      })
+      continue
+    }
     seen.set(key, {
       key,
-      source: isCopilot ? 'copilot' : 'file',
-      file_id: isCopilot ? null : entry.file_id ?? null,
+      source: 'file',
+      file_id: entry.file_id ?? null,
       file_name:
         entry.file_name ||
-        (isCopilot
-          ? 'Copilot 记账'
-          : entry.file_id != null
-            ? `文件 #${entry.file_id}`
-            : '未知来源')
+        (entry.file_id != null ? `文件 #${entry.file_id}` : '未知来源')
     })
   }
   return [...seen.values()]
@@ -200,8 +211,8 @@ const findSourceByKey = (key: string): ReviewSource | undefined =>
 
 /** 解析条目的来源定位信息（无提示） */
 const resolveEntrySource = (entry: FormattedEntry): EntrySourceLocator | null => {
-  if (entry.source === 'copilot') {
-    return { source: 'copilot', fileId: null }
+  if (entry.source === 'copilot' || entry.source === 'recurring') {
+    return { source: entry.source, fileId: null }
   }
   if (entry.file_id == null) {
     return null
@@ -246,8 +257,8 @@ const handleTableReparse = async (
   propagateCandidates = false
 ) => {
   const entry = formattedEntries.value.find((item) => item.uuid === entryUuid)
-  if (entry?.source === 'copilot') {
-    ElMessage.warning('Copilot 记账条目请直接编辑条目文本')
+  if (entry?.source === 'copilot' || entry?.source === 'recurring') {
+    ElMessage.warning('该来源条目请直接编辑条目文本')
     return
   }
 
@@ -459,8 +470,13 @@ function mergeSourceSyncResult(source: ReviewSource, formattedData: FormattedEnt
   const normalized = formattedData.map((entry) => ({
     ...entry,
     source: source.source,
-    file_id: source.source === 'copilot' ? null : source.file_id,
-    file_name: source.source === 'copilot' ? 'Copilot 记账' : source.file_name,
+    file_id: source.source === 'file' ? source.file_id : null,
+    file_name:
+      source.source === 'copilot'
+        ? VIRTUAL_SOURCE_LABELS.copilot
+        : source.source === 'recurring'
+          ? VIRTUAL_SOURCE_LABELS.recurring
+          : source.file_name,
     edited_formatted: (entry.edited_formatted || entry.formatted || '').replace(/\n+$/, ''),
     tag_details: entry.tag_details ?? [],
     tag_overrides: entry.tag_overrides ?? { removed_paths: [], added_paths: [] }
