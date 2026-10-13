@@ -96,7 +96,34 @@
         </el-empty>
       </div>
 
-      <!-- 待办卡片列表 -->
+      <!-- 循环待办（通知）：条目 / 行式清单 -->
+      <div v-else-if="filterType === 'recurring'" class="recurring-task-list">
+        <div v-for="task in tasks" :key="task.id" class="recurring-task-row">
+          <button type="button" class="task-checkbox" :disabled="completingTaskIds.has(task.id)" title="标记完成"
+            @click="handleCompleteRecurring(task)" />
+          <div class="row-title" :title="task.recurring_label || '循环待办'">
+            {{ task.recurring_label || '循环待办' }}
+          </div>
+          <div class="date-info row-date" @click.stop>
+            <el-date-picker :model-value="task.scheduled_date || undefined"
+              @update:model-value="(value: string) => handleDateChange(task.id, value)" type="date" format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD" :clearable="false" placeholder="选择日期" class="date-picker no-border-date-picker"
+              placement="bottom-start" :teleported="true" :popper-options="datePickerPopperOptions" />
+            <el-tag v-if="task.scheduled_date && isOverdue(task.scheduled_date)" type="danger" size="small"
+              class="overdue-tag">
+              逾期
+            </el-tag>
+          </div>
+          <span v-if="task.next_run_date" class="row-next-date" title="本次待办完成后的下一次待办生成日期">
+            <el-icon>
+              <RefreshRight />
+            </el-icon>
+            {{ task.next_run_date }}
+          </span>
+        </div>
+      </div>
+
+      <!-- 待办卡片列表（对账 / 条目审核） -->
       <div v-else class="tasks-grid">
         <div v-for="task in tasks" :key="task.id" class="task-card" :class="{ 'task-overdue': isTaskOverdue(task) }"
           @click="handleStart(task)">
@@ -140,30 +167,6 @@
                 </div>
               </div>
             </template>
-
-            <!-- 循环待办：显示标题、可编辑日期（参考对账卡片）与完成按钮 -->
-            <template v-else-if="task.task_type === 'recurring'">
-              <div class="file-name">
-                {{ task.recurring_label || '循环待办' }}
-              </div>
-              <div class="date-info" @click.stop>
-                <el-date-picker :model-value="task.scheduled_date || undefined"
-                  @update:model-value="(value: string) => handleDateChange(task.id, value)" type="date"
-                  format="YYYY-MM-DD" value-format="YYYY-MM-DD" :clearable="false" placeholder="选择日期"
-                  class="date-picker no-border-date-picker" placement="bottom-start" :teleported="true"
-                  :popper-options="datePickerPopperOptions" />
-                <el-tag v-if="task.scheduled_date && isOverdue(task.scheduled_date)" type="danger" size="small"
-                  class="overdue-tag">
-                  逾期
-                </el-tag>
-              </div>
-              <div class="card-actions recurring-actions" @click.stop>
-                <el-button type="primary" size="small" :loading="completingTaskIds.has(task.id)"
-                  @click="handleCompleteRecurring(task)" class="complete-btn">
-                  完成
-                </el-button>
-              </div>
-            </template>
           </div>
         </div>
       </div>
@@ -177,7 +180,8 @@ import { ref, computed, reactive, onMounted, onActivated, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Check
+  Check,
+  RefreshRight
 } from '@element-plus/icons-vue'
 import { getTasks, updateTask, completeTask } from '../../api/reconciliation'
 import { confirmWrite } from '../../api/parse-review'
@@ -431,30 +435,14 @@ function handleStart(task: ScheduledTask) {
   }
 }
 
-// 完成循环待办实例
+// 完成循环待办实例（点击复选框直接完成，无二次确认）
 async function handleCompleteRecurring(task: ScheduledTask) {
   if (task.task_type !== 'recurring') return
-
-  try {
-    await ElMessageBox.confirm(
-      `确定将循环待办「${task.recurring_label || '循环待办'}」标记为完成吗？`,
-      '确认完成',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-  } catch {
-    return
-  }
+  if (completingTaskIds.value.has(task.id)) return
 
   completingTaskIds.value.add(task.id)
   try {
-    const response = await completeTask(task.id)
-    const nextDate = response.data?.next_date
-    // 下一次执行时间只在完成后才可知（when done 与按计划日期的生成逻辑不同）
-    ElMessage.success(nextDate ? `已完成，下次执行：${nextDate}` : '已完成（该循环已结束）')
+    await completeTask(task.id)
     await loadTasks()
     await loadCounts()
     emitTaskBannerRefresh()
@@ -1010,6 +998,82 @@ async function handleDelete(defn: RecurringTask) {
     }
   }
 
+  // 循环待办（通知）：条目 / 行式清单（参考 Obsidian Tasks 的待办样式）
+  .recurring-task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .recurring-task-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: background-color 0.15s;
+
+    &:hover {
+      background-color: var(--ep-fill-color);
+    }
+
+    // 正方形复选框：点击即完成（无二次确认）
+    .task-checkbox {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      padding: 0;
+      border: 1.5px solid var(--ep-text-color-secondary);
+      border-radius: 3px;
+      background: transparent;
+      cursor: pointer;
+      transition: border-color 0.15s, background-color 0.15s;
+
+      &:hover:not(:disabled) {
+        border-color: var(--ep-color-primary);
+        background-color: var(--ep-color-primary-light-9);
+      }
+
+      &:disabled {
+        cursor: default;
+        opacity: 0.5;
+      }
+    }
+
+    .row-title {
+      min-width: 0;
+      font-size: 14px;
+      color: var(--ep-text-color-primary);
+      word-break: break-word;
+      transition: color 0.2s;
+    }
+
+    .row-date {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      max-width: none;
+      width: auto;
+
+      :deep(.el-input__inner),
+      :deep(.ep-input__inner) {
+        font-size: 14px;
+      }
+    }
+
+    .row-next-date {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 14px;
+      color: var(--ep-text-color-secondary);
+      white-space: nowrap;
+    }
+  }
+
   .empty-state {
     padding: 80px 20px;
     text-align: center;
@@ -1087,11 +1151,6 @@ async function handleDelete(defn: RecurringTask) {
     .card-main {
       flex: 1;
       min-width: 0;
-    }
-
-    // 循环待办「完成」按钮：与日期行保持间距
-    .recurring-actions {
-      margin-top: 12px;
     }
 
     .account-name,
