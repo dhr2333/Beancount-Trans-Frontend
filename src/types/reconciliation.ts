@@ -100,6 +100,14 @@ export interface RecurrencePreview {
   describe: string
   basis?: RecurrenceBasis
   next_occurrences?: string[]
+  /** 本期待办日期（= 基准日期 start_date）；到期即按该日期生成待办 */
+  first_occurrence?: string | null
+  /** 若现在创建会立即生成的日期列表（notify 至多 1 条，generate_review 补齐全部到期周期） */
+  immediate_dates?: string[]
+  /** generate_review 补齐后推进到的下一次预期日期 */
+  next_expected_date?: string | null
+  /** 规则不可满足（无任何发生日期） */
+  ended?: boolean
 }
 
 /** 条目审核待办是否已过用户审核截止时间（截止时间为空表示长期有效，永不过期） */

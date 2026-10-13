@@ -10,18 +10,8 @@
           {{ preset.label }}
         </el-button>
       </div>
-      <RecurrenceRuleInput v-model="form.ruleText" :show-preview="false" :emit-preview="true"
+      <RecurrenceRuleInput v-model="form.ruleText" :kind="form.kind" :show-preview="true" :emit-preview="true"
         :start-date="form.startDate" @preview="onPreview" />
-      <div class="preview-line">
-        <span v-if="preview.error" class="preview-error">{{ preview.error }}</span>
-        <span v-else-if="preview.describe" class="preview-desc">
-          {{ preview.describe }}
-          <span v-if="preview.occurrences.length" class="preview-occ">
-            · 后续：{{ preview.occurrences.join('、') }}
-          </span>
-        </span>
-        <span v-else class="preview-hint">输入或选择规则后，这里会显示中文描述与后续日期</span>
-      </div>
     </section>
 
     <!-- ② 文本/模板 -->
@@ -50,22 +40,47 @@
         <span class="date-label">基准日期</span>
         <el-date-picker v-model="form.startDate" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD"
           :clearable="false" placeholder="选择日期" class="date-picker" />
-        <el-radio-group v-model="form.basis" class="basis-group" @change="applyBasisToRule">
+        <el-radio-group :model-value="basis" class="basis-group" @change="setBasis">
           <el-radio-button label="scheduled">按计划日期</el-radio-button>
           <el-radio-button label="completed">完成后起算</el-radio-button>
         </el-radio-group>
       </div>
-      <p class="block-hint">
-        <template v-if="preview.occurrences.length">
-          首次生成：{{ preview.occurrences[0] }}（若该日期 ≤ 今天，创建后立即生成待办）
-        </template>
-        <template v-else>以基准日期为起算锚点；若已到期，创建后会立即生成待办。</template>
-      </p>
+      <p class="block-hint">以基准日期为起算锚点；「完成后起算」会按实际完成日期重新推算下一期。</p>
     </section>
 
+    <!-- ④ 创建后的即时后果（不可逆副作用前置） -->
+    <div class="consequence" :class="{ 'is-warn': preview.ended || preview.immediateDates.length > 0 }" role="status"
+      aria-live="polite">
+      <p class="consequence-title">创建后会发生什么</p>
+      <p v-if="preview.error" class="consequence-item danger">规则无法解析，请先修正循环规则。</p>
+      <p v-else-if="!preview.describe" class="consequence-item muted">选择或输入循环规则后，这里会显示创建后的即时后果。</p>
+      <p v-else-if="preview.ended" class="consequence-item danger">
+        该规则无法满足任何日期，创建后定义会立即结束，不会生成待办。
+      </p>
+      <template v-else>
+        <p class="consequence-item">本期待办日期：<strong>{{ preview.firstOccurrence || '—' }}</strong></p>
+        <p v-if="preview.immediateDates.length" class="consequence-item warn">
+          <template v-if="form.kind === 'generate_review'">
+            立即补齐 <strong>{{ preview.immediateDates.length }}</strong> 条审核条目（{{
+              preview.immediateDates.join('、') }}），随后本期待办日期推进到
+            <strong>{{ preview.nextExpectedDate || '—' }}</strong>
+          </template>
+          <template v-else>
+            立即生成 <strong>1</strong> 条待办卡片（{{ preview.immediateDates[0] }}）
+          </template>
+        </p>
+        <p v-else class="consequence-item">创建后不会立即生成，到期日为本期待办日期 <strong>{{ preview.firstOccurrence }}</strong></p>
+      </template>
+    </div>
+
     <template #footer>
-      <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="submitting" :disabled="!canSubmit" @click="handleSubmit">创建</el-button>
+      <div class="dialog-footer">
+        <span class="submit-hint">{{ submitHint }}</span>
+        <div class="dialog-actions">
+          <el-button @click="visible = false">取消</el-button>
+          <el-button type="primary" :loading="submitting" :disabled="!canSubmit" @click="handleSubmit">创建</el-button>
+        </div>
+      </div>
     </template>
   </el-dialog>
 </template>
@@ -77,6 +92,7 @@ import { createRecurringTask } from '../../api/recurring'
 import type { RecurrenceBasis } from '../../types/reconciliation'
 import { extractApiErrorMessage } from '../../utils/errorHelper'
 import RecurrenceRuleInput from './RecurrenceRuleInput.vue'
+import type { RecurrencePreviewPayload } from './RecurrenceRuleInput.vue'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -116,14 +132,16 @@ const form = reactive({
   ruleText: '',
   kind: 'notify' as 'notify' | 'generate_review',
   content: '',
-  startDate: todayString(),
-  basis: 'scheduled' as RecurrenceBasis
+  startDate: todayString()
 })
 
-const preview = reactive<{ describe: string; occurrences: string[]; error: string }>({
+const preview = reactive({
   describe: '',
-  occurrences: [],
-  error: ''
+  error: '',
+  firstOccurrence: null as string | null,
+  immediateDates: [] as string[],
+  nextExpectedDate: null as string | null,
+  ended: false
 })
 
 const submitting = ref(false)
@@ -135,49 +153,59 @@ const canSubmit = computed(() => {
   return true
 })
 
+// 提交按钮被禁用时，说明原因（可访问性：不只靠「禁用」表达）
+const submitHint = computed(() => {
+  if (submitting.value) return ''
+  if (!form.ruleText.trim()) return '请先填写或选择循环规则'
+  if (preview.error) return '循环规则无法解析，请修改后再提交'
+  if (!form.content.trim()) return form.kind === 'notify' ? '请输入待办文本' : '请输入审核模板'
+  return ''
+})
+
 const WHEN_DONE_RE = /\s+when done$/i
 
-// 预设仅在「完成后起算」时保留 when done 语义
-function applyPreset(rule: string) {
-  form.ruleText = form.basis === 'completed' ? `${rule} when done` : rule
-}
+// 基准是 rule_text 的派生视图（单一真源，不双向绑定），避免与文本互写
+const basis = computed<RecurrenceBasis>(() =>
+  WHEN_DONE_RE.test(form.ruleText.trim()) ? 'completed' : 'scheduled'
+)
 
-function onPreview(payload: { describe: string; basis?: RecurrenceBasis; next_occurrences?: string[]; error: string }) {
-  preview.describe = payload.describe
-  preview.error = payload.error
-  preview.occurrences = payload.next_occurrences || []
-}
-
-// 切换基准：直接改写规则文本的 when done 后缀（单一数据源）
-function applyBasisToRule() {
+// 切换基准 = 改写规则文本（单向的意图动作）
+function setBasis(value: string | number | boolean | undefined) {
+  const next = value as RecurrenceBasis
   const trimmed = form.ruleText.trim()
   if (!trimmed) return
-  if (form.basis === 'completed' && !WHEN_DONE_RE.test(trimmed)) {
+  if (next === 'completed' && !WHEN_DONE_RE.test(trimmed)) {
     form.ruleText = `${trimmed} when done`
-  } else if (form.basis === 'scheduled' && WHEN_DONE_RE.test(trimmed)) {
+  } else if (next === 'scheduled' && WHEN_DONE_RE.test(trimmed)) {
     form.ruleText = trimmed.replace(WHEN_DONE_RE, '')
   }
 }
 
-// 手动在文本里增删 when done 时同步单选
-watch(
-  () => form.ruleText,
-  (value) => {
-    const has = WHEN_DONE_RE.test(value.trim())
-    if (has && form.basis !== 'completed') form.basis = 'completed'
-    else if (!has && form.basis === 'completed') form.basis = 'scheduled'
-  }
-)
+// 预设仅在「完成后起算」时保留 when done 语义
+function applyPreset(rule: string) {
+  form.ruleText = basis.value === 'completed' ? `${rule} when done` : rule
+}
+
+function onPreview(payload: RecurrencePreviewPayload) {
+  preview.describe = payload.describe
+  preview.error = payload.error
+  preview.firstOccurrence = payload.first_occurrence ?? null
+  preview.immediateDates = payload.immediate_dates ?? []
+  preview.nextExpectedDate = payload.next_expected_date ?? null
+  preview.ended = payload.ended ?? false
+}
 
 function resetForm() {
   form.ruleText = ''
   form.kind = 'notify'
   form.content = ''
   form.startDate = todayString()
-  form.basis = 'scheduled'
   preview.describe = ''
-  preview.occurrences = []
   preview.error = ''
+  preview.firstOccurrence = null
+  preview.immediateDates = []
+  preview.nextExpectedDate = null
+  preview.ended = false
 }
 
 watch(visible, (open) => {
@@ -252,31 +280,6 @@ async function handleSubmit() {
     }
   }
 
-  .preview-line {
-    margin-top: 6px;
-    font-size: 12px;
-    line-height: 1.5;
-    min-height: 18px;
-
-    .preview-desc {
-      font-weight: 600;
-      color: var(--ep-text-color-regular);
-    }
-
-    .preview-occ {
-      font-weight: 400;
-      color: var(--ep-text-color-secondary);
-    }
-
-    .preview-hint {
-      color: var(--ep-text-color-secondary);
-    }
-
-    .preview-error {
-      color: var(--ep-color-danger);
-    }
-  }
-
   .kind-group {
     margin-bottom: 10px;
   }
@@ -304,6 +307,67 @@ async function handleSubmit() {
     .date-label {
       font-size: 14px;
       color: var(--ep-text-color-regular);
+    }
+  }
+
+  .consequence {
+    margin-top: 4px;
+    padding: 12px 14px;
+    border-radius: 6px;
+    background: var(--ep-fill-color-light);
+    border-left: 3px solid var(--ep-border-color);
+
+    &.is-warn {
+      background: var(--ep-color-warning-light-9);
+      border-left-color: var(--ep-color-warning);
+    }
+
+    .consequence-title {
+      margin: 0 0 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ep-text-color-primary);
+    }
+
+    .consequence-item {
+      margin: 2px 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--ep-text-color-regular);
+
+      strong {
+        color: var(--ep-text-color-primary);
+      }
+
+      &.muted {
+        color: var(--ep-text-color-secondary);
+      }
+
+      &.warn {
+        color: var(--ep-color-warning-dark-2);
+      }
+
+      &.danger {
+        color: var(--ep-color-danger);
+      }
+    }
+  }
+
+  .dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    .submit-hint {
+      font-size: 12px;
+      color: var(--ep-text-color-secondary);
+      text-align: left;
+    }
+
+    .dialog-actions {
+      display: flex;
+      gap: 8px;
     }
   }
 }

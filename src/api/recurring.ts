@@ -5,7 +5,8 @@ import axios from '../utils/request'
 import type {
   RecurringTask,
   RecurringTaskPayload,
-  RecurrencePreview
+  RecurrencePreview,
+  RecurringKind
 } from '../types/reconciliation'
 
 const API_BASE = '/reconciliation/recurring-tasks'
@@ -40,8 +41,8 @@ export function deleteRecurringTask(id: number) {
 
 /**
  * 即时预览规则（未保存的 rule_text）
- * @param data 规则 DSL 文本与可选的开始日期
+ * @param data 规则 DSL 文本、可选的开始日期与到期产出类型（用于计算「创建后的即时后果」）
  */
-export function previewRule(data: { rule_text: string, start_date?: string | null }) {
+export function previewRule(data: { rule_text: string, start_date?: string | null, kind?: RecurringKind }) {
   return axios.post<RecurrencePreview>(`${API_BASE}/preview/`, data)
 }
