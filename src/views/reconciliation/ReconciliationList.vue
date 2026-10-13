@@ -37,7 +37,7 @@
 
       <div v-if="definitions.length === 0" class="empty-state">
         <p class="empty-text">还没有循环待办</p>
-        <p class="empty-hint">点击「新建循环待办」填写周期、内容与日期，或让 Copilot 帮你创建</p>
+        <p class="empty-hint">点击「新建循环待办」填写周期、内容与日期</p>
       </div>
 
       <div v-else class="recurring-rows">
