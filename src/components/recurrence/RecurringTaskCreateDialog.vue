@@ -40,12 +40,15 @@
         <span class="date-label">基准日期</span>
         <el-date-picker v-model="form.startDate" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD"
           :clearable="false" placeholder="选择日期" class="date-picker" />
-        <el-radio-group :model-value="basis" class="basis-group" @change="setBasis">
+        <el-radio-group v-if="form.kind === 'notify'" :model-value="basis" class="basis-group" @change="setBasis">
           <el-radio-button label="scheduled">按计划日期</el-radio-button>
           <el-radio-button label="completed">完成后起算</el-radio-button>
         </el-radio-group>
       </div>
-      <p class="block-hint">以基准日期为起算锚点；「完成后起算」会按实际完成日期重新推算下一期。</p>
+      <p class="block-hint">
+        <template v-if="form.kind === 'notify'">以基准日期为起算锚点；「完成后起算」会按实际完成日期重新推算下一期。</template>
+        <template v-else>到期即生成审核条目并立即推进到下一期，不支持「完成后起算」。</template>
+      </p>
     </section>
 
     <!-- ④ 创建后的即时后果（不可逆副作用前置） -->
@@ -185,6 +188,16 @@ function setBasis(value: string | number | boolean | undefined) {
 function applyPreset(rule: string) {
   form.ruleText = basis.value === 'completed' ? `${rule} when done` : rule
 }
+
+// 「生成审核待办」不支持「完成后起算」：切换过去即剥离 when done 后缀
+watch(
+  () => form.kind,
+  (kind) => {
+    if (kind === 'generate_review' && basis.value === 'completed') {
+      setBasis('scheduled')
+    }
+  }
+)
 
 function onPreview(payload: RecurrencePreviewPayload) {
   preview.describe = payload.describe
