@@ -110,8 +110,8 @@
             <el-table :data="formData.transactionItems" border class="allocation-table">
               <el-table-column label="账户" min-width="300">
                 <template #default="{ row }">
-                  <AccountSelector v-model="row.accountId" placeholder="选择账户" compact
-                    :account-tree="accountTree" @change="(account) => handleAccountChange(row, account)" />
+                  <AccountSelector v-model="row.accountId" placeholder="选择账户" compact :account-tree="accountTree"
+                    @change="(account) => handleAccountChange(row, account)" />
                 </template>
               </el-table-column>
               <el-table-column label="金额" min-width="200">
@@ -128,8 +128,7 @@
                       <el-date-picker v-model="row.date" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD"
                         :clearable="true" placeholder="默认为对账日期" :max-date="asOfDate ? new Date(asOfDate) : undefined"
                         :min-date="getMinDate()" :default-value="allocationDatePickerDefault"
-                        class="no-border-date-picker" placement="bottom-start"
-                        :teleported="true" :popper-options="{
+                        class="no-border-date-picker" placement="bottom-start" :teleported="true" :popper-options="{
                           modifiers: [
                             {
                               name: 'offset',
@@ -707,7 +706,7 @@ async function handleSubmit() {
 
     clearDraft()
     ElMessage.success('对账完成')
-    router.push('/reconciliation')
+    router.push('/tasks')
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as {
@@ -807,10 +806,10 @@ async function handleRevokeReconciliation() {
         // 仍为当前任务（后端更新了该待办），重新拉取 start 数据以更新「上次对账」与撤销按钮
         await loadReconciliationData()
       } else {
-        router.push(`/reconciliation/${data.new_task_id}`)
+        router.push(`/tasks/${data.new_task_id}`)
       }
     } else {
-      router.push('/reconciliation')
+      router.push('/tasks')
     }
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {

@@ -133,7 +133,7 @@ const driverObj = driver({
           driverObj.destroy();
           // 异步跳转到待办列表页面
           import('../routers').then(({ default: router }) => {
-            router.push('/reconciliation');
+            router.push('/tasks');
           });
           // 进度更新在 onHighlighted 中处理（如果进入步骤5）
           // 但这里已经销毁了导览，所以不会触发 onHighlighted

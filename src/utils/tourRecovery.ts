@@ -13,7 +13,7 @@ export function getRequiredRouteForStep(stepIndex: number): string {
   if (stepIndex === 3) {
     return '/file';
   }
-  // 步骤 5: 任何有 BaseHeader 的页面都可以（/file, /reconciliation, /config/* 等）
+  // 步骤 5: 任何有 BaseHeader 的页面都可以（/file, /tasks, /config/* 等）
   if (stepIndex === 4) {
     // 返回当前路由，因为步骤5可以在任何页面显示
     return '';

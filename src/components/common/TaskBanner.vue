@@ -54,7 +54,7 @@ const tourStep5Triggered = ref(false) // 标记是否已经触发过导览步骤
 
 // 检查是否在待办列表、对账表单或条目审核页面
 const isReconciliationPage = computed(() => {
-  return route.path.startsWith('/reconciliation') || route.path.startsWith('/entry-review')
+  return route.path.startsWith('/tasks') || route.path.startsWith('/entry-review')
 })
 
 // 检查是否已关闭（存储在 localStorage）
@@ -256,7 +256,7 @@ function handleGoToTasks() {
       destroyUserTour();
     }
   }
-  router.push('/reconciliation')
+  router.push('/tasks')
   handleClose()
 }
 

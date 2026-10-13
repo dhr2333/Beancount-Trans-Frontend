@@ -656,7 +656,7 @@ const handleConfirmWrite = async () => {
     )
 
     // 返回待办列表
-    router.push('/reconciliation')
+    router.push('/tasks')
 
     // 延迟触发横幅更新，确保页面跳转完成后再更新
     // 这样横幅组件可以正确检测到任务数量变化并触发导览步骤5
@@ -784,7 +784,7 @@ const confirmReparseAllWithPassword = async () => {
 
 // 返回
 const handleBack = () => {
-  router.push('/reconciliation')
+  router.push('/tasks')
 }
 
 onMounted(() => {

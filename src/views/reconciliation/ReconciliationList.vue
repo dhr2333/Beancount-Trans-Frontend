@@ -431,7 +431,7 @@ function handleStart(task: ScheduledTask) {
     }
     router.push('/entry-review')
   } else {
-    router.push(`/reconciliation/${task.id}`)
+    router.push(`/tasks/${task.id}`)
   }
 }
 

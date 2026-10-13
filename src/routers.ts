@@ -43,8 +43,8 @@ const router = createRouter({
     { path: '/template/accounts', name: "accountTemplates", component: AccountTemplates },
     { path: '/template/mappings', name: "mappingTemplates", component: MappingTemplates },
     // 对账功能
-    { path: '/reconciliation', name: "reconciliationList", component: ReconciliationList },
-    { path: '/reconciliation/:id', name: "reconciliationForm", component: ReconciliationForm },
+    { path: '/tasks', name: "reconciliationList", component: ReconciliationList },
+    { path: '/tasks/:id', name: "reconciliationForm", component: ReconciliationForm },
     // 条目审核功能
     { path: '/entry-review', name: "entryReviewForm", component: ParseReviewForm },
     // Copilot
