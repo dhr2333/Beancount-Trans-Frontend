@@ -109,10 +109,6 @@
               @update:model-value="(value: string) => handleDateChange(task.id, value)" type="date" format="YYYY-MM-DD"
               value-format="YYYY-MM-DD" :clearable="false" placeholder="选择日期" class="date-picker no-border-date-picker"
               placement="bottom-start" :teleported="true" :popper-options="datePickerPopperOptions" />
-            <el-tag v-if="task.scheduled_date && isOverdue(task.scheduled_date)" type="danger" size="small"
-              class="overdue-tag">
-              逾期
-            </el-tag>
           </div>
           <span v-if="task.next_run_date" class="row-next-date" title="本次待办完成后的下一次待办生成日期">
             <el-icon>
@@ -120,6 +116,10 @@
             </el-icon>
             {{ task.next_run_date }}
           </span>
+          <el-tag v-if="task.scheduled_date && isOverdue(task.scheduled_date)" type="danger" size="small"
+            class="overdue-tag">
+            逾期
+          </el-tag>
         </div>
       </div>
 
