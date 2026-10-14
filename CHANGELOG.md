@@ -1,3 +1,21 @@
+## [5.17.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.16.0...5.17.0) (2026-10-14)
+
+### Features
+
+* **reconciliation:** 循环待办支持日历改期并精简管理视图 ([577adc0](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/577adc0518155d795fec1bb38704342ab77bb8b3))
+* **reconciliation:** 循环待办新增三块式新建弹窗 ([658c57d](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/658c57de1ebd1ee993df4987a42af5fc479810b7))
+* **reconciliation:** 循环待办新增到期产出与固定模板编辑 ([1b0c910](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/1b0c91075aafb6185390a5d4c1db3379c24fd7ac))
+* **reconciliation:** 循环待办管理日期样式统一与列表即时刷新 ([de0621a](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/de0621a2b5921961b578456781b0f5ac1c7ea492))
+* **reconciliation:** 循环待办管理行内编辑与日期闭环 ([120b577](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/120b57746e1feb8f690184d455e157f28fdb64de))
+* **reconciliation:** 新增next_run_date字段并更新对账任务列表日期展示 ([d8f7dad](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/d8f7dad7b7a7aecebca8c0bdd64514dd6c4cf162))
+* **reconciliation:** 新增循环待办管理与「待办」页签 ([1801038](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/18010385b6d869a82ec6c1801f84a3f0c9d31862))
+* **reconciliation:** 新建循环待办展示创建后果并统一基准日期语义 ([1ee8ebd](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/1ee8ebd082db35bf511ce8b76c217f39a1b17596))
+
+### Bug Fixes
+
+* **reconciliation:** 循环待办创建时 template_ref 传空串 ([85c9669](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/85c96698115c007e29e4357a78df155c640879bf))
+* **reconciliation:** 生成审核待办隐藏「完成后起算」选项 ([b2c5c6e](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/b2c5c6e73a3f53c2820d0c379f739d4d2630b321))
+
 ## [5.16.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.15.1...5.16.0) (2026-10-06)
 
 ### Features
