@@ -64,21 +64,10 @@
                   style="width: 100%" />
               </div>
               <div v-if="formData.actualBalance !== undefined && formData.actualBalance !== null && hasBaseDifference"
-                class="difference-badge" :class="{ 'positive': baseDifference > 0, 'negative': baseDifference < 0 }">
+                class="difference-badge"
+                :class="{ 'positive': remainingDifference > 0, 'negative': remainingDifference < 0 }">
                 <div class="difference-main">
-                  差额：{{ baseDifference > 0 ? '+' : '' }}{{ baseDifference.toFixed(2) }}
-                </div>
-                <div v-if="hasAllocatedAmount" class="difference-detail">
-                  已分配：{{ totalAllocated > 0 ? '+' : '' }}{{ totalAllocated.toFixed(2) }}
-                  <span v-if="!isFullyAllocated" class="remaining-hint">
-                    （剩余：{{ difference > 0 ? '+' : '' }}{{ difference.toFixed(2) }}）
-                  </span>
-                  <span v-else class="complete-hint">
-                    ✓ 已完全分配
-                  </span>
-                </div>
-                <div v-else class="difference-detail">
-                  其他账户应分配：{{ -baseDifference > 0 ? '+' : '' }}{{ (-baseDifference).toFixed(2) }} 给当前账户
+                  差额：{{ remainingDifference > 0 ? '+' : '' }}{{ remainingDifference.toFixed(2) }}
                 </div>
               </div>
             </div>
@@ -469,15 +458,11 @@ const totalAllocated = computed(() => {
     .reduce((sum: number, item: TransactionItem) => sum + (item.amount || 0), 0)
 })
 
-// 剩余差额（-基础差额 - 已分配金额）
-// 差额分配的总和应该等于 -基础差额，才能满足：实际余额 + 差额分配 = 预期余额
-const difference = computed(() => {
-  const targetAllocation = -baseDifference.value
-  return targetAllocation - totalAllocated.value
-})
-
-const remainingAmount = computed(() => {
-  return difference.value
+// 展示用的差额：随表单分配动态调整
+// 在复式记账中：实际余额 + 差额分配 = 预期余额，故差额 = 实际余额 + 已分配金额 - 预期余额
+// 分配完成后（已分配金额 = 预期余额 - 实际余额）归零
+const remainingDifference = computed(() => {
+  return baseDifference.value + totalAllocated.value
 })
 
 // 将金额转换为整数（以分为单位）进行精确比较，避免浮点数精度问题
@@ -485,19 +470,9 @@ function toCents(amount: number): number {
   return Math.round(amount * 100)
 }
 
-// 判断是否完全分配（使用整数比较避免浮点数精度问题）
-const isFullyAllocated = computed(() => {
-  return toCents(Math.abs(difference.value)) === 0
-})
-
 // 判断是否有基础差额（使用整数比较避免浮点数精度问题）
 const hasBaseDifference = computed(() => {
   return toCents(Math.abs(baseDifference.value)) > 0
-})
-
-// 判断是否有已分配金额（使用整数比较避免浮点数精度问题）
-const hasAllocatedAmount = computed(() => {
-  return toCents(Math.abs(totalAllocated.value)) > 0
 })
 
 // 获取日期选择器的最小日期（上一次对账日期的下一天）
@@ -961,22 +936,6 @@ function handleBack() {
 
       .difference-main {
         font-weight: 600;
-        margin-bottom: 4px;
-      }
-
-      .difference-detail {
-        font-size: 12px;
-        font-weight: 400;
-        opacity: 0.8;
-        margin-top: 4px;
-      }
-
-      .remaining-hint {
-        color: var(--ep-color-warning);
-      }
-
-      .complete-hint {
-        color: var(--ep-color-success);
       }
     }
   }
