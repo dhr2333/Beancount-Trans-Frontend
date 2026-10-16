@@ -217,7 +217,13 @@
                 <template v-if="shouldShowReconciliationCycleForNewAccount()">
                     <el-divider content-position="left">对账周期设置（可选）</el-divider>
                     <el-form-item label="对账规则" prop="reconciliation_rule">
-                        <RecurrenceRuleInput v-model="newAccount.reconciliation_rule" />
+                        <RecurrenceRuleInput v-model="newAccount.reconciliation_rule" :show-preview="false" />
+                        <div class="cycle-presets">
+                            <el-button v-for="preset in RECONCILIATION_CYCLE_PRESETS" :key="preset.rule" size="small"
+                                class="preset-btn" @click="newAccount.reconciliation_rule = preset.rule">
+                                {{ preset.label }}
+                            </el-button>
+                        </div>
                     </el-form-item>
                 </template>
             </el-form>
@@ -239,7 +245,13 @@
                 <template v-if="shouldShowReconciliationCycle(selectedAccount)">
                     <el-divider content-position="left">对账周期设置（可选）</el-divider>
                     <el-form-item label="对账规则" prop="reconciliation_rule">
-                        <RecurrenceRuleInput v-model="editAccountForm.reconciliation_rule" />
+                        <RecurrenceRuleInput v-model="editAccountForm.reconciliation_rule" :show-preview="false" />
+                        <div class="cycle-presets">
+                            <el-button v-for="preset in RECONCILIATION_CYCLE_PRESETS" :key="preset.rule" size="small"
+                                class="preset-btn" @click="editAccountForm.reconciliation_rule = preset.rule">
+                                {{ preset.label }}
+                            </el-button>
+                        </div>
                     </el-form-item>
                 </template>
             </el-form>
@@ -310,10 +322,10 @@
                                             selectedMigrationAccountInfo.mapping_count.expense }}支出</el-tag>
                                         <el-tag type="success" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.assets
-                                            }}资产</el-tag>
+                                        }}资产</el-tag>
                                         <el-tag type="primary" size="small">{{
                                             selectedMigrationAccountInfo.mapping_count.income
-                                            }}收入</el-tag>
+                                        }}收入</el-tag>
                                     </div>
                                 </div>
                             </el-card>
@@ -462,6 +474,15 @@ const editAccountForm = ref({
     description: '',
     reconciliation_rule: ''
 })
+
+// 对账周期极简预设：点击即把 DSL 写入对账规则（均为后端解析器已验证可解析的规则）
+const RECONCILIATION_CYCLE_PRESETS: Array<{ label: string; rule: string }> = [
+    { label: '完成后一周', rule: 'every week when done' },
+    { label: '每月', rule: 'every month' },
+    { label: '月初', rule: 'every month on the 1st' },
+    { label: '月底', rule: 'every month on the last' },
+    { label: '年', rule: 'every year' }
+]
 
 // 删除账户相关
 const migrationCandidates = ref<AccountOption[]>([])
@@ -1203,6 +1224,18 @@ onMounted(() => {
     margin-top: 20px;
     padding-top: 20px;
     border-top: 1px solid var(--ep-border-color);
+}
+
+/* 对账周期极简预设 */
+.cycle-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.cycle-presets .preset-btn {
+    margin: 0;
 }
 
 .currency-management {
