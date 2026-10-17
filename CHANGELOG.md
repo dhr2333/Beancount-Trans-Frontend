@@ -1,3 +1,13 @@
+## [5.18.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.17.0...5.18.0) (2026-10-17)
+
+### Features
+
+* **account-management:** 添加对账周期快速预设并补全组件类型声明 ([e000eb7](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/e000eb705cb689dcc34cb49f36a4a96c6a0514a4))
+
+### Bug Fixes
+
+* **config/account:** 修复模板缩进并补充映射刷新逻辑 ([8f8f248](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/8f8f248891b6f177c19347d43ac3ef23feba4a57))
+
 ## [5.17.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.16.0...5.17.0) (2026-10-14)
 
 ### Features
