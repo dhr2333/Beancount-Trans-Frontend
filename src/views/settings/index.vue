@@ -197,56 +197,65 @@
                         <el-card shadow="never" class="section-card">
                             <template #header>
                                 <div class="section-header">
-                                    <h3>共享账本</h3>
-                                    <el-button type="primary" @click="showBindSharedLedgerDialog = true">
-                                        添加共享账本
-                                    </el-button>
+                                    <h3>
+                                        共享账本
+                                        <el-tooltip placement="bottom-start" :show-after="100">
+                                            <template #content>
+                                                <div style="max-width: 280px; line-height: 1.6;">
+                                                    绑定他人分享给你的账本后，Copilot 会把它与你的账本作为同一批数据来源综合分析与合计。解除绑定不会撤销对方的令牌。
+                                                </div>
+                                            </template>
+                                            <el-icon class="token-help" tabindex="0" aria-label="共享账本说明">
+                                                <QuestionFilled />
+                                            </el-icon>
+                                        </el-tooltip>
+                                    </h3>
                                 </div>
                             </template>
 
-                            <el-alert type="info" :closable="false" class="token-tip">
-                                <template #default>
-                                    在此绑定他人分享给你的账本，Copilot 对话中即可把你的账本与共享账本作为同一批数据来源综合分析与合计。
-                                </template>
-                            </el-alert>
-
-                            <el-table v-loading="sharedLedgersLoading" :data="sharedLedgers" empty-text="暂无共享账本"
-                                class="token-table">
-                                <el-table-column label="别名" min-width="140" show-overflow-tooltip>
-                                    <template #default="{ row }">
-                                        <span class="shared-ledger-alias-cell"
-                                            @click="openEditSharedLedgerAliasesDialog(row)">
-                                            {{ row.aliases?.length ? row.aliases.join('、') : '/' }}
-                                        </span>
-                                    </template>
-                                </el-table-column>
-                                <el-table-column prop="owner_username" label="来源用户" min-width="140"
-                                    show-overflow-tooltip />
-                                <el-table-column label="状态" width="100">
-                                    <template #default="{ row }">
-                                        <el-tag :type="row.usable ? 'success' : 'info'" size="small">
-                                            {{ row.usable ? '有效' : '已失效' }}
-                                        </el-tag>
-                                    </template>
-                                </el-table-column>
-                                <el-table-column label="令牌有效期" min-width="160">
-                                    <template #default="{ row }">
-                                        {{ formatTokenTime(row.expires_at, '/') }}
-                                    </template>
-                                </el-table-column>
-                                <el-table-column label="最后使用时间" min-width="160">
-                                    <template #default="{ row }">
-                                        {{ formatTokenTime(row.last_used_at, '/') }}
-                                    </template>
-                                </el-table-column>
-                                <el-table-column label="操作" width="110" fixed="right">
-                                    <template #default="{ row }">
-                                        <el-button link type="danger" @click="handleUnbindSharedLedger(row)">
-                                            解除绑定
-                                        </el-button>
-                                    </template>
-                                </el-table-column>
-                            </el-table>
+                            <div v-loading="sharedLedgersLoading" class="token-panel">
+                                <el-empty v-if="!sharedLedgersLoading && sharedLedgers.length === 0"
+                                    description="暂无共享账本" :image-size="72" />
+                                <div v-else class="token-list">
+                                    <div v-for="ledger in sharedLedgers" :key="ledger.id"
+                                        class="token-card shared-ledger-card"
+                                        :class="{ 'shared-ledger-card--unusable': !ledger.usable }">
+                                        <div class="token-card__body">
+                                            <div class="token-card__head">
+                                                <span class="token-card__name">
+                                                    {{ getSharedLedgerDisplayName(ledger) }} 的账本
+                                                </span>
+                                                <el-tag :type="ledger.usable ? 'success' : 'info'" size="small"
+                                                    effect="light">
+                                                    {{ ledger.usable ? '有效' : '已失效' }}
+                                                </el-tag>
+                                            </div>
+                                            <div class="token-card__meta">
+                                                <span>
+                                                    最后使用 {{ formatTokenDate(ledger.last_used_at, '从未使用') }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="token-card__actions">
+                                            <el-button link class="token-card__edit" title="编辑别名" aria-label="编辑别名"
+                                                @click="openEditSharedLedgerAliasesDialog(ledger)">
+                                                <el-icon>
+                                                    <Edit />
+                                                </el-icon>
+                                            </el-button>
+                                            <el-button link type="danger" class="token-card__delete" title="解除绑定"
+                                                aria-label="解除绑定" @click="handleUnbindSharedLedger(ledger)">
+                                                <el-icon>
+                                                    <Delete />
+                                                </el-icon>
+                                            </el-button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <el-button class="token-add" @click="showBindSharedLedgerDialog = true">
+                                    添加共享账本
+                                </el-button>
+                            </div>
                         </el-card>
                     </el-tab-pane>
 
@@ -1490,6 +1499,10 @@ const fetchSharedLedgers = async () => {
     }
 }
 
+const getSharedLedgerDisplayName = (binding: SharedLedgerBinding) => {
+    return [binding.owner_username, ...(binding.aliases ?? [])].filter(Boolean).join('、')
+}
+
 const resetBindSharedLedgerForm = () => {
     bindSharedLedgerFormRef.value?.resetFields()
     bindSharedLedgerForm.aliases = []
@@ -1809,18 +1822,9 @@ onMounted(() => {
     color: var(--ep-text-color-secondary);
 }
 
-/* 点击别名即可编辑：用可点击文本替代单独的操作按钮 */
-.shared-ledger-alias-cell {
-    cursor: pointer;
-    color: var(--ep-color-primary);
-}
-
-.shared-ledger-alias-cell:hover {
-    text-decoration: underline;
-}
-
-.token-table {
-    width: 100%;
+/* 共享账本卡片：沿用访问令牌卡片的视觉与交互 */
+.shared-ledger-card--unusable {
+    opacity: 0.72;
 }
 
 .token-panel {
