@@ -121,56 +121,74 @@
                         <el-card shadow="never" class="section-card">
                             <template #header>
                                 <div class="section-header">
-                                    <h3>访问令牌</h3>
-                                    <el-button type="primary" @click="showCreateTokenDialog = true">
-                                        新建令牌
-                                    </el-button>
+                                    <h3>
+                                        访问令牌
+                                        <el-tooltip placement="bottom-start" :show-after="100">
+                                            <template #content>
+                                                <div style="max-width: 280px; line-height: 1.6;">
+                                                    把令牌交给他人等于把该账本的只读权限分享给他；建议为每次分享单独创建令牌，需要收回时直接删除。
+                                                </div>
+                                            </template>
+                                            <el-icon class="token-help" tabindex="0" aria-label="访问令牌说明">
+                                                <QuestionFilled />
+                                            </el-icon>
+                                        </el-tooltip>
+                                    </h3>
                                 </div>
                             </template>
 
-                            <el-alert type="info" :closable="false" class="token-tip">
-                                <template #default>
-                                    把令牌交给他人等于把该账本的只读权限分享给他；建议为每次分享单独创建令牌，需要收回时直接删除。
-                                </template>
-                            </el-alert>
-
-                            <el-table v-loading="tokensLoading" :data="tokens" empty-text="暂无访问令牌" class="token-table">
-                                <el-table-column prop="name" label="用途" min-width="140" show-overflow-tooltip />
-                                <el-table-column label="令牌前缀" min-width="140">
-                                    <template #default="{ row }">
-                                        <code class="token-prefix">{{ row.prefix }}…</code>
-                                    </template>
-                                </el-table-column>
-                                <el-table-column label="状态" width="100">
-                                    <template #default="{ row }">
-                                        <el-tag :type="getTokenStatus(row).type" size="small">
-                                            {{ getTokenStatus(row).text }}
-                                        </el-tag>
-                                    </template>
-                                </el-table-column>
-                                <el-table-column label="过期时间" min-width="160">
-                                    <template #default="{ row }">
-                                        {{ formatTokenTime(row.expires_at, '长期有效') }}
-                                    </template>
-                                </el-table-column>
-                                <el-table-column label="最后使用" min-width="160">
-                                    <template #default="{ row }">
-                                        {{ formatTokenTime(row.last_used_at, '从未使用') }}
-                                    </template>
-                                </el-table-column>
-                                <el-table-column label="创建时间" min-width="160">
-                                    <template #default="{ row }">
-                                        {{ formatTokenTime(row.created) }}
-                                    </template>
-                                </el-table-column>
-                                <el-table-column label="操作" width="90" fixed="right">
-                                    <template #default="{ row }">
-                                        <el-button link type="danger" @click="handleDeleteToken(row)">
-                                            删除
-                                        </el-button>
-                                    </template>
-                                </el-table-column>
-                            </el-table>
+                            <div v-loading="tokensLoading" class="token-panel">
+                                <el-empty v-if="!tokensLoading && tokens.length === 0" description="暂无访问令牌"
+                                    :image-size="72" />
+                                <div v-else class="token-list">
+                                    <div v-for="token in tokens" :key="token.id" class="token-card">
+                                        <div class="token-card__body">
+                                            <div class="token-card__head">
+                                                <el-input v-if="editingTokenId === token.id" :ref="setTokenEditInput"
+                                                    v-model="editingTokenName" class="token-card__edit-input"
+                                                    size="small" maxlength="64" :disabled="savingTokenId === token.id"
+                                                    @keyup.enter="saveTokenName(token)" @keyup.esc="cancelEditToken"
+                                                    @blur="saveTokenName(token)" />
+                                                <span v-else class="token-card__name">{{ token.name }}</span>
+                                            </div>
+                                            <div class="token-card__meta">
+                                                <code class="token-card__prefix">{{ token.prefix }}…</code>
+                                                <span class="token-card__sep">·</span>
+                                                <el-tooltip :content="`创建于 ${formatTokenTime(token.created)}`"
+                                                    placement="top" :show-after="200">
+                                                    <span class="token-card__expiry"
+                                                        :class="`token-card__expiry--${getTokenExpiry(token).type}`">
+                                                        <el-icon v-if="getTokenExpiry(token).type === 'warning'">
+                                                            <WarningFilled />
+                                                        </el-icon>
+                                                        {{ getTokenExpiry(token).text }}
+                                                    </span>
+                                                </el-tooltip>
+                                                <span class="token-card__last-used">
+                                                    {{ formatTokenDate(token.last_used_at, '从未使用') }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="token-card__actions">
+                                            <el-button v-if="editingTokenId !== token.id" link class="token-card__edit"
+                                                title="编辑用途" aria-label="编辑用途" @click="startEditToken(token)">
+                                                <el-icon>
+                                                    <Edit />
+                                                </el-icon>
+                                            </el-button>
+                                            <el-button link type="danger" class="token-card__delete" title="删除令牌"
+                                                aria-label="删除令牌" @click="handleDeleteToken(token)">
+                                                <el-icon>
+                                                    <Delete />
+                                                </el-icon>
+                                            </el-button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <el-button class="token-add" @click="showCreateTokenDialog = true">
+                                    新建令牌
+                                </el-button>
+                            </div>
                         </el-card>
                     </el-tab-pane>
 
@@ -603,9 +621,9 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
+import type { FormInstance, FormRules, InputInstance } from 'element-plus'
 import { User, Phone, Message, Lock, DocumentCopy } from '@element-plus/icons-vue'
 import axios from '../../utils/request'
 import { hasAuthTokens } from '../../utils/auth'
@@ -615,6 +633,7 @@ import type { GitRepository } from '../../types/git'
 import {
     listPersonalAccessTokens,
     createPersonalAccessToken,
+    updatePersonalAccessToken,
     deletePersonalAccessToken
 } from '../../api/token'
 import type { PersonalAccessToken, CreateTokenRequest } from '../../types/token'
@@ -642,6 +661,13 @@ const gitRepository = ref<GitRepository | null>(null)
 // 访问令牌状态
 const tokens = ref<PersonalAccessToken[]>([])
 const tokensLoading = ref(false)
+const editingTokenId = ref<number | null>(null)
+const editingTokenName = ref('')
+const savingTokenId = ref<number | null>(null)
+const tokenEditInput = ref<InputInstance | null>(null)
+const setTokenEditInput = (el: unknown) => {
+    if (el) tokenEditInput.value = el as InputInstance
+}
 const showCreateTokenDialog = ref(false)
 const showCreatedTokenDialog = ref(false)
 const createTokenLoading = ref(false)
@@ -1323,21 +1349,68 @@ const fetchTokens = async () => {
     }
 }
 
-const getTokenStatus = (token: PersonalAccessToken) => {
-    if (token.revoked_at) {
-        return { text: '已撤销', type: 'info' as const }
-    }
-    if (token.expires_at && new Date(token.expires_at).getTime() <= Date.now()) {
-        return { text: '已过期', type: 'danger' as const }
-    }
-    return { text: '有效', type: 'success' as const }
-}
-
 const formatTokenTime = (value: string | null, fallback = '—') => {
     if (!value) return fallback
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return fallback
     return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+const formatTokenDate = (value: string | null, fallback = '—') => {
+    if (!value) return fallback
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return fallback
+    return date.toLocaleDateString('zh-CN')
+}
+
+const getTokenExpiry = (token: PersonalAccessToken) => {
+    if (token.revoked_at) {
+        return { text: '已撤销', type: 'info' as const }
+    }
+    if (!token.expires_at) {
+        return { text: '长期有效', type: 'warning' as const }
+    }
+    if (new Date(token.expires_at).getTime() <= Date.now()) {
+        return { text: `已于 ${formatTokenDate(token.expires_at)} 过期`, type: 'danger' as const }
+    }
+    return { text: `到期 ${formatTokenDate(token.expires_at)}`, type: 'default' as const }
+}
+
+const startEditToken = (token: PersonalAccessToken) => {
+    editingTokenId.value = token.id
+    editingTokenName.value = token.name
+    nextTick(() => tokenEditInput.value?.focus())
+}
+
+const cancelEditToken = () => {
+    editingTokenId.value = null
+    editingTokenName.value = ''
+}
+
+const saveTokenName = async (token: PersonalAccessToken) => {
+    if (editingTokenId.value !== token.id || savingTokenId.value === token.id) return
+    const name = editingTokenName.value.trim()
+    if (!name) {
+        ElMessage.warning('用途不能为空')
+        cancelEditToken()
+        return
+    }
+    if (name === token.name) {
+        cancelEditToken()
+        return
+    }
+    savingTokenId.value = token.id
+    try {
+        const updated = await updatePersonalAccessToken(token.id, { name })
+        tokens.value = tokens.value.map((item) => (item.id === updated.id ? updated : item))
+        ElMessage.success('用途已更新')
+        if (editingTokenId.value === token.id) cancelEditToken()
+    } catch (error: any) {
+        const detail = error.response?.data?.name?.[0] || error.response?.data?.detail
+        ElMessage.error(detail || '更新用途失败')
+    } finally {
+        savingTokenId.value = null
+    }
 }
 
 const resetCreateTokenForm = () => {
@@ -1699,7 +1772,22 @@ onMounted(() => {
 }
 
 .section-header h3 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin: 0;
+}
+
+.token-help {
+    font-size: 15px;
+    color: var(--ep-text-color-placeholder);
+    cursor: default;
+    transition: color 0.2s;
+}
+
+.token-help:hover,
+.token-help:focus-visible {
+    color: var(--ep-color-primary);
 }
 
 .token-tip {
@@ -1735,9 +1823,155 @@ onMounted(() => {
     width: 100%;
 }
 
-.token-prefix {
+.token-panel {
+    min-height: 120px;
+    text-align: left;
+}
+
+.token-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.token-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--ep-border-color-lighter);
+    border-radius: 10px;
+    background: var(--ep-fill-color-blank);
+    text-align: left;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.token-card:hover {
+    border-color: var(--ep-color-primary-light-5);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.token-card__body {
+    flex: 1;
+    min-width: 0;
+}
+
+.token-card__head {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.token-card__name {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ep-text-color-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.token-card__last-used {
+    margin-left: auto;
+    padding-left: 12px;
+    font-size: 12px;
+    color: var(--ep-text-color-secondary);
+    white-space: nowrap;
+}
+
+.token-card__actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.token-card__edit {
+    padding: 2px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.token-card__edit:hover {
+    opacity: 1;
+}
+
+.token-card__edit-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.token-card__delete {
+    padding: 2px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.token-card__delete:hover {
+    opacity: 1;
+}
+
+.token-card__meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--ep-text-color-secondary);
+}
+
+.token-card__prefix {
     font-family: monospace;
-    color: var(--ep-text-color-regular);
+    color: var(--ep-text-color-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.token-card__sep {
+    flex-shrink: 0;
+    color: var(--ep-text-color-placeholder);
+}
+
+.token-card__expiry {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.token-card__expiry--default {
+    color: var(--ep-text-color-secondary);
+}
+
+.token-card__expiry--warning {
+    color: var(--ep-color-warning);
+}
+
+.token-card__expiry--danger {
+    color: var(--ep-color-danger);
+}
+
+.token-card__expiry--info {
+    color: var(--ep-text-color-placeholder);
+}
+
+.token-add {
+    display: inline-flex;
+    margin-top: 12px;
+}
+
+@media (max-width: 768px) {
+    .token-card__meta {
+        flex-wrap: wrap;
+    }
+
+    .token-card__last-used {
+        margin-left: 0;
+        padding-left: 0;
+    }
 }
 
 .token-plain {

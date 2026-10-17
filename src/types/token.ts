@@ -41,3 +41,11 @@ export interface CreateTokenRequest {
   /** 有效天数（1~3650）；不传或传 null 表示长期有效 */
   expires_in_days?: number | null
 }
+
+/**
+ * 更新令牌请求参数（目前仅支持修改用途说明）
+ */
+export interface UpdateTokenRequest {
+  /** 用途说明 */
+  name: string
+}

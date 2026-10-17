@@ -2,7 +2,8 @@ import axios from '../utils/request'
 import type {
   PersonalAccessToken,
   CreatedPersonalAccessToken,
-  CreateTokenRequest
+  CreateTokenRequest,
+  UpdateTokenRequest
 } from '../types/token'
 
 /**
@@ -26,6 +27,18 @@ export const createPersonalAccessToken = async (
   data: CreateTokenRequest
 ): Promise<CreatedPersonalAccessToken> => {
   const response = await axios.post<CreatedPersonalAccessToken>(`/auth/tokens/`, data)
+  return response.data
+}
+
+/**
+ * 修改访问令牌的用途说明
+ * PATCH /api/auth/tokens/{id}/
+ */
+export const updatePersonalAccessToken = async (
+  id: number,
+  data: UpdateTokenRequest
+): Promise<PersonalAccessToken> => {
+  const response = await axios.patch<PersonalAccessToken>(`/auth/tokens/${id}/`, data)
   return response.data
 }
 
