@@ -1,3 +1,9 @@
+## [5.18.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.18.0...5.18.1) (2026-10-19)
+
+### Bug Fixes
+
+* **copilot:** 修复生成的分享图表格内容被截断的问题 ([92b5159](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/92b5159d20cfd842f67285d3fed8e1046342b69e))
+
 ## [5.18.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.17.0...5.18.0) (2026-10-17)
 
 ### Features
