@@ -135,7 +135,7 @@ export interface SharedLedgerBinding {
   usable: boolean
   /** 令牌过期时间；null 表示长期有效 */
   expires_at: string | null
-  /** 最后一次使用时间；null 表示从未使用 */
+  /** 最后一次实际使用共享账本数据的时间；null 表示从未使用 */
   last_used_at: string | null
   /** 创建时间 */
   created: string

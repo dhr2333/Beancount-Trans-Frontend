@@ -16,7 +16,7 @@ export interface PersonalAccessToken {
   scopes: string
   /** 过期时间；null 表示长期有效 */
   expires_at: string | null
-  /** 最后一次使用时间；null 表示从未使用 */
+  /** 最后一次实际使用账本/目录数据的时间；null 表示从未使用 */
   last_used_at: string | null
   /** 撤销时间；null 表示未撤销 */
   revoked_at: string | null
