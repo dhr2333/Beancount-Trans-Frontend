@@ -2,12 +2,23 @@
 import { computed } from 'vue'
 import { renderMarkdown } from '@/utils/markdown'
 
-const props = defineProps<{ content: string }>()
+const props = withDefaults(
+  defineProps<{
+    content: string
+    /** 表格收缩到容器宽度并换行，用于分享图等不可滚动场景 */
+    fitTable?: boolean
+  }>(),
+  { fitTable: false },
+)
 const html = computed(() => renderMarkdown(props.content))
 </script>
 
 <template>
-  <div class="markdown-body" v-html="html" />
+  <div
+    class="markdown-body"
+    :class="{ 'markdown-body--fit-table': fitTable }"
+    v-html="html"
+  />
 </template>
 
 <style scoped lang="scss">
@@ -131,6 +142,22 @@ const html = computed(() => renderMarkdown(props.content))
 
   :deep(tr:nth-child(even) td) {
     background: var(--ep-fill-color-lighter);
+  }
+
+  // 分享图等不可滚动场景：表格收缩到容器宽度，单元格内容换行，避免右侧被裁掉。
+  &.markdown-body--fit-table {
+    :deep(table) {
+      display: table;
+      table-layout: fixed;
+      overflow: visible;
+    }
+
+    :deep(th),
+    :deep(td) {
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
   }
 }
 </style>

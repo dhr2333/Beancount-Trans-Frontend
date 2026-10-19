@@ -35,7 +35,7 @@ const showTurnNumber = computed(() => props.turns.length > 1)
 
         <div class="share-card__section">
           <div class="share-card__label">Copilot</div>
-          <MarkdownContent :content="turn.assistantContent" class="share-card__markdown" />
+          <MarkdownContent :content="turn.assistantContent" fit-table class="share-card__markdown" />
         </div>
       </div>
     </template>
