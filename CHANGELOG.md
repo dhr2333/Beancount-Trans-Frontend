@@ -1,3 +1,9 @@
+## [5.19.0](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.18.1...5.19.0) (2026-10-23)
+
+### Features
+
+* **map/format:** 优化AI解析引擎配置的登录状态适配 ([4a01f36](https://github.com/dhr2333/Beancount-Trans-Frontend/commit/4a01f3601a8ddc1b6f18ca7a0e34a31f3667fa96))
+
 ## [5.18.1](https://github.com/dhr2333/Beancount-Trans-Frontend/compare/5.18.0...5.18.1) (2026-10-19)
 
 ### Bug Fixes
