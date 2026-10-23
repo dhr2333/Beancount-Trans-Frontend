@@ -15,7 +15,7 @@
                             <el-option label="井号 #" value="#" />
                         </el-select>
                     </el-form-item>
-                    
+
                     <el-form-item label="显示字段">
                         <el-checkbox-group v-model="formatSettings" class="checkbox-grid" style="width: 100%;">
                             <el-checkbox label="showNote">显示备注内容</el-checkbox>
@@ -33,15 +33,14 @@
             <el-collapse-item title="高级配置" name="template" class="config-item">
                 <div class="config-group">
                     <el-divider>账户模板配置</el-divider>
-                    
+
                     <!-- 收入模板组 -->
                     <div class="template-group">
                         <div class="template-input-group">
                             <div class="template-input-prepend">优惠收入模板</div>
                             <div class="template-input-content">
                                 <AccountSelector v-model="incomeTemplateId" :account-tree="accountTree"
-                                    :show-details="false" placeholder="请选择收入账户"
-                                    @change="handleIncomeTemplateChange" />
+                                    :show-details="false" placeholder="请选择收入账户" @change="handleIncomeTemplateChange" />
                             </div>
                         </div>
 
@@ -58,9 +57,7 @@
                             <div class="template-input-prepend">
                                 <div class="label-with-tip">
                                     <span>兜底账户</span>
-                                    <el-tooltip
-                                        content="无法匹配资产账户时的默认账户，也用于对账差额分配"
-                                        placement="top">
+                                    <el-tooltip content="无法匹配资产账户时的默认账户，也用于对账差额分配" placement="top">
                                         <el-icon class="tip-icon">
                                             <Warning />
                                         </el-icon>
@@ -85,8 +82,7 @@
                                 <div class="template-input-prepend">
                                     <div class="label-with-tip">
                                         <span>基础货币模板</span>
-                                        <el-tooltip
-                                            content="货币必须以大写字母开头，以大写字母/数字结尾，并且只能包含 [A-Z0-9'._-]"
+                                        <el-tooltip content="货币必须以大写字母开头，以大写字母/数字结尾，并且只能包含 [A-Z0-9'._-]"
                                             placement="top">
                                             <el-icon class="tip-icon">
                                                 <Warning />
@@ -113,12 +109,7 @@
                                 <el-radio label="review">审核模式</el-radio>
                                 <el-radio label="direct_write">直接写入模式</el-radio>
                             </el-radio-group>
-                            <el-alert 
-                                type="info" 
-                                show-icon 
-                                :closable="false"
-                                class="mode-alert"
-                            >
+                            <el-alert type="info" show-icon :closable="false" class="mode-alert">
                                 <template v-if="parsingModePreference === 'review'">
                                     <strong>审核模式：</strong>解析完成后需要用户审核，可以选择关键字或直接编辑条目，确认后再写入账本
                                 </template>
@@ -132,22 +123,20 @@
                     <el-divider>解析引擎（仅用于账单分类）</el-divider>
                     <el-form-item label="解析引擎" prop="aiModel">
                         <div class="ai-engine-container">
-                            <el-select v-model="aiModel" placeholder="选择AI处理引擎" class="model-selector">
-                                <el-option label="单规则匹配" value="None" />
-                                <el-option label="BERT - 本地模型 (平衡模式)" value="BERT" />
-                                <el-option
-                                    label="DeepSeek - 云端大模型 (高精度模式)"
-                                    value="DeepSeek"
-                                    :disabled="!hasUserAssistantKey"
-                                />
+                            <el-select v-model="aiModel" :placeholder="isAuthenticated ? '选择解析引擎' : '默认解析'"
+                                class="model-selector" :disabled="!isAuthenticated">
+                                <el-option label="单规则匹配" value="None" :disabled="!isAuthenticated" />
+                                <el-option label="BERT - 本地模型（平衡模式）" value="BERT" :disabled="!isAuthenticated" />
+                                <el-option label="DeepSeek - 自有密钥（高精度模式）" value="DeepSeek"
+                                    :disabled="!isAuthenticated || !hasUserAssistantKey" />
                             </el-select>
 
-                            <el-alert
-                                v-if="engineDescription"
-                                type="info"
-                                :closable="false"
-                                class="engine-description-alert"
-                            >
+                            <el-alert v-if="!isAuthenticated" type="info" :closable="false"
+                                class="engine-description-alert">
+                                未登录时使用默认解析；登录后可选择单规则匹配、BERT 或自有 DeepSeek 密钥。
+                            </el-alert>
+                            <el-alert v-else-if="engineDescription" type="info" :closable="false"
+                                class="engine-description-alert">
                                 {{ engineDescription }}
                             </el-alert>
                         </div>
@@ -173,8 +162,7 @@
                     <el-form-item label="API 密钥">
                         <div class="api-key-row">
                             <el-input v-model="assistantApiKey" type="password"
-                                placeholder="未填写时 Copilot 可走平台密钥；云端解析需填写"
-                                show-password clearable />
+                                placeholder="未填写时 Copilot 可走平台密钥；自有解析引擎需填写" show-password clearable />
                             <el-button @click="testApiKey" :loading="loading.test">测试</el-button>
                         </div>
                     </el-form-item>
@@ -184,7 +172,7 @@
                     </el-form-item>
 
                     <el-alert type="info" :closable="false" class="engine-description-alert">
-                        Copilot 只读查询账本，不会改账。未填写密钥时可用平台密钥聊天，但不能使用云端解析；填写后 Copilot 与云端解析共用这一把密钥。
+                        Copilot 只读查询账本，不会改账。默认解析由平台自动完成；只有把解析引擎切到「DeepSeek - 自有密钥」时，才会使用这里填写的密钥与模型。
                     </el-alert>
                 </div>
             </el-collapse-item>
@@ -218,14 +206,18 @@ const formModel = computed(() => ({
     aiModel: aiModel.value,
     assistantApiKey: assistantApiKey.value,
 }))
-const formRules = computed(() => ({}))
+const formRules = computed(() => ({
+    aiModel: isAuthenticated.value
+        ? [{ required: true, message: '请选择解析引擎', trigger: 'change' }]
+        : [],
+}))
 
 // 修改提交方法
 const validateAndSubmit = async () => {
     try {
         await configForm.value?.validate()
         if (aiModel.value === 'DeepSeek' && !assistantApiKey.value.trim()) {
-            ElMessage.error('云端解析需要先在 Copilot 填写 API 密钥')
+            ElMessage.error('自有 DeepSeek 解析需要先在 BYOK 填写 API 密钥')
             return
         }
         await applyConfig()
@@ -291,7 +283,8 @@ const incomeTemplateId = ref<number | null>(null)
 const commissionTemplateId = ref<number | null>(null)
 const reconciliationFallbackAccountId = ref<number | null>(null)
 const currency = ref('')
-const aiModel = ref('BERT') // 默认使用 BERT
+const aiModel = ref('') // 未配置时由后端默认解析，前端不展示平台默认项
+const isAuthenticated = ref(hasAuthTokens())
 const assistantPreset = ref<AssistantPreset>('deepseek')
 const assistantBaseUrl = ref('')
 const assistantApiKey = ref('')
@@ -313,9 +306,11 @@ const hasUserAssistantKey = computed(() => assistantApiKey.value.trim() !== '')
 const engineDescription = computed(() => {
     switch (aiModel.value) {
         case 'None':
-            return '选择第一个'
+            return '仅按关键词与账户层级规则选择，不调用模型'
         case 'BERT':
-            return '默认推荐。分类在部署环境内完成，不调用云端大模型'
+            return '本地模型，不调用云端；仅在登录后手动选择时生效'
+        case 'DeepSeek':
+            return '使用你在 BYOK 中填写的密钥与模型'
         default:
             return ''
     }
@@ -323,13 +318,14 @@ const engineDescription = computed(() => {
 
 // 转换配置格式：前端 camelCase <-> 后端 snake_case
 const convertToFrontend = (config: Config) => {
+    const engine = config.ai_model === 'spaCy' ? 'BERT' : (config.ai_model || '')
     return {
         flag: config.flag,
         incomeTemplate: config.income_template || '',
         commissionTemplate: config.commission_template || '',
         reconciliationFallbackAccount: config.reconciliation_fallback_account || 'Equity:Adjustments',
         currency: config.currency || 'CNY',
-        aiModel: config.ai_model === 'spaCy' ? 'BERT' : (config.ai_model || 'BERT'),
+        aiModel: ['None', 'BERT', 'DeepSeek'].includes(engine) ? engine : '',
         assistantBaseUrl: config.assistant_base_url || '',
         assistantApiKey: config.assistant_api_key || config.deepseek_apikey || '',
         assistantModel: config.assistant_model || '',
@@ -434,7 +430,7 @@ const loadConfig = async () => {
             axios.get<Config>('config/')
         ])
         const frontendConfig = convertToFrontend(data)
-        aiModel.value = frontendConfig.aiModel
+        aiModel.value = isAuthenticated.value ? frontendConfig.aiModel : ''
         assistantBaseUrl.value = frontendConfig.assistantBaseUrl
         assistantApiKey.value = frontendConfig.assistantApiKey
         assistantModel.value = frontendConfig.assistantModel
@@ -466,10 +462,7 @@ const handleSkipAnonymous = () => {
 
 // 初始化加载配置
 onMounted(() => {
-    // 检查用户是否已登录
-    const isAuthenticated = hasAuthTokens()
-
-    if (isAuthenticated) {
+    if (isAuthenticated.value) {
         // 已登录用户直接加载配置
         loadConfig()
     } else {
@@ -497,11 +490,13 @@ const currentConfig = computed(() => {
         commission_template: commissionTemplate.value,
         reconciliation_fallback_account: reconciliationFallbackAccount.value,
         currency: currency.value,
-        ai_model: aiModel.value,
         parsing_mode_preference: parsingModePreference.value,
         assistant_base_url: assistantBaseUrl.value.trim(),
         assistant_api_key: assistantApiKey.value.trim(),
         assistant_model: assistantModel.value.trim(),
+    }
+    if (aiModel.value) {
+        config.ai_model = aiModel.value
     }
 
     return config
